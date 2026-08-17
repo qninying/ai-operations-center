@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How It Fits Together — AI Operations Center Blueprint</title>
+<meta name="description" content="The full architecture diagram, deployment topology, and security guarantee behind the AI Operations Center.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 3 of 7</div>
+      <h1>How It Fits Together</h1>
+      <p>Every arrow is labelled with the data or action crossing it. Only one arrow in this whole diagram is a write.</p>
+    </div>
+
+    <div class="section-block">
+      <h2>Architecture diagram</h2>
+      <div id="fig-architecture"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Layered another way</h2>
+      <p class="section-sub">The same 18 components, arranged left to right by how far a request has to travel from an external platform to a human.</p>
+      <div id="fig-arch-layers"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Deployment topology</h2>
+      <div class="card" id="deploy-notes"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Security notes</h2>
+      <div class="card" id="security-notes"></div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="assets/blueprint.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "architecture" });
+
+  Site.renderMermaidFigure("fig-architecture", {
+    title: "Full architecture (flowchart)",
+    source: BLUEPRINT.architecture.mermaid,
+    interpretation: BLUEPRINT.architecture.interpretation
+  });
+
+  Site.renderStaticFigure("fig-arch-layers", {
+    title: "Architecture by distance from production",
+    svgMarkup: Site.svg.architectureLayers(false),
+    interpretation: "Only the two rightmost-adjacent columns (Orchestrate and AI Agents) ever reach back left to the External column through the MCP Tool Gateway's write path — and only after approval."
+  });
+
+  document.getElementById("deploy-notes").textContent = BLUEPRINT.architecture.deploymentNotes;
+  document.getElementById("security-notes").textContent = BLUEPRINT.architecture.securityNotes;
+</script>
+</body>
+</html>

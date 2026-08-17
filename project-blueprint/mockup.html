@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Operations Center — Incident INC-4471</title>
+<style>
+  :root{
+    --bg:#eef2f6; --panel:#ffffff; --panel-2:#f8fafc; --border:#e2e8f0;
+    --text:#0f172a; --muted:#64748b; --faint:#94a3b8;
+    --blue:#2563eb; --teal:#0f766e; --amber:#d97706; --red:#dc2626; --green:#16a34a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'Segoe UI', -apple-system, system-ui, Arial, sans-serif;
+    font-size:14px; line-height:1.5;
+  }
+  a{color:inherit;}
+
+  /* ===== Top bar ===== */
+  .topbar{
+    display:flex; align-items:center; gap:18px; padding:12px 22px;
+    background:var(--panel-2); border-bottom:1px solid var(--border);
+  }
+  .brand{ display:flex; align-items:center; gap:10px; font-weight:700; font-size:15px; }
+  .brand .mark{
+    width:28px; height:28px; border-radius:8px;
+    background:linear-gradient(135deg,var(--blue),var(--teal));
+    display:flex; align-items:center; justify-content:center;
+  }
+  .nav{ display:flex; gap:4px; margin-left:12px; }
+  .nav a{
+    padding:8px 12px; border-radius:7px; font-size:13px; color:var(--muted); text-decoration:none;
+  }
+  .nav a.active{ background:rgba(15,118,110,.12); color:var(--teal); font-weight:600; }
+  .topbar-right{ margin-left:auto; display:flex; align-items:center; gap:14px; }
+  .env-pill{
+    font-size:11px; font-family:ui-monospace,Consolas,monospace; padding:4px 9px;
+    border-radius:20px; background:rgba(22,163,74,.12); color:var(--green);
+    border:1px solid rgba(22,163,74,.3);
+  }
+  .user{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--muted); }
+  .avatar{
+    width:26px; height:26px; border-radius:50%; background:var(--teal);
+    display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#ffffff;
+  }
+
+  /* ===== Layout ===== */
+  .shell{ display:flex; min-height:calc(100vh - 53px); }
+  .sidebar{
+    width:300px; flex:none; border-right:1px solid var(--border); background:var(--panel-2);
+    padding:16px 0;
+  }
+  .sidebar h4{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--faint);
+    margin:6px 18px 10px;
+  }
+  .incident-item{
+    display:block; padding:12px 18px; border-left:3px solid transparent; cursor:pointer;
+  }
+  .incident-item:hover{ background:rgba(15,23,42,.035); }
+  .incident-item.selected{ border-left-color:var(--teal); background:rgba(15,118,110,.08); }
+  .incident-item .row1{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+  .incident-item .id{ font-family:ui-monospace,Consolas,monospace; font-size:11.5px; color:var(--faint); }
+  .incident-item .title{ font-size:13px; font-weight:600; margin-bottom:3px; }
+  .incident-item .meta{ font-size:11.5px; color:var(--muted); }
+  .badge{
+    display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700;
+    padding:2px 8px; border-radius:20px; text-transform:uppercase; letter-spacing:.03em;
+  }
+  .badge.critical{ background:rgba(220,38,38,.12); color:var(--red); }
+  .badge.pending{ background:rgba(217,119,6,.12); color:var(--amber); }
+  .badge.resolved{ background:rgba(22,163,74,.12); color:var(--green); }
+  .badge.watching{ background:rgba(37,99,235,.12); color:var(--blue); }
+
+  main{ flex:1; padding:26px 34px 60px; max-width:980px; }
+
+  .incident-header{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:22px; }
+  .incident-header h1{ font-size:21px; margin:0 0 6px; }
+  .incident-header .sub{ font-size:12.5px; color:var(--muted); font-family:ui-monospace,Consolas,monospace; }
+  .header-badges{ display:flex; gap:8px; }
+
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:18px 20px; margin-bottom:16px;
+    box-shadow:0 1px 2px rgba(15,23,42,.04), 0 6px 16px rgba(15,23,42,.05);
+  }
+  .card h3{
+    display:flex; align-items:center; gap:8px; font-size:12.5px; text-transform:uppercase;
+    letter-spacing:.05em; color:var(--muted); margin:0 0 12px; font-weight:700;
+  }
+  .card h3 svg{ flex:none; }
+
+  .event-row{
+    display:flex; gap:12px; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px;
+  }
+  .event-row:last-child{ border-bottom:none; }
+  .event-row .t{ font-family:ui-monospace,Consolas,monospace; color:var(--faint); flex:none; width:76px; }
+  .event-row .src{ flex:none; width:120px; color:var(--teal); font-weight:600; }
+  .event-row .desc{ color:var(--text); }
+
+  .ai-card{ border-color:rgba(15,118,110,.3); background:linear-gradient(180deg,rgba(15,118,110,.06),var(--panel)); }
+  .ai-card p{ margin:0; font-size:14.5px; line-height:1.65; }
+  .ai-card .confidence{ margin-top:12px; font-size:11.5px; color:var(--faint); }
+
+  .impact-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .impact-stat{ background:var(--panel-2); border-radius:10px; padding:12px 14px; box-shadow:0 1px 2px rgba(15,23,42,.03); }
+  .impact-stat .num{ font-size:20px; font-weight:700; color:var(--amber); }
+  .impact-stat .lbl{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .affected-list{ margin:12px 0 0; padding:0; list-style:none; font-size:13px; }
+  .affected-list li{ padding:5px 0; display:flex; align-items:center; gap:8px; color:var(--text); }
+  .affected-list li .dot{ width:6px; height:6px; border-radius:50%; background:var(--amber); flex:none; }
+
+  .tabs{ display:flex; gap:6px; margin-bottom:10px; }
+  .tab{
+    font-size:12px; font-weight:600; padding:6px 13px; border-radius:7px; cursor:pointer;
+    color:var(--muted); background:transparent; border:1px solid var(--border);
+  }
+  .tab.active{ background:rgba(15,118,110,.12); color:var(--teal); border-color:transparent; }
+
+  .code-block{
+    background:#f1f5f9; border:1px solid var(--border); border-radius:10px; padding:14px 16px;
+    font-family:ui-monospace,Consolas,monospace; font-size:12.5px; color:var(--teal); overflow-x:auto;
+    white-space:pre;
+  }
+
+  .action-row{ display:flex; gap:10px; margin-top:16px; }
+  .btn{
+    font-size:13px; font-weight:700; padding:10px 18px; border-radius:10px; border:none; cursor:pointer;
+    display:inline-flex; align-items:center; gap:7px;
+  }
+  .btn.approve{ background:var(--green); color:#ffffff; }
+  .btn.reject{ background:transparent; color:var(--red); border:1px solid rgba(220,38,38,.4); }
+  .btn.ghost{ background:transparent; color:var(--muted); border:1px solid var(--border); }
+
+  .approval-note{ font-size:12px; color:var(--faint); margin-top:10px; }
+
+  .audit-strip{
+    margin-top:22px; padding:12px 16px; border-top:1px solid var(--border);
+    display:flex; align-items:center; gap:8px; font-size:12px; color:var(--faint);
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <span class="mark">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v6c0 5 4 9 9 9s9-4 9-9V7l-9-5z" fill="white" opacity=".95"/></svg>
+    </span>
+    AI Operations Center
+  </div>
+  <nav class="nav">
+    <a class="active" href="#">Incidents</a>
+    <a href="#">Dependency Map</a>
+    <a href="#">Audit Log</a>
+  </nav>
+  <div class="topbar-right">
+    <span class="env-pill">● Monitoring 42 hosts — Read-Only</span>
+    <div class="user">
+      <div class="avatar">MC</div>
+      M. Chen · Approver
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+  <aside class="sidebar">
+    <h4>Open Incidents</h4>
+    <div class="incident-item selected">
+      <div class="row1"><span class="id">INC-4471</span><span class="badge critical">Critical</span></div>
+      <div class="title">SSIS load blocked by SQL Server chain</div>
+      <div class="meta">PROD-SQL02 · 2 min ago</div>
+    </div>
+    <div class="incident-item">
+      <div class="row1"><span class="id">INC-4469</span><span class="badge watching">Watching</span></div>
+      <div class="title">SSRS report generation latency rising</div>
+      <div class="meta">RPT-SRV01 · 18 min ago</div>
+    </div>
+    <h4 style="margin-top:20px;">Resolved Today</h4>
+    <div class="incident-item">
+      <div class="row1"><span class="id">INC-4468</span><span class="badge resolved">Resolved</span></div>
+      <div class="title">Windows disk space warning</div>
+      <div class="meta">FILE-SRV03 · 6:02 AM</div>
+    </div>
+    <div class="incident-item">
+      <div class="row1"><span class="id">INC-4463</span><span class="badge resolved">Resolved</span></div>
+      <div class="title">SSIS package timeout, auto-recovered</div>
+      <div class="meta">ETL-SRV01 · 1:47 AM</div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="incident-header">
+      <div>
+        <div class="header-badges" style="margin-bottom:8px;">
+          <span class="badge critical">Critical</span>
+          <span class="badge pending">Pending Approval</span>
+        </div>
+        <h1>SSIS load blocked by a SQL Server blocking chain</h1>
+        <div class="sub">INC-4471 · Correlated from 2 events · Detected 02:14:03 UTC</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Correlated Events
+      </h3>
+      <div class="event-row">
+        <span class="t">02:14:03</span>
+        <span class="src">PROD-SQL02</span>
+        <span class="desc">Blocking chain detected on <code>dbo.SalesFact</code> — head blocker: index rebuild, running 41 min</span>
+      </div>
+      <div class="event-row">
+        <span class="t">02:14:41</span>
+        <span class="src">ETL-SRV01</span>
+        <span class="desc">SSIS package <code>Load_DailySales</code> failed — exit code 3, timeout after 30 min</span>
+      </div>
+    </div>
+
+    <div class="card ai-card">
+      <h3>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.5 6.5L21 11l-6.5 2.5L12 20l-2.5-6.5L3 11l6.5-2.5z"/></svg>
+        Root Cause — explained by Claude
+      </h3>
+      <p>A scheduled index rebuild on <code>dbo.SalesFact</code> started at 01:33 and was still holding a lock at 02:14, well past its usual 15-minute window. The nightly <code>Load_DailySales</code> SSIS package tried to write to the same table, waited the full 30-minute timeout, and failed. The index rebuild is the root event — the SSIS failure is a downstream symptom, not a separate problem.</p>
+      <div class="confidence">Reasoning based on 2 correlated events · read-only diagnostic query via MCP Tool Gateway</div>
+    </div>
+
+    <div class="card">
+      <h3>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/></svg>
+        Downstream Business Impact
+      </h3>
+      <div class="impact-grid">
+        <div class="impact-stat"><div class="num">3</div><div class="lbl">SSRS reports affected</div></div>
+        <div class="impact-stat"><div class="num">~45 min</div><div class="lbl">Expected delay to executives</div></div>
+      </div>
+      <ul class="affected-list">
+        <li><span class="dot"></span> Daily Sales Summary — used in 8 AM leadership standup</li>
+        <li><span class="dot"></span> Regional Performance Dashboard</li>
+        <li><span class="dot"></span> Executive KPI Rollup</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Recommended Remediation — requires your approval
+      </h3>
+      <p style="margin:0 0 10px; font-size:13.5px; color:var(--muted);">
+        Terminate the blocking index rebuild and re-queue the SSIS load. This is classified <strong style="color:var(--amber)">high-risk</strong> because it kills an in-progress operation on a production database.
+      </p>
+      <div class="code-block">-- Generated diagnostic / remediation script
+KILL 82;  -- SPID holding the blocking lock on dbo.SalesFact
+GO
+EXEC msdb.dbo.sp_start_job N'Load_DailySales_Retry';</div>
+      <div class="action-row">
+        <button class="btn approve">✓ Approve &amp; Run</button>
+        <button class="btn reject">✕ Reject</button>
+        <button class="btn ghost">View Full Diagnostics</button>
+      </div>
+      <div class="approval-note">Execution Service will not run anything on PROD-SQL02 until this is approved here.</div>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <span class="tab active">Technical Summary</span>
+        <span class="tab">Executive Summary</span>
+      </div>
+      <p style="margin:0; font-size:13.5px; color:var(--muted);">
+        "PROD-SQL02: long-running index rebuild on dbo.SalesFact held a lock past its window, causing Load_DailySales (ETL-SRV01) to time out after 30 min. Recommend killing SPID 82 and re-queuing the job. No data loss risk; job is idempotent."
+      </p>
+    </div>
+
+    <div class="audit-strip">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h5"/></svg>
+      Every event, query, and decision on this incident is being written to the Audit Log Store in real time.
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

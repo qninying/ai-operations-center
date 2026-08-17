@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Components — AI Operations Center Blueprint</title>
+<meta name="description" content="Every component in the AI Operations Center architecture, grouped by category, with the words that required it and the recommended technology.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 2 of 7</div>
+      <h1>Components</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>Grouped by layer</h2>
+      <p class="section-sub">Read-only collection at the top, the human at the bottom — every component sits in exactly one layer.</p>
+      <div id="fig-layers"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Every component</h2>
+      <p class="section-sub">Full technology fit ratings and reasoning: <a href="tech-stack.md">tech-stack.md</a>.</p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Component</th><th>Category</th><th style="width:30%">What it does</th><th>Words that required it</th><th>Technology</th></tr>
+          </thead>
+          <tbody id="comp-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/blueprint.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "components" });
+
+  document.getElementById("page-sub").textContent =
+    BLUEPRINT.components.length + " components — every one traces back to a specific phrase in the idea. No frontend, queue, or database was added beyond what the idea required.";
+
+  Site.renderStaticFigure("fig-layers", {
+    title: "Components grouped into layers",
+    svgMarkup: Site.svg.componentLayers(false),
+    interpretation: "Reading top to bottom follows the trust boundary: everything above the services layer can only read; only the Execution Service, gated by Approval, can write."
+  });
+
+  var categoryLabel = {};
+  BLUEPRINT.categories.forEach(function (c) { categoryLabel[c.id] = c.label; });
+  var pillClass = {
+    collector: "pill-blue", infra: "pill-slate", store: "pill-slate", service: "pill-teal",
+    agent: "pill-teal", frontend: "pill-info", external: "pill-amber", actor: "pill-green"
+  };
+
+  var tbody = document.getElementById("comp-tbody");
+  tbody.innerHTML = BLUEPRINT.components.map(function (c) {
+    var words = c.words.map(function (w) { return '<span class="word-chip">' + Site.escapeHtml(w) + '</span>'; }).join(" ");
+    return '<tr class="component-row">' +
+      '<td><strong>' + Site.escapeHtml(c.name) + '</strong></td>' +
+      '<td><span class="pill ' + (pillClass[c.category] || "pill-slate") + '">' + Site.escapeHtml(categoryLabel[c.category] || c.category) + '</span></td>' +
+      '<td>' + Site.escapeHtml(c.summary) + '</td>' +
+      '<td>' + words + '</td>' +
+      '<td class="mono">' + Site.escapeHtml(c.technology) + '</td>' +
+      '</tr>';
+  }).join("");
+  Site.registerSearchable(".component-row");
+</script>
+</body>
+</html>

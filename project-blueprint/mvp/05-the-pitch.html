@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Pitch — AI Operations Center Week 1 MVP</title>
+<meta name="description" content="The one-page pitch for the AI Operations Center: who needs it, why it matters, and which claims are estimates versus design guarantees.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 5 of 7</div>
+      <h1>The Pitch</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>Open the one-pager</h2>
+      <p class="section-sub" id="pitch-open-note-top"></p>
+      <a class="big-link" id="pitch-link" href="../one-pager.pdf" target="_blank" rel="noopener">
+        <span class="big-link-glyph" aria-hidden="true">⇩</span>
+        <span class="big-link-text">
+          <span class="big-link-title" id="pitch-headline"></span>
+          <span class="big-link-sub">One-page PDF — no jargon, written for a funder or a colleague in the hallway</span>
+        </span>
+        <span class="big-link-arrow" aria-hidden="true">↗</span>
+      </a>
+      <p class="big-link-note" id="pitch-note"></p>
+    </div>
+
+    <div class="section-block">
+      <div class="card" id="pitch-subhead-card" style="font-size:16px; line-height:1.7; border-left: 4px solid var(--accent);"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Who needs it, and why now</h2>
+      <div class="info-list">
+        <div class="info-row"><span class="info-dot" style="background:var(--c-teal,#0f766e)"></span><span><strong>Who</strong> — <span id="pitch-who"></span></span><span></span></div>
+        <div class="info-row"><span class="info-dot" style="background:var(--c-amber,#b45309)"></span><span><strong>Why it matters</strong> — <span id="pitch-why"></span></span><span></span></div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="group-header"><h2>What's actually being claimed</h2><span class="group-count" id="bullets-count"></span></div>
+      <p class="section-sub">Every claim is labeled — most are estimates, not measurements, and the one that isn't is a fact about how the system is built, not a performance promise.</p>
+      <div class="info-list" id="bullets-list"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>What's next</h2>
+      <div class="card" id="whats-next-card" style="border-left: 4px solid var(--c-teal,#0f766e);"></div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/mvp.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "pitch" });
+
+  document.getElementById("page-sub").textContent =
+    "The marketing case in plain language — " + MVP.pitch.bullets.length + " claims, each labeled honestly.";
+
+  document.getElementById("pitch-open-note-top").textContent =
+    "The full one-pager is a real, single-page PDF. Everything in it is also summarized below, so this page stands on its own.";
+  document.getElementById("pitch-headline").textContent = MVP.pitch.headline;
+  document.getElementById("pitch-note").textContent = MVP.pitch.openNote;
+  document.getElementById("pitch-link").setAttribute("href", MVP.pitch.file);
+
+  document.getElementById("pitch-subhead-card").textContent = MVP.pitch.subhead;
+  document.getElementById("pitch-who").textContent = MVP.pitch.who;
+  document.getElementById("pitch-why").textContent = MVP.pitch.why;
+
+  document.getElementById("bullets-count").textContent = MVP.pitch.bullets.length + " claims";
+
+  document.getElementById("bullets-list").innerHTML = MVP.pitch.bullets.map(function (b) {
+    var pillClass = b.tone === "green" ? "pill-green" : "pill-amber";
+    return '<div class="info-row bullet-row" style="grid-template-columns:20px 1fr auto;">' +
+      '<span class="info-dot" style="background:var(--c-' + (b.tone === "green" ? "green" : "amber") + ',#b45309)"></span>' +
+      '<span><strong>' + Site.escapeHtml(b.claim) + '</strong><br><span style="color:var(--muted);font-size:13px;">' + Site.escapeHtml(b.detail) + '</span></span>' +
+      '<span class="pill ' + pillClass + '">' + Site.escapeHtml(b.label) + '</span>' +
+    '</div>';
+  }).join("");
+  Site.registerSearchable(".bullet-row");
+
+  document.getElementById("whats-next-card").textContent = MVP.pitch.whatsNext;
+</script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What's Cut — AI Operations Center Week 1 MVP</title>
+<meta name="description" content="Everything deliberately left out of the AI Operations Center Week 1 MVP, what each cut would have proved, and why that isn't this week's question.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 3 of 7</div>
+      <h1>What's Cut</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>Kept vs. deleted</h2>
+      <p class="section-sub">The left column is the entire build. The right column is everything named in the architecture and stack that is deliberately not being built this week.</p>
+      <div id="fig-kept"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="group-header"><h2>What you are NOT building, and why that's safe</h2><span class="group-count" id="cuts-count"></span></div>
+      <p class="section-sub">Every cut is paired with the thing it would have proved, so nobody has to guess later whether it was forgotten or refused. Use the search box in the top bar to narrow this table.</p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th style="width:22%">Cut</th><th style="width:30%">What it would prove</th><th>Why that isn't this week's question</th></tr></thead>
+          <tbody id="cuts-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="group-header"><h2>For contrast: what you ARE building</h2><span class="group-count" id="building-count"></span></div>
+      <p class="section-sub">The full list from <a href="01-the-bet.html">The Bet</a>, restated here so the ratio is visible on one page.</p>
+      <div class="info-list" id="building-list"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>The stack, cut down to Week 1</h2>
+      <p class="section-sub">Component by component: what <a href="../tech-stack.md">tech-stack.md</a> recommends in full, and what actually gets used this week.</p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th style="width:24%">Component</th><th style="width:32%">Full recommendation</th><th>Week 1</th></tr></thead>
+          <tbody id="cutdown-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/mvp.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "cuts" });
+
+  document.getElementById("page-sub").textContent =
+    MVP.cuts.length + " deliberate cuts against " + MVP.building.length + " things kept. Each cut names what it would have proved — none of them were forgotten.";
+
+  Site.renderStaticFigure("fig-kept", {
+    title: "Kept vs. deleted",
+    svg: Site.svg.keptVsCut,
+    interpretation: "The right pile is more than twice the left. That imbalance is the plan — a week that builds everything proves nothing in particular."
+  });
+
+  document.getElementById("cuts-count").textContent = MVP.cuts.length + " cuts";
+
+  document.getElementById("cuts-tbody").innerHTML = MVP.cuts.map(function (c) {
+    return '<tr class="cut-row">' +
+      '<td><strong>' + Site.escapeHtml(c.cut) + '</strong></td>' +
+      '<td>' + Site.escapeHtml(c.proves) + '</td>' +
+      '<td>' + Site.escapeHtml(c.whyNot) + '</td>' +
+    '</tr>';
+  }).join("");
+  Site.registerSearchable(".cut-row");
+
+  document.getElementById("building-count").textContent = MVP.building.length + " kept";
+
+  document.getElementById("building-list").innerHTML = MVP.building.map(function (b) {
+    return '<div class="info-row"><span class="info-dot" style="background:var(--c-green,#15803d)"></span>' +
+      '<span><strong>' + Site.escapeHtml(b.component) + '</strong> — ' + Site.escapeHtml(b.short) + '</span>' +
+      '<span class="info-note">kept</span></div>';
+  }).join("");
+
+  document.getElementById("cutdown-tbody").innerHTML = MVP.stackCutdown.map(function (s) {
+    return '<tr class="cutdown-row">' +
+      '<td><strong>' + Site.escapeHtml(s.component) + '</strong></td>' +
+      '<td class="mono">' + Site.escapeHtml(s.full) + '</td>' +
+      '<td><span class="pill ' + (s.kept ? "pill-green" : "pill-red") + '">' + (s.kept ? "kept" : "cut") + '</span> ' + Site.escapeHtml(s.week1) + '</td>' +
+    '</tr>';
+  }).join("");
+  Site.registerSearchable(".cutdown-row");
+</script>
+</body>
+</html>

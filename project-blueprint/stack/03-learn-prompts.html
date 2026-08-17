@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learn-More Prompts — AI Operations Center Tech Stack</title>
+<meta name="description" content="Every copy-ready learning prompt for the AI Operations Center tech stack, collected in one place.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 3 of 8</div>
+      <h1>Learn-More Prompts</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <div id="prompt-list"></div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/stack.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "prompts" });
+
+  document.getElementById("page-sub").textContent =
+    STACK.recommendations.length + " prompts, each naming this project by name — paste any one into a new conversation to go deeper on that specific technology.";
+
+  var list = document.getElementById("prompt-list");
+  list.innerHTML = STACK.recommendations.map(function (r) {
+    return '<div class="rec-card component-row">' +
+      '<div class="rec-head">' +
+        '<div><div class="rec-title">' + Site.escapeHtml(r.component) + '</div><div class="rec-tech">' + Site.escapeHtml(r.technology) + '</div></div>' +
+        '<span class="pill ' + Site.fitPillClass(r.fit) + '">' + Site.fitIcon(r.fit) + '</span>' +
+      '</div>' +
+      Site.renderCopyRow(r.learnPrompt) +
+    '</div>';
+  }).join("");
+  Site.registerSearchable(".component-row");
+  Site.wireCopyButtons(list);
+</script>
+</body>
+</html>

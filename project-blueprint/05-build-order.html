@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build Order — AI Operations Center Blueprint</title>
+<meta name="description" content="Six build phases for the AI Operations Center, each proving one capability before the next depends on it.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap-narrow">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 5 of 7</div>
+      <h1>Build Order</h1>
+      <p>The riskiest capability — anything that can write to production — is scheduled last, on purpose.</p>
+    </div>
+
+    <div class="section-block">
+      <h2>Phases, proportional to duration</h2>
+      <p class="section-sub">Red-bordered segment is the make-or-break phase — the first time the system can act, not just advise.</p>
+      <div id="fig-timeline"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Gantt</h2>
+      <div id="fig-gantt"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Phases in detail</h2>
+      <div id="phase-list"></div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="assets/blueprint.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "buildorder" });
+
+  Site.renderStaticFigure("fig-timeline", {
+    title: "Build phases, proportional to weeks",
+    svgMarkup: Site.svg.phaseTimeline(false),
+    interpretation: "Five phases build and prove read-only capability before Phase 6 introduces the one component that can write to production."
+  });
+
+  Site.renderMermaidFigure("fig-gantt", {
+    title: "Gantt",
+    source: BLUEPRINT.buildOrder.mermaid,
+    interpretation: BLUEPRINT.buildOrder.interpretation
+  });
+
+  var riskPill = { low: "pill-green", medium: "pill-amber", high: "pill-red" };
+  var list = document.getElementById("phase-list");
+  list.innerHTML = BLUEPRINT.buildOrder.phases.map(function (p) {
+    return '<div class="card phase-row" style="margin-bottom:12px;">' +
+      '<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">' +
+        '<span class="pill pill-info">Phase ' + p.n + '</span>' +
+        '<strong style="font-size:15px;">' + Site.escapeHtml(p.name) + '</strong>' +
+        '<span class="pill ' + (riskPill[p.risk] || "pill-slate") + '">' + Site.escapeHtml(p.risk) + ' risk</span>' +
+        '<span class="pill pill-slate">' + p.weeks + ' weeks</span>' +
+      '</div>' +
+      '<p style="margin:0 0 6px; font-size:13.5px;"><strong>Builds:</strong> ' + Site.escapeHtml(p.builds.join(", ")) + '</p>' +
+      '<p style="margin:0; font-size:13.5px; color:var(--muted);"><strong>Proves:</strong> ' + Site.escapeHtml(p.proves) + '</p>' +
+    '</div>';
+  }).join("");
+  Site.registerSearchable(".phase-row");
+</script>
+</body>
+</html>

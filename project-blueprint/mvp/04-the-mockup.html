@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Mockup — AI Operations Center Week 1 MVP</title>
+<meta name="description" content="The Operations Console screen for the AI Operations Center, drawn as a schematic — and the five things worth noticing in it.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 4 of 7</div>
+      <h1>The Mockup</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>Open the mockup</h2>
+      <p class="section-sub" id="mockup-intro"></p>
+      <a class="big-link" id="mockup-link" href="../mockup.html" target="_blank" rel="noopener">
+        <span class="big-link-glyph" aria-hidden="true">▤</span>
+        <span class="big-link-text">
+          <span class="big-link-title">Open the Operations Console mockup</span>
+          <span class="big-link-sub" id="mockup-sub"></span>
+        </span>
+        <span class="big-link-arrow" aria-hidden="true">↗</span>
+      </a>
+      <p class="big-link-note" id="mockup-note"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>What's on the screen</h2>
+      <p class="section-sub">A schematic of the layout, not a screenshot — three regions, and what each one holds. Expand it to read the labels full-screen.</p>
+      <div id="fig-wireframe"></div>
+      <div class="info-list" id="regions-list"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="group-header"><h2>Things worth noticing</h2><span class="group-count" id="notes-count"></span></div>
+      <p class="section-sub">The mockup draws the finished product. Week 1 builds a slice of it — these notes mark where the drawing and the plan part company.</p>
+      <div class="info-list" id="notes-list"></div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/mvp.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "mockup" });
+
+  document.getElementById("page-sub").textContent =
+    "One incident, its evidence, its root cause, and both summaries on a single screen — plus " + MVP.mockup.notes.length + " things worth noticing about what is and isn't in it.";
+
+  document.getElementById("mockup-intro").textContent = MVP.mockup.intro;
+  document.getElementById("mockup-sub").textContent = MVP.mockup.title;
+  document.getElementById("mockup-note").textContent = MVP.mockup.openNote;
+  document.getElementById("mockup-link").setAttribute("href", MVP.mockup.file);
+
+  Site.renderStaticFigure("fig-wireframe", {
+    title: "Operations Console — screen layout",
+    svg: Site.svg.consoleWireframe,
+    interpretation: "Top bar, left sidebar, main panel. Week 1 builds only the middle of the main panel — correlated events, root cause, and the two summaries — with no sidebar, no nav, and no approval row."
+  });
+
+  document.getElementById("regions-list").innerHTML = MVP.mockup.regions.map(function (r) {
+    return '<div class="info-row"><span class="info-dot" style="background:var(--c-teal,#0f766e)"></span>' +
+      '<span><strong>' + Site.escapeHtml(r.label) + '</strong> — ' + Site.escapeHtml(r.detail) + '</span><span></span></div>';
+  }).join("");
+
+  document.getElementById("notes-count").textContent = MVP.mockup.notes.length + " notes";
+
+  document.getElementById("notes-list").innerHTML = MVP.mockup.notes.map(function (n, i) {
+    return '<div class="info-row note-row"><span class="info-dot" style="background:var(--c-info,#0369a1)"></span>' +
+      '<span>' + Site.escapeHtml(n) + '</span><span class="info-note">' + (i + 1) + '</span></div>';
+  }).join("");
+  Site.registerSearchable(".note-row");
+</script>
+</body>
+</html>

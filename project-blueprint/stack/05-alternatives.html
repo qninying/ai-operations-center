@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alternatives Considered — AI Operations Center Tech Stack</title>
+<meta name="description" content="The runner-up technology for every decision in the AI Operations Center tech stack, and why it lost.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 5 of 8</div>
+      <h1>Alternatives Considered</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Component</th><th>Chosen</th><th>Runner-up</th><th style="width:38%">Why not chosen</th></tr></thead>
+          <tbody id="alt-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/stack.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "alternatives" });
+
+  document.getElementById("page-sub").textContent =
+    "Every component with a real runner-up, and the specific reason it didn't win — including the two genuinely close calls (Event Bus, Operations Console).";
+
+  var tbody = document.getElementById("alt-tbody");
+  tbody.innerHTML = STACK.recommendations.filter(function (r) { return r.alternative && r.alternative.name !== "—"; }).map(function (r) {
+    return '<tr class="component-row">' +
+      '<td><strong>' + Site.escapeHtml(r.component) + '</strong></td>' +
+      '<td class="mono">' + Site.escapeHtml(r.technology) + '</td>' +
+      '<td class="mono">' + Site.escapeHtml(r.alternative.name) + '</td>' +
+      '<td>' + Site.escapeHtml(r.alternative.why) + '</td>' +
+    '</tr>';
+  }).join("");
+  Site.registerSearchable(".component-row");
+</script>
+</body>
+</html>

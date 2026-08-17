@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What This Doesn't Tell You — AI Operations Center Tech Stack</title>
+<meta name="description" content="What the AI Operations Center tech stack document deliberately leaves unresolved, and why.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 7 of 8</div>
+      <h1>What This Document Does Not Tell You</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>Explicitly out of scope</h2>
+      <div class="info-list" id="notcovered-list"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Least confident calls</h2>
+      <p class="section-sub">Restated here from the Summary page — the three recommendations worth a second, independent look before committing.</p>
+      <div class="info-list" id="least-confident-list"></div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/stack.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "notcovered" });
+
+  document.getElementById("page-sub").textContent =
+    STACK.notCovered.length + " things this document deliberately leaves unresolved — naming a gap honestly is more useful than a false sense of completeness.";
+
+  var list = document.getElementById("notcovered-list");
+  list.innerHTML = STACK.notCovered.map(function (n) {
+    return '<div class="info-row component-row"><span class="info-dot" style="background:var(--c-slate,#475569)"></span>' +
+      '<span><strong>' + Site.escapeHtml(n.item) + '</strong> — ' + Site.escapeHtml(n.why) + '</span><span></span></div>';
+  }).join("");
+  Site.registerSearchable(".component-row");
+
+  var lc = document.getElementById("least-confident-list");
+  lc.innerHTML = STACK.leastConfident.map(function (l) {
+    return '<div class="info-row"><span class="info-dot" style="background:var(--c-info,#0369a1)"></span>' +
+      '<span><strong>' + Site.escapeHtml(l.component) + '</strong> — ' + Site.escapeHtml(l.why) + '</span><span></span></div>';
+  }).join("");
+</script>
+</body>
+</html>

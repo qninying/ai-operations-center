@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Hard to Undo — AI Operations Center Tech Stack</title>
+<meta name="description" content="Which technology decisions in the AI Operations Center stack are a config change, and which ones you'll live with for years.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 6 of 8</div>
+      <h1>How Hard Each Decision Is to Undo</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>The lock-in scale</h2>
+      <p class="section-sub">Which Claude model tier an agent calls is trivially reversible; which database holds the Incident Store, and which message bus carries every event, are not.</p>
+      <div id="fig-lockin"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Component</th><th>Technology</th><th style="width:110px">Undo cost</th><th>Why</th></tr></thead>
+          <tbody id="lockin-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/stack.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "lockin" });
+
+  document.getElementById("page-sub").textContent =
+    "Spend the most deliberation on the “hard” row before committing — that's where a wrong call is expensive to walk back.";
+
+  Site.renderStaticFigure("fig-lockin", {
+    title: "Every decision, by undo cost",
+    svg: Site.svg.lockInScale,
+    interpretation: "The Execution Service, Incident Store, Audit Log Store, Event Bus, and hosting layer are all “hard” — notably, that's also where most of the security and compliance weight of this design sits."
+  });
+
+  var lockInPill = { easy: "pill-green", moderate: "pill-amber", hard: "pill-red" };
+  var tbody = document.getElementById("lockin-tbody");
+  var order = { hard: 0, moderate: 1, easy: 2 };
+  var sorted = STACK.recommendations.slice().sort(function (a, b) { return order[a.lockIn] - order[b.lockIn]; });
+  tbody.innerHTML = sorted.map(function (r) {
+    return '<tr class="component-row">' +
+      '<td><strong>' + Site.escapeHtml(r.component) + '</strong></td>' +
+      '<td class="mono">' + Site.escapeHtml(r.technology) + '</td>' +
+      '<td><span class="pill ' + lockInPill[r.lockIn] + '">' + Site.escapeHtml(r.lockIn) + '</span></td>' +
+      '<td>' + Site.escapeHtml(r.lockInWhy || "") + '</td>' +
+    '</tr>';
+  }).join("");
+  Site.registerSearchable(".component-row");
+</script>
+</body>
+</html>

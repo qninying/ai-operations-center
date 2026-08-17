@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coverage — AI Operations Center Blueprint</title>
+<meta name="description" content="What the AI Operations Center design covers, what's partial, what's explicitly out of scope, and the one open question that would most change it.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap-narrow">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 7 of 7</div>
+      <h1>Coverage &amp; What This Design Does Not Cover</h1>
+      <p>An honest accounting — what's handled, what's partial, and what was deliberately left out.</p>
+    </div>
+
+    <div class="section-block">
+      <h2>Coverage grid</h2>
+      <p class="section-sub" id="coverage-sub"></p>
+      <div id="fig-coverage-grid"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Coverage breakdown</h2>
+      <div id="fig-coverage-chart"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Every concern, listed</h2>
+      <div class="coverage-list" id="coverage-list"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>What this design does not cover</h2>
+      <div id="not-covered-list"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>The one open question</h2>
+      <p class="section-sub" id="oq-question"></p>
+      <div id="fig-fork"></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px;">
+        <div class="card" style="border-left:4px solid var(--c-green);">
+          <div class="pill pill-green" style="margin-bottom:8px;" id="fork-a-label"></div>
+          <p style="margin:0; font-size:13.5px;" id="fork-a-consequence"></p>
+        </div>
+        <div class="card" style="border-left:4px solid var(--c-amber);">
+          <div class="pill pill-amber" style="margin-bottom:8px;" id="fork-b-label"></div>
+          <p style="margin:0; font-size:13.5px;" id="fork-b-consequence"></p>
+        </div>
+      </div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="assets/blueprint.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "coverage" });
+
+  var covered = BLUEPRINT.coverage.filter(function (c) { return c.status === "covered"; }).length;
+  var partial = BLUEPRINT.coverage.filter(function (c) { return c.status === "partial"; }).length;
+  var notCoveredCount = BLUEPRINT.coverage.filter(function (c) { return c.status === "not-covered"; }).length;
+
+  document.getElementById("coverage-sub").textContent =
+    BLUEPRINT.coverage.length + " concerns tracked — " + covered + " covered, " + partial + " partial, " + notCoveredCount + " not covered.";
+
+  Site.renderStaticFigure("fig-coverage-grid", {
+    title: "Coverage, conditional-formatted",
+    svgMarkup: Site.svg.coverageGrid(false),
+    interpretation: "Every red cell below has a matching entry in “What this design does not cover” — nothing is silently missing."
+  });
+
+  Site.renderChartFigure("fig-coverage-chart", {
+    title: "Coverage status breakdown",
+    config: {
+      type: "doughnut",
+      data: {
+        labels: ["Covered", "Partial", "Not covered"],
+        datasets: [{
+          data: [covered, partial, notCoveredCount],
+          backgroundColor: ["#15803d", "#b45309", "#b91c1c"]
+        }]
+      },
+      options: { plugins: { legend: { position: "bottom" } } }
+    },
+    interpretation: covered + " of " + BLUEPRINT.coverage.length + " tracked concerns are fully covered by a named component; the rest are explicit, not accidental, gaps."
+  });
+
+  var statusPill = { covered: "pill-green", partial: "pill-amber", "not-covered": "pill-red" };
+  var statusLabel = { covered: "Covered", partial: "Partial", "not-covered": "Not covered" };
+  var covList = document.getElementById("coverage-list");
+  covList.innerHTML = BLUEPRINT.coverage.map(function (c) {
+    return '<div class="coverage-row assumption-row">' +
+      '<span class="coverage-dot" style="background:' + (c.status === "covered" ? "var(--c-green)" : c.status === "partial" ? "var(--c-amber)" : "var(--c-red)") + '"></span>' +
+      '<span>' + Site.escapeHtml(c.concern) + '<div class="coverage-note">' + Site.escapeHtml(c.note) + '</div></span>' +
+      '<span class="pill ' + statusPill[c.status] + '">' + statusLabel[c.status] + '</span>' +
+    '</div>';
+  }).join("");
+  Site.registerSearchable(".coverage-row");
+
+  var ncList = document.getElementById("not-covered-list");
+  ncList.innerHTML = BLUEPRINT.notCovered.map(function (n) {
+    return '<div class="card assumption-row" style="margin-bottom:12px; border-left:4px solid var(--c-red);">' +
+      '<strong style="font-size:14px;">' + Site.escapeHtml(n.item) + '</strong>' +
+      '<p style="margin:6px 0 0; font-size:13.5px; color:var(--muted);">' + Site.escapeHtml(n.why) + '</p>' +
+    '</div>';
+  }).join("");
+
+  document.getElementById("oq-question").textContent = BLUEPRINT.openQuestion.question;
+  Site.renderStaticFigure("fig-fork", {
+    title: "Two-branch fork",
+    svgMarkup: Site.svg.openQuestionFork(false),
+    interpretation: "Whichever branch is true changes what the Approval Workflow Service and Execution Service actually need to be."
+  });
+  document.getElementById("fork-a-label").textContent = BLUEPRINT.openQuestion.forkA.label;
+  document.getElementById("fork-a-consequence").textContent = BLUEPRINT.openQuestion.forkA.consequence;
+  document.getElementById("fork-b-label").textContent = BLUEPRINT.openQuestion.forkB.label;
+  document.getElementById("fork-b-consequence").textContent = BLUEPRINT.openQuestion.forkB.consequence;
+</script>
+</body>
+</html>

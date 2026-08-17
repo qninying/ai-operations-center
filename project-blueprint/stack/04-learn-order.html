@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What to Learn First — AI Operations Center Tech Stack</title>
+<meta name="description" content="A 12-step learning ladder for the AI Operations Center tech stack, foundational technologies before specialized ones.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 4 of 8</div>
+      <h1>What to Learn First, In Order</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>The learning ladder</h2>
+      <p class="section-sub">Foundational before specialized; low-risk quick wins before the pieces that are hard to undo.</p>
+      <div id="fig-ladder"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th style="width:60px">Step</th><th>Technology</th><th>Why here</th></tr></thead>
+          <tbody id="order-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/stack.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "learnorder" });
+
+  document.getElementById("page-sub").textContent =
+    STACK.learningOrder.length + " steps — PostgreSQL first because it's reused five times; self-monitoring last because you need services running before you can watch them.";
+
+  Site.renderStaticFigure("fig-ladder", {
+    title: "12-step learning ladder",
+    svg: Site.svg.learningLadder,
+    interpretation: "Each rung assumes the ones below it — Kubernetes (step 9) assumes Docker basics (step 2), MCP (step 7) assumes both the Claude API and the Agent SDK."
+  });
+
+  var tbody = document.getElementById("order-tbody");
+  tbody.innerHTML = STACK.learningOrder.map(function (l) {
+    return '<tr class="component-row"><td><span class="pill pill-teal">' + l.n + '</span></td><td><strong>' + Site.escapeHtml(l.technology) + '</strong></td><td>' + Site.escapeHtml(l.why) + '</td></tr>';
+  }).join("");
+  Site.registerSearchable(".component-row");
+</script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AIOps — Live Demo</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0e14;
+    --panel: #131826;
+    --border: #232a3d;
+    --text: #e6e9f0;
+    --muted: #8a92a6;
+    --accent: #4f8cff;
+    --ok: #3ddc97;
+    --warn: #f2b84b;
+    --danger: #ff5c6c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 32px;
+  }
+  header { margin-bottom: 24px; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  .subtitle { color: var(--muted); font-size: 14px; }
+  .status-line { margin-top: 8px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+  .dot.ok { background: var(--ok); }
+  .dot.bad { background: var(--danger); }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .panel h2 { margin: 0 0 4px; font-size: 15px; }
+  .panel .desc { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .tag.fallback { color: var(--warn); border-color: var(--warn); }
+  .tag.live { color: var(--ok); border-color: var(--ok); }
+  .row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 13px;
+    background: #0f1420;
+  }
+  .card.blocked { border-color: var(--danger); background: #1c1013; }
+  .card .k { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+  .card .v { font-family: ui-monospace, SFMono-Regular, monospace; margin-bottom: 6px; }
+  button.action {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.action:disabled { opacity: 0.6; cursor: default; }
+  .guardrail-result {
+    margin-top: 16px;
+    padding: 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    display: none;
+  }
+  .guardrail-result.blocked { display: block; border-color: var(--danger); background: #1c1013; }
+  .guardrail-result.allowed { display: block; border-color: var(--ok); background: #0f1c17; }
+  .verdict { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
+  .verdict.blocked-text { color: var(--danger); }
+  .verdict.allowed-text { color: var(--ok); }
+  .violation {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 12px;
+    color: var(--danger);
+    margin: 2px 0;
+  }
+  footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+  footer code { color: var(--text); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>AIOps — Live Demo</h1>
+    <div class="subtitle">Walking skeleton. Every number on this page is real output from real, tested code — nothing here is staged.</div>
+    <div class="status-line"><span class="dot" id="health-dot"></span><span id="health-text">Checking service health…</span></div>
+  </header>
+
+  <section class="panel">
+    <h2>Live incidents — <code>sys.dm_exec_requests</code></h2>
+    <div class="desc">Read via the MCP Tool Gateway's <code>read_sql_server_dmv</code> tool (R2/R3). Source tag tells you honestly whether this is a live query or fixture fallback.</div>
+    <div id="dmv-status">Loading…</div>
+    <div class="row" id="dmv-rows"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Proposed remediation</h2>
+    <div class="desc">A recommendation that's evidence-linked and of a valid, reversible action type — missing only human approval. Watch it get blocked anyway.</div>
+    <button class="action" id="recommend-btn">Recommend: restart_service on prod-app-server-03</button>
+    <div class="guardrail-result" id="guardrail-result"></div>
+  </section>
+
+  <footer>
+    AIOps MCP Tool Gateway · <code>mcp-server/src/httpServer.ts</code> · guardrail from <code>guardrails/remediationGuardrail.ts</code>
+  </footer>
+
+<script>
+async function loadHealth() {
+  const dot = document.getElementById('health-dot');
+  const text = document.getElementById('health-text');
+  try {
+    const res = await fetch('/health');
+    const body = await res.json();
+    dot.className = 'dot ok';
+    text.textContent = 'Service: ' + body.status;
+  } catch (e) {
+    dot.className = 'dot bad';
+    text.textContent = 'Service unreachable';
+  }
+}
+
+async function loadIncidents() {
+  const statusEl = document.getElementById('dmv-status');
+  const rowsEl = document.getElementById('dmv-rows');
+  try {
+    const res = await fetch('/dmv/exec-requests');
+    const body = await res.json();
+    const tagClass = body.source === 'live' ? 'live' : 'fallback';
+    statusEl.innerHTML = 'Source: <span class="tag ' + tagClass + '">' + body.source + '</span>'
+      + (body.message ? ' — ' + body.message : '');
+
+    rowsEl.innerHTML = '';
+    for (const row of body.rows) {
+      const blocked = row.blocking_session_id && row.blocking_session_id !== 0;
+      const card = document.createElement('div');
+      card.className = 'card' + (blocked ? ' blocked' : '');
+      card.innerHTML =
+        '<div class="k">session</div><div class="v">' + row.session_id + '</div>' +
+        '<div class="k">status</div><div class="v">' + row.status + '</div>' +
+        '<div class="k">wait_type</div><div class="v">' + (row.wait_type ?? '—') + '</div>' +
+        '<div class="k">blocked_by</div><div class="v">' + (blocked ? row.blocking_session_id : '—') + '</div>';
+      rowsEl.appendChild(card);
+    }
+  } catch (e) {
+    statusEl.textContent = 'Failed to load: ' + e.message;
+  }
+}
+
+async function recommendRemediation() {
+  const btn = document.getElementById('recommend-btn');
+  const resultEl = document.getElementById('guardrail-result');
+  btn.disabled = true;
+  btn.textContent = 'Checking guardrail…';
+
+  try {
+    const res = await fetch('/guardrail/check-demo', { method: 'POST' });
+    const body = await res.json();
+    const allowed = body.result.allowed;
+
+    resultEl.className = 'guardrail-result ' + (allowed ? 'allowed' : 'blocked');
+    let html = '<div class="verdict ' + (allowed ? 'allowed-text' : 'blocked-text') + '">'
+      + (allowed ? 'ALLOWED' : 'BLOCKED') + '</div>';
+    if (!allowed) {
+      for (const v of body.result.violations) {
+        html += '<div class="violation">' + v + '</div>';
+      }
+    }
+    resultEl.innerHTML = html;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Recommend: restart_service on prod-app-server-03';
+  }
+}
+
+document.getElementById('recommend-btn').addEventListener('click', recommendRemediation);
+loadHealth();
+loadIncidents();
+</script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Five Days — AI Operations Center Week 1 MVP</title>
+<meta name="description" content="Monday to Friday of the AI Operations Center Week 1 MVP, each day written as an outcome rather than a task.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 2 of 7</div>
+      <h1>The Five Days</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>The five days as a strip</h2>
+      <p class="section-sub">Each day feeds the next. Friday is drawn differently because it is the only day whose outcome is not yours to produce.</p>
+      <div id="fig-strip"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="group-header"><h2>The checklist</h2><span class="group-count" id="days-count"></span></div>
+      <p class="section-sub">Written as outcomes, not tasks — each one either happened or it didn't. Nothing here is checked off yet; the week hasn't run.</p>
+      <div id="days-list"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="card">
+        <h3 style="margin-top:0">Why Friday is a different kind of day</h3>
+        <p style="margin:8px 0 0;font-size:14px;line-height:1.6;">Monday through Thursday can be finished alone at a keyboard. Friday cannot. The whole week is built so that one person who did not write any of it can look at one screen and answer one question — and their answer, not yours, is the result. See <a href="06-did-it-work.html">Did It Work?</a> for what counts as a pass.</p>
+      </div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/mvp.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "fivedays" });
+
+  document.getElementById("page-sub").textContent =
+    MVP.fiveDays.length + " days, " + MVP.fiveDays.length + " outcomes. The last one is a verdict from someone else, which is the only reason the first four are worth doing.";
+
+  Site.renderStaticFigure("fig-strip", {
+    title: "The five days as a strip",
+    svg: Site.svg.fiveDayStrip,
+    interpretation: "Monday–Thursday build the thing; Friday puts it in front of a real person. Four days of work exist to make one conversation possible."
+  });
+
+  document.getElementById("days-count").textContent =
+    MVP.fiveDays.length + " outcomes, 0 complete";
+
+  document.getElementById("days-list").innerHTML = MVP.fiveDays.map(function (d, i) {
+    var isFriday = i === MVP.fiveDays.length - 1;
+    return '<div class="rec-card component-row">' +
+      '<div class="rec-head">' +
+        '<div><div class="rec-title">' +
+          '<span aria-hidden="true" style="display:inline-block;width:15px;height:15px;border:1.5px solid var(--muted);border-radius:4px;margin-right:9px;vertical-align:-2px;"></span>' +
+          '<strong>' + Site.escapeHtml(d.day) + '</strong> — ' + Site.escapeHtml(d.short) +
+        '</div>' +
+        '<div class="rec-tech">Day ' + (i + 1) + ' of ' + MVP.fiveDays.length + '</div></div>' +
+        '<span class="pill ' + (isFriday ? "pill-green" : "pill-teal") + '">' + (isFriday ? "Needs another person" : "Yours alone") + '</span>' +
+      '</div>' +
+      '<p class="rec-why">' + Site.escapeHtml(d.outcome) + '</p>' +
+    '</div>';
+  }).join("");
+  Site.registerSearchable(".component-row");
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "aiops-mcp-server",
+  "version": "0.1.0",
+  "description": "AIOps MCP Tool Gateway — read-only stdio MCP server exposing SQL Server DMV data to AI agents.",
+  "private": true,
+  "type": "module",
+  "main": "dist/mcp-server/src/index.js",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "http": "tsx src/httpServer.ts",
+    "build": "tsc",
+    "start": "node dist/mcp-server/src/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "mssql": "^12.7.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/mssql": "^12.3.0",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.10"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "aiops-mcp-server": {
+      "command": "npx",
+      "args": ["tsx", "mcp-server/src/index.ts"],
+      "cwd": "/Users/quincynkwainninying/Desktop/ColaberryAI/ai-operations-center"
+    }
+  }
+}

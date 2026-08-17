@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Flow — AI Operations Center Blueprint</title>
+<meta name="description" content="A 12-step numbered walkthrough of one incident, from first telemetry sample to a closed, audited remediation.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap-narrow">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 4 of 7</div>
+      <h1>Data Flow</h1>
+      <p>One incident, start to finish, in 12 steps.</p>
+    </div>
+
+    <div class="section-block">
+      <h2>Steps at a glance</h2>
+      <p class="section-sub">Teal steps are where an AI agent calls Claude; slate steps are deterministic code.</p>
+      <div id="fig-ribbon"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Sequence diagram</h2>
+      <div id="fig-sequence"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Walkthrough</h2>
+      <div id="steps-list"></div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="assets/blueprint.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "dataflow" });
+
+  Site.renderStaticFigure("fig-ribbon", {
+    title: "12 steps, colour-coded by whether Claude is involved",
+    svgMarkup: Site.svg.stepsRibbon(false),
+    interpretation: "Steps 5 through 8 are the only ones where Claude reasons about the incident; everything before and after is deterministic plumbing or a human decision."
+  });
+
+  Site.renderMermaidFigure("fig-sequence", {
+    title: "Sequence diagram",
+    source: BLUEPRINT.dataFlow.mermaid,
+    interpretation: BLUEPRINT.dataFlow.interpretation
+  });
+
+  var list = document.getElementById("steps-list");
+  list.innerHTML = BLUEPRINT.dataFlow.steps.map(function (s) {
+    var pill = s.touchesModel
+      ? '<span class="pill pill-teal">Calls Claude</span>'
+      : '<span class="pill pill-slate">Deterministic</span>';
+    return '<div class="card step-row" style="margin-bottom:12px;">' +
+      '<div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">' +
+        '<span class="pill pill-info">Step ' + s.n + '</span>' + pill +
+        '<strong style="font-size:14.5px;">' + Site.escapeHtml(s.title) + '</strong>' +
+      '</div>' +
+      '<p style="margin:0; color:var(--muted); font-size:13.5px;">' + Site.escapeHtml(s.detail) + '</p>' +
+    '</div>';
+  }).join("");
+  Site.registerSearchable(".step-row");
+</script>
+</body>
+</html>

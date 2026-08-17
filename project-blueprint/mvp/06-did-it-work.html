@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Did It Work? — AI Operations Center Week 1 MVP</title>
+<meta name="description" content="What success and failure look like for the AI Operations Center Week 1 MVP, and the three-way fork Friday's result leads to.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 6 of 7</div>
+      <h1>Did It Work?</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>Two bars, set in advance</h2>
+      <p class="section-sub">Both were written before Friday, not after — a checkable bar somebody else could apply without the builder in the room.</p>
+      <div class="split-grid">
+        <div class="outcome-card good">
+          <p class="oc-eyebrow">What "it worked" looks like</p>
+          <p id="success-bar"></p>
+        </div>
+        <div class="outcome-card bad">
+          <p class="oc-eyebrow">What "it didn't work" looks like</p>
+          <p id="failure-bar"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h2>The Friday decision</h2>
+      <p class="section-sub">One incoming result, three possible next moves. The fail branch is allowed to say "stop and reconsider the product" — and does.</p>
+      <div id="fig-fork"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="group-header"><h2>What you'll know on Friday, and what to do about it</h2><span class="group-count" id="outcomes-count"></span></div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th style="width:14%">Outcome</th><th style="width:36%">What happened</th><th>Next move</th></tr></thead>
+          <tbody id="outcomes-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/mvp.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "outcome" });
+
+  document.getElementById("page-sub").textContent =
+    MVP.outcomes.length + " possible outcomes for Friday, each with its own next move — including the one that says stop.";
+
+  document.getElementById("success-bar").textContent = MVP.successBar;
+  document.getElementById("failure-bar").textContent = MVP.failureBar;
+
+  Site.renderStaticFigure("fig-fork", {
+    title: "The Friday decision, as a three-way fork",
+    svg: Site.svg.fridayFork,
+    interpretation: "Pass moves toward real infrastructure. Partial stays in place and improves the evidence. Fail is a real branch, not a formality — it ends at reconsidering the product, not at trying harder."
+  });
+
+  document.getElementById("outcomes-count").textContent = MVP.outcomes.length + " outcomes";
+
+  var pillFor = { green: "pill-green", amber: "pill-amber", red: "pill-red" };
+  document.getElementById("outcomes-tbody").innerHTML = MVP.outcomes.map(function (o) {
+    return '<tr class="outcome-row">' +
+      '<td><span class="pill ' + pillFor[o.tone] + '">' + Site.escapeHtml(o.outcome) + '</span></td>' +
+      '<td>' + Site.escapeHtml(o.whatHappened) + '</td>' +
+      '<td>' + Site.escapeHtml(o.nextMove) + '</td>' +
+    '</tr>';
+  }).join("");
+  Site.registerSearchable(".outcome-row");
+</script>
+</body>
+</html>

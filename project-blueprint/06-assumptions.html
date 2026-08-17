@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assumptions — AI Operations Center Blueprint</title>
+<meta name="description" content="Five assumptions the AI Operations Center design rests on, and exactly what breaks if each one is wrong.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap-narrow">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 6 of 7</div>
+      <h1>Assumptions</h1>
+      <p>Every non-obvious call this design makes, and what breaks if it's wrong.</p>
+    </div>
+
+    <div class="section-block">
+      <h2>At a glance</h2>
+      <p class="section-sub">Amber marks an assumption that would change the design if wrong; slate marks one with no architectural impact.</p>
+      <div id="fig-assumptions"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>In detail</h2>
+      <div id="assumption-list"></div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/blueprint.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "assumptions" });
+
+  Site.renderStaticFigure("fig-assumptions", {
+    title: "Assumptions, ranked by whether they change the design",
+    svgMarkup: Site.svg.assumptionsRibbon(false),
+    interpretation: "Four of five assumptions actively shape the architecture; only the API-access assumption is purely administrative."
+  });
+
+  var list = document.getElementById("assumption-list");
+  list.innerHTML = BLUEPRINT.assumptions.map(function (a, i) {
+    return '<div class="card assumption-row" style="margin-bottom:12px;">' +
+      '<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">' +
+        '<span class="pill pill-info">A' + (i + 1) + '</span>' +
+        '<strong style="font-size:14.5px;">' + Site.escapeHtml(a.assumption) + '</strong>' +
+      '</div>' +
+      '<p style="margin:0; font-size:13.5px; color:var(--muted);"><strong>Impact if wrong:</strong> ' + Site.escapeHtml(a.impact) + '</p>' +
+    '</div>';
+  }).join("");
+  Site.registerSearchable(".assumption-row");
+</script>
+</body>
+</html>

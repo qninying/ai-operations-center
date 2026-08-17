@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fit Key & Headline — AI Operations Center Tech Stack</title>
+<meta name="description" content="What each fit rating means, and the one-paragraph headline for where this stack is most likely to break.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 1 of 8</div>
+      <h1>Fit Key & Headline</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>What each rating means</h2>
+      <p class="section-sub">Graded against this project's actual scale — an internal ops team, one enterprise's own infrastructure — not general popularity.</p>
+      <div class="fitkey-grid" id="fitkey-grid"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Where this stack is most likely to break</h2>
+      <div class="headline-block">
+        <div class="eyebrow">Headline</div>
+        <p id="headline-text"></p>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h2>The overall picture</h2>
+      <p class="section-sub">19 technology decisions, proportioned by fit. The red segment is the one to read the caveat on first.</p>
+      <div id="fig-bar"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Least confident calls</h2>
+      <p class="section-sub">If everything came back green, we hadn't thought hard enough. These three are the genuine toss-ups.</p>
+      <div class="info-list" id="least-confident-list"></div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/stack.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "summary" });
+
+  document.getElementById("page-sub").textContent =
+    "Four rating levels, one headline naming this stack's biggest real risk, and the calls we're least sure about.";
+
+  document.getElementById("headline-text").textContent = STACK.headline;
+
+  var grid = document.getElementById("fitkey-grid");
+  grid.innerHTML = STACK.fitKey.map(function (f) {
+    return '<div class="fitkey-card"><span class="icon">' + f.icon + '</span><span class="label">' + Site.escapeHtml(f.label) + '</span>' +
+      '<div class="desc">' + Site.escapeHtml(f.desc) + '</div></div>';
+  }).join("");
+
+  Site.renderStaticFigure("fig-bar", {
+    title: "19 technology decisions, by fit",
+    svg: Site.svg.proportionalBar,
+    interpretation: "14 green, 4 amber, 1 red — the red segment (Event Bus / Apache Kafka) is where the operational skill gap named in the headline actually lives."
+  });
+
+  var lc = document.getElementById("least-confident-list");
+  lc.innerHTML = STACK.leastConfident.map(function (l) {
+    return '<div class="info-row"><span class="info-dot" style="background:var(--c-info,#0369a1)"></span>' +
+      '<span><strong>' + Site.escapeHtml(l.component) + '</strong> — ' + Site.escapeHtml(l.why) + '</span><span></span></div>';
+  }).join("");
+</script>
+</body>
+</html>

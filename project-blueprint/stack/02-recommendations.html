@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recommendations — AI Operations Center Tech Stack</title>
+<meta name="description" content="Every technology decision for the AI Operations Center, grouped by what a person touches, what you write, what you store, what you depend on, and what the data flow needs.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 2 of 8</div>
+      <h1>Recommendations</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>The whole stack at a glance</h2>
+      <p class="section-sub">Grouped the same way as below; color is fit rating, not category.</p>
+      <div id="fig-bands"></div>
+    </div>
+
+    <div id="groups"></div>
+
+    <div class="section-block">
+      <h2>Not a technology decision</h2>
+      <p class="section-sub">Existing infrastructure and a person — listed for completeness, not rated.</p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Component</th><th>Note</th></tr></thead>
+          <tbody id="na-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/stack.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "recommendations" });
+
+  document.getElementById("page-sub").textContent =
+    STACK.recommendations.length + " technology decisions, one per component — grouped by what kind of thing it is, not by the architecture's original component order.";
+
+  Site.renderStaticFigure("fig-bands", {
+    title: "Recommendations grouped, colored by fit",
+    svg: Site.svg.fitBands,
+    interpretation: "Reading group by group: touch and write are almost entirely green or amber (low risk if wrong); the one red sits in “things you depend on.”"
+  });
+
+  var groupsEl = document.getElementById("groups");
+  groupsEl.innerHTML = STACK.categories.map(function (cat) {
+    var items = STACK.recommendations.filter(function (r) { return r.category === cat.id; });
+    var cards = items.map(function (r) {
+      var caveatHtml = r.caveat ? '<div class="rec-caveat' + (r.fit === "red" ? " red" : "") + '"><strong>Caveat:</strong> ' + Site.escapeHtml(r.caveat) + '</div>' : "";
+      var confHtml = r.confidence === "low" ? '<span class="confidence-tag">Least confident call</span>' : "";
+      return '<div class="rec-card component-row">' +
+        '<div class="rec-head">' +
+          '<div><div class="rec-title">' + Site.escapeHtml(r.component) + '</div><div class="rec-tech">' + Site.escapeHtml(r.technology) + '</div></div>' +
+          '<span class="pill ' + Site.fitPillClass(r.fit) + '">' + Site.fitIcon(r.fit) + ' ' + Site.fitLabel(r.fit) + '</span>' +
+        '</div>' +
+        '<p class="rec-why">' + Site.escapeHtml(r.why) + '</p>' +
+        caveatHtml +
+        '<div class="rec-meta">' + confHtml + '<span class="pill pill-slate">Undo: ' + Site.escapeHtml(r.lockIn) + '</span></div>' +
+      '</div>';
+    }).join("");
+    return '<div class="section-block">' +
+      '<div class="group-header"><h2>' + Site.escapeHtml(cat.label) + '</h2><span class="group-count">' + items.length + ' item' + (items.length === 1 ? "" : "s") + '</span></div>' +
+      '<p class="section-sub">' + Site.escapeHtml(cat.desc) + '</p>' +
+      cards +
+      '</div>';
+  }).join("");
+  Site.registerSearchable(".component-row");
+
+  var naBody = document.getElementById("na-tbody");
+  naBody.innerHTML = STACK.notApplicable.map(function (n) {
+    return '<tr><td><strong>' + Site.escapeHtml(n.component) + '</strong></td><td>' + Site.escapeHtml(n.note) + '</td></tr>';
+  }).join("");
+</script>
+</body>
+</html>

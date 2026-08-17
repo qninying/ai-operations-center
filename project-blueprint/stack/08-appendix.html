@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Appendix — AI Operations Center Tech Stack</title>
+<meta name="description" content="Full architecture cross-reference for the AI Operations Center: every component, its technology, fit rating, and where it runs.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 8 of 8</div>
+      <h1>Appendix</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>What runs on your infrastructure vs. a vendor's</h2>
+      <p class="section-sub">Everything in the teal column is something your team operates and is responsible for keeping healthy. Everything in the amber column is infrastructure someone else runs — Anthropic for the three Claude model tiers, Microsoft for Key Vault.</p>
+      <div id="fig-topology"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Full cross-reference</h2>
+      <p class="section-sub">Every row from <a href="../architecture.md">architecture.md</a>'s component table, one line each. This is the complete list — same set, no more, no fewer.</p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Component</th><th>Category</th><th>Technology</th><th style="width:70px">Fit</th><th style="width:90px">Runs on</th><th style="width:90px">Undo</th></tr></thead>
+          <tbody id="full-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h2>Not a technology decision</h2>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Component</th><th>Note</th></tr></thead>
+          <tbody id="na-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/stack.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "appendix" });
+
+  document.getElementById("page-sub").textContent =
+    (STACK.recommendations.length + STACK.notApplicable.length) + " rows total — every component from the architecture, in one table, with the topology split shown above it.";
+
+  Site.renderStaticFigure("fig-topology", {
+    title: "Your infrastructure vs. a vendor's",
+    svg: Site.svg.topology,
+    interpretation: "Most of this stack is yours to operate. The exceptions — the three Claude model calls and Azure Key Vault — are the pieces where someone else is on the hook for uptime."
+  });
+
+  var categoryLabel = {};
+  STACK.categories.forEach(function (c) { categoryLabel[c.id] = c.short; });
+  var runsOnLabel = { yours: "Your infra", vendor: "Vendor" };
+  var lockInPill = { easy: "pill-green", moderate: "pill-amber", hard: "pill-red" };
+
+  var tbody = document.getElementById("full-tbody");
+  tbody.innerHTML = STACK.recommendations.map(function (r) {
+    return '<tr class="component-row">' +
+      '<td><strong>' + Site.escapeHtml(r.component) + '</strong></td>' +
+      '<td><span class="pill pill-slate">' + Site.escapeHtml(categoryLabel[r.category] || r.category) + '</span></td>' +
+      '<td class="mono">' + Site.escapeHtml(r.technology) + '</td>' +
+      '<td><span class="pill ' + Site.fitPillClass(r.fit) + '">' + Site.fitIcon(r.fit) + '</span></td>' +
+      '<td>' + Site.escapeHtml(runsOnLabel[r.runsOn] || "—") + '</td>' +
+      '<td><span class="pill ' + lockInPill[r.lockIn] + '">' + Site.escapeHtml(r.lockIn) + '</span></td>' +
+    '</tr>';
+  }).join("");
+  Site.registerSearchable(".component-row");
+
+  var naBody = document.getElementById("na-tbody");
+  naBody.innerHTML = STACK.notApplicable.map(function (n) {
+    return '<tr><td><strong>' + Site.escapeHtml(n.component) + '</strong></td><td>' + Site.escapeHtml(n.note) + '</td></tr>';
+  }).join("");
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# OS cruft
+.DS_Store
+
+# Internal Colaberry operating contract — contains a real production server
+# IP/SSH command and an internal escalation email. Not for the public repo.
+CLAUDE.md

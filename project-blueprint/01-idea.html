@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Idea — AI Operations Center Blueprint</title>
+<meta name="description" content="The one-paragraph project idea and the phrases in it that drove every component in the AI Operations Center architecture.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap-narrow">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 1 of 7</div>
+      <h1>The Idea</h1>
+      <p>One paragraph, read literally. Every component in this blueprint traces back to a specific phrase below — nothing was added because it's a "usual" part of a system like this.</p>
+    </div>
+
+    <div class="section-block">
+      <div class="card" style="font-size:16px; line-height:1.7; border-left: 4px solid var(--accent);" id="idea-paragraph"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>Idea as a pipeline</h2>
+      <p class="section-sub">Four platforms feed a continuous pipeline of six stages; the teal stages are where Claude does the reasoning.</p>
+      <div id="fig-pipeline"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>The sentence that outranks everything else</h2>
+      <p class="section-sub">The one requirement every other design decision was built to protect.</p>
+      <div class="card" id="key-sentence-card"></div>
+    </div>
+
+    <div class="section-block">
+      <h2>What each phrase drove</h2>
+      <p class="section-sub" id="req-count-sub"></p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th style="width:46%">Phrase in the idea</th><th>What it drove</th></tr></thead>
+          <tbody id="req-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/blueprint.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "idea" });
+
+  document.getElementById("idea-paragraph").textContent = BLUEPRINT.idea.paragraph;
+
+  Site.renderStaticFigure("fig-pipeline", {
+    title: "Inputs → pipeline → output",
+    svgMarkup: Site.svg.ideaPipeline(false),
+    interpretation: "Four platforms feed one continuous loop; by the time it reaches the green box, an incident carries a root cause, an impact statement, a remediation script, and both summaries."
+  });
+
+  var kc = document.getElementById("key-sentence-card");
+  kc.innerHTML = '<p style="margin:0 0 10px; font-family:var(--mono); font-size:13px; color:var(--accent); font-weight:700;">“' +
+    Site.escapeHtml(BLUEPRINT.idea.keySentence) + '”</p><p style="margin:0; color:var(--text);">' +
+    Site.escapeHtml(BLUEPRINT.idea.keySentenceExplain) + '</p>';
+
+  document.getElementById("req-count-sub").textContent = BLUEPRINT.idea.requirements.length + " phrases, each mapped to what it required in the design.";
+
+  var tbody = document.getElementById("req-tbody");
+  tbody.innerHTML = BLUEPRINT.idea.requirements.map(function (r) {
+    return '<tr class="req-row"><td class="mono">“' + Site.escapeHtml(r.phrase) + '”</td><td>' + Site.escapeHtml(r.drives) + '</td></tr>';
+  }).join("");
+  Site.registerSearchable(".req-row");
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "aiops-guardrails",
+  "version": "0.1.0",
+  "description": "R4 safety guardrails — pure, deterministic pre-execution checks for remediation actions.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.10"
+  }
+}

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Bet — AI Operations Center Week 1 MVP</title>
+<meta name="description" content="The one question Week 1 answers, and the only five things being built to answer it.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main">
+  <div class="wrap">
+    <div id="breadcrumbs-slot"></div>
+
+    <div class="page-header">
+      <div class="page-eyebrow">Section 1 of 7</div>
+      <h1>The Bet</h1>
+      <p id="page-sub"></p>
+    </div>
+
+    <div class="section-block">
+      <h2>The one question Week 1 answers</h2>
+      <p class="section-sub">Everything on the other six pages exists to answer this sentence, or was cut because it doesn't.</p>
+      <div class="headline-block">
+        <div class="eyebrow">The question</div>
+        <p id="question-text"></p>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <h2>Inputs → one screen → one verdict</h2>
+      <p class="section-sub">The whole week, drawn end to end. Three things get built; one person decides whether it was worth building.</p>
+      <div id="fig-verdict"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="group-header"><h2>What you are building</h2><span class="group-count" id="building-count"></span></div>
+      <p class="section-sub">These are the only things being built this week — each one named after the architecture component it stands in for. Anything not on this list is on <a href="03-whats-cut.html">What's Cut</a>.</p>
+      <div id="building-list"></div>
+    </div>
+
+    <div id="foot-nav-slot"></div>
+  </div>
+</main>
+
+<script src="assets/mvp.js"></script>
+<script src="assets/site.js"></script>
+<script>
+  Site.init({ page: "bet" });
+
+  document.getElementById("page-sub").textContent =
+    "One question, " + MVP.building.length + " things built to answer it, and nothing else. If a piece of work doesn't move the question, it isn't in this week.";
+
+  document.getElementById("question-text").textContent = MVP.question;
+
+  Site.renderStaticFigure("fig-verdict", {
+    title: "Inputs → one screen → one verdict",
+    svg: Site.svg.inputsToVerdict,
+    interpretation: "Hardcoded events go in, two Claude calls run over them, one screen shows the result — and the only output that counts is a person saying whether they'd act on it."
+  });
+
+  document.getElementById("building-count").textContent =
+    MVP.building.length + " component" + (MVP.building.length === 1 ? "" : "s");
+
+  document.getElementById("building-list").innerHTML = MVP.building.map(function (b, i) {
+    return '<div class="rec-card component-row">' +
+      '<div class="rec-head">' +
+        '<div><div class="rec-title">' + Site.escapeHtml(b.component) + '</div>' +
+        '<div class="rec-tech">Architecture component ' + (i + 1) + ' of ' + MVP.building.length + '</div></div>' +
+        '<span class="pill pill-green">Being built</span>' +
+      '</div>' +
+      '<p class="rec-why">' + Site.escapeHtml(b.description) + '</p>' +
+    '</div>';
+  }).join("");
+  Site.registerSearchable(".component-row");
+</script>
+</body>
+</html>
