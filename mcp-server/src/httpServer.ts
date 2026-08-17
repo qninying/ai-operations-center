@@ -70,7 +70,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
 
 const server = createServer((req, res) => {
   handleRequest(req, res).catch((error) => {
-    console.error("aiops-http: unhandled request error", error);
+    console.error("coreops-http: unhandled request error", error);
     if (!res.headersSent) {
       sendJson(res, 500, { error: "INTERNAL_ERROR" });
     }
@@ -80,5 +80,5 @@ const server = createServer((req, res) => {
 server.requestTimeout = REQUEST_TIMEOUT_MS;
 
 server.listen(PORT, () => {
-  console.error(`aiops-http: listening on http://localhost:${PORT}`);
+  console.error(`coreops-http: listening on http://localhost:${PORT}`);
 });

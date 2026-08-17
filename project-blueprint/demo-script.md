@@ -1,4 +1,4 @@
-# AIOps — 90-Second Demo Script
+# CoreOps — 90-Second Demo Script
 
 A screencast script for the "Showcase & portfolio" deliverable. Every command below
 was run against this repo's real code before being written into this script — nothing
@@ -29,7 +29,7 @@ dashboard used for both Act 2 and Act 3.
 > manually cross-referencing job logs, blocking sessions, and downstream reports
 > across a dozen different tools, trying to reconstruct what happened.
 >
-> AIOps watches SQL Server, SSIS, SSRS, and Windows Server continuously, correlates
+> CoreOps watches SQL Server, SSIS, SSRS, and Windows Server continuously, correlates
 > failures automatically, and uses Claude to explain *why* something broke — using
 > live evidence, not guesswork. But there's one rule that outranks everything else in
 > this design: it can investigate and recommend all day long. It can never act
@@ -77,7 +77,7 @@ violation list]**
 > good. The evidence was real. It still doesn't run — because nothing in this system
 > can execute a change against production without a human clicking approve first.
 > Not a content filter checking if the AI's idea is smart. A structural gate checking
-> if a person signed off. That's AIOps."
+> if a person signed off. That's CoreOps."
 
 **[Cut to end card / repo link]**
 

@@ -1,7 +1,7 @@
 {
-  "name": "aiops-mcp-server",
+  "name": "coreops-mcp-server",
   "version": "0.1.0",
-  "description": "AIOps MCP Tool Gateway — read-only stdio MCP server exposing SQL Server DMV data to AI agents.",
+  "description": "CoreOps MCP Tool Gateway — read-only stdio MCP server exposing SQL Server DMV data to AI agents.",
   "private": true,
   "type": "module",
   "main": "dist/mcp-server/src/index.js",

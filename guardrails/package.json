@@ -1,5 +1,5 @@
 {
-  "name": "aiops-guardrails",
+  "name": "coreops-guardrails",
   "version": "0.1.0",
   "description": "R4 safety guardrails — pure, deterministic pre-execution checks for remediation actions.",
   "private": true,

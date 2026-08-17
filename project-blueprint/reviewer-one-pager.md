@@ -1,4 +1,4 @@
-# AIOps — Architecture Summary for Reviewers
+# CoreOps — Architecture Summary for Reviewers
 
 *An intelligent, read-only-by-construction command center for SQL Server, SSIS, SSRS,
 and Windows Server infrastructure. This page covers what's actually built and tested
@@ -9,7 +9,7 @@ for per-requirement status and test evidence.*
 
 When a SQL Server job fails or an SSRS report comes back empty, someone has to
 manually cross-reference job logs, blocking sessions, and downstream reports across
-a dozen tools to figure out why — often hours after the fact. AIOps continuously
+a dozen tools to figure out why — often hours after the fact. CoreOps continuously
 watches these systems, correlates related failures, and uses Claude to explain root
 cause from live evidence rather than a static runbook or a guess.
 

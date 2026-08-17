@@ -4,12 +4,12 @@ import { z } from "zod";
 import { dmExecRequestsFixture } from "./dmvFixtures.js";
 import { readDmv, SUPPORTED_DMVS, UnsupportedDmvError } from "./dmvReader.js";
 
-// AIOps MCP Tool Gateway (R2): a read-only stdio MCP server. Per the R4 guardrail
+// CoreOps MCP Tool Gateway (R2): a read-only stdio MCP server. Per the R4 guardrail
 // already locked in project-blueprint/requirements.md, this surface never writes to
 // a monitored system — every resource and tool here is read-only or a stub.
 
 const server = new McpServer({
-  name: "aiops-mcp-server",
+  name: "coreops-mcp-server",
   version: "0.1.0",
 });
 
@@ -96,10 +96,10 @@ server.registerTool(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("aiops-mcp-server: connected over stdio");
+  console.error("coreops-mcp-server: connected over stdio");
 }
 
 main().catch((error) => {
-  console.error("aiops-mcp-server: fatal startup error", error);
+  console.error("coreops-mcp-server: fatal startup error", error);
   process.exit(1);
 });

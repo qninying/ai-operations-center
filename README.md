@@ -1,4 +1,4 @@
-# AIOps — AI Operations Center
+# CoreOps — AI Operations Center
 
 An enterprise-grade AI Operations Center concept — an intelligent command center for
 SQL Server, SSIS, SSRS, Windows Servers, and enterprise data platforms. It
