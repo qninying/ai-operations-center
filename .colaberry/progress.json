@@ -1,0 +1,12 @@
+{
+  "storyId": "p1786405883766-t1",
+  "repo": "qninying/ai-operations-center",
+  "updatedAt": "2026-08-17T15:59:00Z",
+  "summary": "AIOps walking skeleton: MCP Tool Gateway (mcp-server/) over stdio + HTTP with a read-only SQL Server DMV tool, a reliability layer (timeout/retry/circuit breaker), a live dashboard, and a remediation guardrail (guardrails/) requiring human approval before any corrective action.",
+  "tests": {
+    "mcp-server": { "files": 4, "passing": 30, "runner": "vitest" },
+    "guardrails": { "files": 1, "passing": 8, "runner": "vitest" }
+  },
+  "requirementsFile": "project-blueprint/requirements.md",
+  "note": "Status per requirement (UNMAPPED/PLANNED/BUILT) and the acceptance criteria backing each test are documented in requirementsFile — this summary doesn't assert a verdict, it points at the real evidence."
+}
