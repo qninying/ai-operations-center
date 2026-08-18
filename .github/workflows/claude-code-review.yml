@@ -1,0 +1,56 @@
+name: Claude Code Review
+
+# Runs automatically whenever a pull request is opened, or when new commits
+# are pushed to an already-open pull request.
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+# Cancel an in-progress review for a PR if a newer commit lands before it finishes.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# The review only needs to read the code and leave comments — nothing more.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pull request's code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ask Claude to review the changes
+        uses: anthropics/claude-code-action@v1
+        with:
+          prompt: >
+            Review this pull request's diff for the CoreOps AI Operations Center
+            repo. This is a TypeScript walking skeleton with two independently
+            tested packages: mcp-server/ (an MCP tool gateway over stdio/HTTP)
+            and guardrails/ (checkRemediationGuardrail + auditLog.ts), each with
+            its own vitest suite and tsconfig.
+
+            Check any change to .ts files against this repo's actual, established
+            conventions — not a generic checklist:
+            - Does it keep `npx tsc --noEmit` clean in whichever package it touches?
+            - Does new business logic ship with a test covering the happy path,
+              at minimum? (See guardrails/remediationGuardrail.test.ts and
+              guardrails/auditLog.test.ts for this repo's test style.)
+            - Does any side-effecting or replayable operation stay idempotent?
+              (See guardrails/auditLog.ts's id-as-idempotency-key pattern: same
+              input twice must not duplicate state, and a conflicting write
+              should error rather than silently overwrite.)
+            - Does anything claim "done"/"verified" in .colaberry/progress.json
+              or PROGRESS.md without a real test or check backing it? This repo
+              treats overclaiming status as a defect, not a style nit.
+
+            Flag correctness bugs first, then meaningful simplification/reuse/
+            efficiency opportunities. Leave inline comments on specific lines
+            rather than one long summary comment.
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.PR_REVIEWER }}
