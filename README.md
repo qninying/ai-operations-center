@@ -13,6 +13,34 @@ tech stack, MVP plan, browsable knowledge base), and a **working walking skeleto
 a real MCP server, a tested guardrail, and a live dashboard — built incrementally on
 top of that design, one small, tested, reversible step at a time.
 
+It also tracks two separate things, on purpose: `project-blueprint/requirements.md`
+covers the MCP/guardrail work below (requirements R1–R5), while `.colaberry/plan.json`
++ `.colaberry/progress.json` track a larger, formally-scoped programme (11 stories
+across 5 releases, 18 requirements) — see the Command Center for that one.
+
+## Command Center
+
+The programme's live status dashboard — 9 tabs (Overview, Outcomes, Users & Use Case,
+Guardrails, Systems, Project Management, AI Agents, Knowledge Base, Data Model),
+reading `.colaberry/plan.json` and `.colaberry/progress.json` at runtime. Nothing on
+the page is hard-coded.
+
+```bash
+python3 -m http.server   # from the repo root; defaults to port 8000
+```
+
+Then open `http://localhost:8000/` — **must be served over HTTP, not opened as a
+`file://` path**, or the browser can't resolve the page's relative data/asset paths.
+
+Every tab has a **Sample / Real** toggle. Sample fills the page with clearly-labelled
+made-up data so the finished shape is visible on day one. Real shows exactly what's
+actually been built — which right now is honestly little: 0 of 11 programme stories
+started, all four guardrails (REQ-001/005/012/015) unenforced, none of the four
+target systems connected. That's not a bug in the dashboard — it's the real state of
+a programme on day one, and the whole point of the "Trust" rule this page is built
+around: no tab shows a number, a connection, or a result the project hasn't actually
+produced.
+
 ## See it running
 
 ```bash
@@ -63,5 +91,7 @@ everything else" in `architecture.md` for the full reasoning.
 ## Status
 
 This is a walking skeleton, not a finished product. `project-blueprint/requirements.md`
-tracks exactly what's real vs. planned, with a test a reviewer can run for every
-claim — nothing is marked done without one.
+tracks the MCP/guardrail work (R1–R5), and `.colaberry/progress.json` tracks the
+programme (STORY-000 through STORY-011) — both are honest about what's real vs.
+planned, with a test or an in-browser check for every claim. Nothing is marked done
+without one.
