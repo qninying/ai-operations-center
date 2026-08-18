@@ -9,10 +9,21 @@
 // responsible for writing that trail; see remediationGuardrail.test.ts for the contract
 // test that documents this split.
 
+// STORY-001 (REQ-001): approval is a decision, not just a presence/absence flag —
+// a denied request must be distinguishable from one nobody has reviewed yet, so a
+// denial can be resubmitted without silently reading as "already approved." Both
+// null (no decision yet) and status: "denied" fail the approval check below.
+export interface ApprovalDecision {
+  status: "approved" | "denied";
+  decidedBy: string;
+  decidedAt: string;
+  reason?: string;
+}
+
 export interface RemediationAction {
   actionType: string;
   evidenceIds: string[];
-  approval: { approvedBy: string; approvedAt: string } | null;
+  approval: ApprovalDecision | null;
   targetSystem: { name: string; productionWriteProtected: boolean };
 }
 
@@ -40,13 +51,16 @@ export function checkRemediationGuardrail(action: RemediationAction): GuardrailR
   if (!action.evidenceIds || action.evidenceIds.length === 0) {
     violations.push("NOT_EVIDENCE_LINKED");
   }
-  if (!action.approval) {
+  if (!action.approval || action.approval.status !== "approved") {
     violations.push("NOT_HUMAN_APPROVED");
   }
   if (!ALLOWED_ACTION_TYPES.has(action.actionType)) {
     violations.push("ACTION_TYPE_NOT_ALLOWED");
   }
-  if (action.targetSystem.productionWriteProtected && !action.approval) {
+  if (
+    action.targetSystem.productionWriteProtected &&
+    (!action.approval || action.approval.status !== "approved")
+  ) {
     violations.push("PRODUCTION_WRITE_REQUIRES_APPROVAL");
   }
 

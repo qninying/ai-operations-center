@@ -3,8 +3,8 @@
   "totals": {
     "stories_total": 11,
     "stories_verified": 0,
-    "criteria_total": 5,
-    "criteria_passed": 5,
+    "criteria_total": 8,
+    "criteria_passed": 8,
     "points_awarded": 0
   },
   "stories": [
@@ -18,9 +18,18 @@
         { "text": "Trust — no tab shows a number, a connection or a result the project has not actually produced.", "passed": true }
       ],
       "verification": { "state": "submitted", "commit": null }
+    },
+    {
+      "id": "STORY-001",
+      "criteria": [
+        { "text": "Given a production change request, when the request is submitted, then it must require human approval.", "passed": true },
+        { "text": "Given a denied approval, when the request is resubmitted unchanged, then it must still require approval.", "passed": true },
+        { "text": "Every approval decision (approve or deny) is logged for audit, keyed by correlation ID.", "passed": true }
+      ],
+      "verification": { "state": "submitted", "commit": null }
     }
   ],
-  "note_totals": "stories_total/stories_verified count the 11 real programme stories (plan.stories); criteria_total/criteria_passed currently reflect only STORY-000's criteria, since no other story has acceptance criteria defined yet — this will expand as later stories get built.",
+  "note_totals": "stories_total/stories_verified count the 11 real programme stories (plan.stories); criteria_total/criteria_passed reflect STORY-000 and STORY-001's criteria, since those are the only two stories with acceptance criteria defined so far — this will expand as later stories get built. 'submitted' means the criteria are backed by passing tests but no reviewer/commit sign-off has moved the story to 'verified' yet.",
   "r2McpServer": {
     "description": "MCP server built on the official @modelcontextprotocol/sdk, run over stdio (index.ts) and a thin HTTP wrapper (httpServer.ts) for local verification. One read-only resource + tool: read_sql_server_dmv, backed by dmvReader.ts/dmvLiveSource.ts, parameterized and honestly fixture-fallback when no live SQL Server is connected.",
     "stdioEntry": "mcp-server/src/index.ts",
@@ -29,14 +38,19 @@
     "claudeCodeConfig": ".mcp.json"
   },
   "r4Guardrail": {
-    "description": "checkRemediationGuardrail() rejects any remediation missing evidence, an allowed action type, or explicit human approval.",
+    "description": "checkRemediationGuardrail() rejects any remediation missing evidence, an allowed action type, or an approved (not denied, not absent) human decision.",
     "validationFunction": "guardrails/remediationGuardrail.ts",
     "tests": "guardrails/remediationGuardrail.test.ts",
     "demo": "guardrails/demoUnsafeAction.ts"
   },
+  "story001ApprovalAudit": {
+    "description": "buildApprovalAuditEntry() + ApprovalAuditLog record every approve/deny decision, keyed by correlation ID, idempotent on repeat (STORY-001 criterion 3). Covers the approval-decision slice of REQ-005's full audit trail, not the whole trail — that's STORY-002.",
+    "module": "guardrails/approvalAuditLog.ts",
+    "tests": "guardrails/approvalAuditLog.test.ts"
+  },
   "tests": {
     "mcp-server": { "files": 4, "passing": 30, "runner": "vitest" },
-    "guardrails": { "files": 1, "passing": 8, "runner": "vitest" }
+    "guardrails": { "files": 2, "passing": 15, "runner": "vitest" }
   },
   "requirementsFile": "project-blueprint/requirements.md"
 }

@@ -61,10 +61,11 @@ for a one-page technical summary.
 |---|---|
 | [`mcp-server/`](mcp-server/) | A real MCP server (official `@modelcontextprotocol/sdk`) over stdio and HTTP, exposing a read-only `read_sql_server_dmv` tool — parameterized queries, honest fixture-fallback when no live SQL Server is connected, a live dashboard at `/`. |
 | [`mcp-server/src/reliability/`](mcp-server/src/reliability/) | A generic, reusable timeout + capped-retry-with-backoff wrapper and circuit breaker, wired around every upstream call. |
-| [`guardrails/`](guardrails/) | `checkRemediationGuardrail()` — the structural rule that no remediation can execute without evidence, an allowed action type, and explicit human approval. |
+| [`guardrails/`](guardrails/) | `checkRemediationGuardrail()` — the structural rule that no remediation can execute without evidence, an allowed action type, and an approved (not denied, not absent) human decision. `approvalAuditLog.ts` records every approve/deny decision, idempotently. |
 | [`project-blueprint/requirements.md`](project-blueprint/requirements.md) | Per-requirement traceability (UNMAPPED / PLANNED / BUILT) with a reviewer-verifiable acceptance checklist — every claim points at a real test. |
 
-30 tests, run with `cd mcp-server && npm test`.
+30 tests in `mcp-server/` (`cd mcp-server && npm test`), 15 in `guardrails/`
+(`cd guardrails && npm test`).
 
 ## The design + planning layer
 

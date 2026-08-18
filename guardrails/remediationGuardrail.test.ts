@@ -5,7 +5,7 @@ function baseAction(overrides: Partial<RemediationAction> = {}): RemediationActi
   return {
     actionType: "restart_service",
     evidenceIds: ["evt-123"],
-    approval: { approvedBy: "jsmith", approvedAt: "2026-08-07T12:00:00Z" },
+    approval: { status: "approved", decidedBy: "jsmith", decidedAt: "2026-08-07T12:00:00Z" },
     targetSystem: { name: "app-server-01", productionWriteProtected: false },
     ...overrides,
   };
@@ -27,6 +27,27 @@ describe("checkRemediationGuardrail", () => {
     const result = checkRemediationGuardrail(baseAction({ approval: null }));
     expect(result.allowed).toBe(false);
     expect(result.violations).toContain("NOT_HUMAN_APPROVED");
+  });
+
+  it("rejects a denied approval the same as no approval (STORY-001: a denial is not silently treated as clearance)", () => {
+    const result = checkRemediationGuardrail(
+      baseAction({
+        approval: { status: "denied", decidedBy: "jsmith", decidedAt: "2026-08-07T12:00:00Z", reason: "not reversible enough" },
+      })
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.violations).toContain("NOT_HUMAN_APPROVED");
+  });
+
+  it("still requires approval when a denied action is resubmitted unchanged (STORY-001 criterion 2)", () => {
+    const denied = baseAction({
+      approval: { status: "denied", decidedBy: "jsmith", decidedAt: "2026-08-07T12:00:00Z" },
+    });
+    const firstSubmission = checkRemediationGuardrail(denied);
+    const resubmission = checkRemediationGuardrail(denied);
+    expect(firstSubmission).toEqual(resubmission);
+    expect(resubmission.allowed).toBe(false);
+    expect(resubmission.violations).toContain("NOT_HUMAN_APPROVED");
   });
 
   it("rejects an action type outside the allowed remediation list", () => {
