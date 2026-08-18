@@ -1,9 +1,16 @@
 {
-  "storyId": "p1786405883766-t2",
-  "storyIds": ["p1786405883766-t1", "p1786405883766-t2"],
+  "storyId": "p1786405883766-t3",
+  "storyIds": ["p1786405883766-t1", "p1786405883766-t2", "p1786405883766-t3"],
   "repo": "qninying/ai-operations-center",
-  "updatedAt": "2026-08-17T16:20:00Z",
+  "updatedAt": "2026-08-17T16:35:00Z",
   "summary": "CoreOps walking skeleton: MCP Tool Gateway (mcp-server/) over stdio + HTTP with a read-only SQL Server DMV tool, a reliability layer (timeout/retry/circuit breaker), a live dashboard, and a remediation guardrail (guardrails/) requiring human approval before any corrective action.",
+  "r2McpServer": {
+    "description": "MCP server built on the official @modelcontextprotocol/sdk, run over stdio (index.ts) and a thin HTTP wrapper (httpServer.ts) for local verification. One read-only resource + tool: read_sql_server_dmv, backed by dmvReader.ts/dmvLiveSource.ts, parameterized and honestly fixture-fallback when no live SQL Server is connected.",
+    "stdioEntry": "mcp-server/src/index.ts",
+    "httpEntry": "mcp-server/src/httpServer.ts",
+    "tool": "mcp-server/src/dmvReader.ts",
+    "claudeCodeConfig": ".mcp.json"
+  },
   "r4Guardrail": {
     "description": "checkRemediationGuardrail() rejects any remediation missing evidence, an allowed action type, or explicit human approval.",
     "validationFunction": "guardrails/remediationGuardrail.ts",
