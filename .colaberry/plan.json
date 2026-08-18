@@ -1,655 +1,79 @@
 {
-  "schema_version": 2,
-  "project_name": "CoreOps AI Operations Dashboard",
-  "descriptor": "An enterprise-grade AI Operations Dashboard for SQL Server, SSIS, SSRS, and Windows servers, providing intelligent command center capabilities with human approval for production changes.",
-  "requirements": [
-    {
-      "id": "REQ-001",
-      "kind": "SAFE",
-      "cluster": "Approval Workflow",
-      "priority": "must",
-      "statement": "The system must require human approval for any action that changes a production environment.",
-      "fulfilled_by": [
-        "STORY-001"
-      ]
-    },
-    {
-      "id": "REQ-002",
-      "kind": "FUNC",
-      "cluster": "AI Analysis",
-      "priority": "must",
-      "statement": "The system must automatically detect, diagnose, correlate, and recommend actions without executing production changes.",
-      "fulfilled_by": [
-        "STORY-003"
-      ]
-    },
-    {
-      "id": "REQ-003",
-      "kind": "FUNC",
-      "cluster": "AI Analysis",
-      "priority": "must",
-      "statement": "The system must provide confidence scores for recommended actions.",
-      "fulfilled_by": [
-        "STORY-003"
-      ]
-    },
-    {
-      "id": "REQ-004",
-      "kind": "FUNC",
-      "cluster": "AI Analysis",
-      "priority": "must",
-      "statement": "The system must present evidence-backed reasoning for all recommendations.",
-      "fulfilled_by": [
-        "STORY-003"
-      ]
-    },
-    {
-      "id": "REQ-005",
-      "kind": "SAFE",
-      "cluster": "Audit Trail",
-      "priority": "must",
-      "statement": "The system must log every decision and action for audit purposes.",
-      "fulfilled_by": [
-        "STORY-002"
-      ]
-    },
-    {
-      "id": "REQ-006",
-      "kind": "FUNC",
-      "cluster": "User Interface",
-      "priority": "must",
-      "statement": "The system must provide role-based dashboards for different user types.",
-      "fulfilled_by": [
-        "STORY-005"
-      ]
-    },
-    {
-      "id": "REQ-007",
-      "kind": "CONSTRAINT",
-      "cluster": "Integration",
-      "priority": "must",
-      "statement": "The system must support integration with SQL Server, SSIS, SSRS, and Windows servers.",
-      "fulfilled_by": [
-        "STORY-006"
-      ]
-    },
-    {
-      "id": "REQ-008",
-      "kind": "CONSTRAINT",
-      "cluster": "Integration",
-      "priority": "must",
-      "statement": "The system must support integration with cloud services and enterprise applications through standardized connectors.",
-      "fulfilled_by": [
-        "STORY-007"
-      ]
-    },
-    {
-      "id": "REQ-009",
-      "kind": "FUNC",
-      "cluster": "User Interface",
-      "priority": "must",
-      "statement": "The system must provide operational summaries for IT Managers and Engineering Leaders.",
-      "fulfilled_by": [
-        "STORY-005"
-      ]
-    },
-    {
-      "id": "REQ-010",
-      "kind": "FUNC",
-      "cluster": "AI Analysis",
-      "priority": "must",
-      "statement": "The system must gather additional diagnostics when confidence is below 80%.",
-      "fulfilled_by": [
-        "STORY-004"
-      ]
-    },
-    {
-      "id": "REQ-011",
-      "kind": "FUNC",
-      "cluster": "AI Analysis",
-      "priority": "must",
-      "statement": "The system must escalate incidents to a human when confidence is below 60%.",
-      "fulfilled_by": [
-        "STORY-009"
-      ]
-    },
-    {
-      "id": "REQ-012",
-      "kind": "SAFE",
-      "cluster": "Notification",
-      "priority": "must",
-      "statement": "The system must notify operators immediately of any autonomous actions taken.",
-      "fulfilled_by": [
-        "STORY-010"
-      ]
-    },
-    {
-      "id": "REQ-013",
-      "kind": "FUNC",
-      "cluster": "AI Analysis",
-      "priority": "must",
-      "statement": "The system must provide explainable AI recommendations for all users.",
-      "fulfilled_by": [
-        "STORY-006",
-        "STORY-007"
-      ]
-    },
-    {
-      "id": "REQ-014",
-      "kind": "FUNC",
-      "cluster": "Configuration",
-      "priority": "should",
-      "statement": "The system must allow configuration of confidence thresholds for actions.",
-      "fulfilled_by": []
-    },
-    {
-      "id": "REQ-015",
-      "kind": "SAFE",
-      "cluster": "Approval Workflow",
-      "priority": "must",
-      "statement": "The system must support rollback capabilities for low-risk, reversible tasks.",
-      "fulfilled_by": [
-        "STORY-011"
-      ]
-    },
-    {
-      "id": "REQ-016",
-      "kind": "FUNC",
-      "cluster": "Monitoring",
-      "priority": "must",
-      "statement": "The system must provide continuous monitoring and AI-powered root cause analysis.",
-      "fulfilled_by": [
-        "STORY-008"
-      ]
-    },
-    {
-      "id": "REQ-017",
-      "kind": "NFR",
-      "cluster": "Efficiency",
-      "priority": "should",
-      "statement": "The system must reduce manual incident correlation across systems by 50-70%.",
-      "fulfilled_by": []
-    },
-    {
-      "id": "REQ-018",
-      "kind": "CONSTRAINT",
-      "cluster": "Integration",
-      "priority": "must",
-      "statement": "The system must provide a plug-in connector architecture for extensibility.",
-      "fulfilled_by": []
-    }
-  ],
-  "releases": [
-    {
-      "key": "r0",
-      "demo": "Show a production change requiring human approval and logging the decision.",
-      "goal": "Establish the core system with audit and approval workflows.",
-      "name": "Initial Setup and Trust Spine",
-      "week_end": 1,
-      "week_start": 0,
-      "story_ids": [
-        "STORY-001",
-        "STORY-002"
-      ],
-      "starts_on": "2026-08-13",
-      "ends_on": "2026-08-23",
-      "is_demo_target": false
-    },
-    {
-      "key": "r1",
-      "demo": "Demonstrate AI recommendations with confidence scores and evidence-backed reasoning.",
-      "goal": "Implement AI-driven diagnostics and recommendations with confidence scores.",
-      "name": "AI Analysis and Recommendations",
-      "week_end": 2,
-      "week_start": 1,
-      "story_ids": [
-        "STORY-003",
-        "STORY-004"
-      ],
-      "starts_on": "2026-08-23",
-      "ends_on": "2026-09-02",
-      "is_demo_target": false
-    },
-    {
-      "key": "r2",
-      "demo": "Display role-based dashboards for DBAs and IT Managers.",
-      "goal": "Develop role-based dashboards and operational summaries.",
-      "name": "User Interface and Role-based Dashboards",
-      "week_end": 3,
-      "week_start": 2,
-      "story_ids": [
-        "STORY-005"
-      ],
-      "starts_on": "2026-09-11",
-      "ends_on": "2026-09-11",
-      "is_demo_target": false
-    },
-    {
-      "key": "r3",
-      "demo": "Show integration with SQL Server and a cloud service using standardized connectors.",
-      "goal": "Enable integration with SQL Server, SSIS, SSRS, Windows servers, and cloud services.",
-      "name": "Integration and Extensibility",
-      "week_end": 4,
-      "week_start": 3,
-      "story_ids": [
-        "STORY-006",
-        "STORY-007"
-      ],
-      "starts_on": "2026-09-11",
-      "ends_on": "2026-09-21",
-      "is_demo_target": false
-    },
-    {
-      "key": "r4",
-      "demo": "Demonstrate continuous monitoring and incident escalation based on confidence thresholds.",
-      "goal": "Enhance monitoring capabilities and incident management workflows.",
-      "name": "Advanced Monitoring and Incident Management",
-      "week_end": 5,
-      "week_start": 4,
-      "story_ids": [
-        "STORY-008",
-        "STORY-009",
-        "STORY-010",
-        "STORY-011"
-      ],
-      "starts_on": "2026-09-16",
-      "ends_on": "2026-10-01",
-      "is_demo_target": false
-    }
-  ],
-  "stories": [
-    {
-      "id": "STORY-001",
-      "title": "Implement human approval workflow for production changes",
-      "release": "r0",
-      "fulfills": [
-        "REQ-001"
-      ],
-      "narrative": "As an IT Operations Manager, I want production changes to require human approval, so that unauthorized changes are prevented.",
-      "acceptance": [
-        "Given a production change request, When the request is submitted, Then it must require human approval.",
-        "Given a denied approval, When the request is resubmitted, Then it must still require approval.",
-        "Trust: Every approval decision is logged for audit."
-      ],
-      "blocked_by": [],
-      "owner_agent": "IT Operations",
-      "failure_paths": [
-        "Approval request not sent",
-        "Approval request denied",
-        "Audit log failure"
-      ],
-      "task_guidance": "Implement approval workflow using existing ITSM tools. Log decisions in the audit trail.",
-      "due_on": "2026-08-13",
-      "due_baseline_on": "2026-08-13"
-    },
-    {
-      "id": "STORY-002",
-      "title": "Log all decisions and actions for audit purposes",
-      "release": "r0",
-      "fulfills": [
-        "REQ-005"
-      ],
-      "narrative": "As a Compliance Officer, I want all decisions and actions logged, so that I can audit them later.",
-      "acceptance": [
-        "Given an action is taken, When it is logged, Then it must be retrievable in the audit log.",
-        "Given a decision is made, When it is logged, Then it must include the decision maker.",
-        "Trust: Every log entry is timestamped and immutable."
-      ],
-      "blocked_by": [],
-      "owner_agent": "Compliance",
-      "failure_paths": [
-        "Log entry missing",
-        "Log entry incorrect",
-        "Log retrieval failure"
-      ],
-      "task_guidance": "Use a secure logging service to store audit logs with timestamps.",
-      "due_on": "2026-08-23",
-      "due_baseline_on": "2026-08-23"
-    },
-    {
-      "id": "STORY-003",
-      "title": "Implement AI-driven diagnostics and recommendations",
-      "release": "r1",
-      "fulfills": [
-        "REQ-002",
-        "REQ-003",
-        "REQ-004"
-      ],
-      "narrative": "As a DBA, I want AI to diagnose issues and recommend actions, so that I can resolve incidents faster.",
-      "acceptance": [
-        "Given an incident, When AI analyzes it, Then it must provide a recommendation with a confidence score.",
-        "Given a recommendation, When it is viewed, Then it must include evidence-backed reasoning.",
-        "Trust: All recommendations are logged with confidence scores."
-      ],
-      "blocked_by": [
-        "STORY-001",
-        "STORY-002"
-      ],
-      "owner_agent": "DBA",
-      "failure_paths": [
-        "AI fails to diagnose",
-        "Recommendation lacks evidence",
-        "Confidence score incorrect"
-      ],
-      "task_guidance": "Develop AI models to analyze incidents and generate recommendations with confidence scores.",
-      "due_on": "2026-08-23",
-      "due_baseline_on": "2026-08-23"
-    },
-    {
-      "id": "STORY-004",
-      "title": "Gather additional diagnostics for low-confidence incidents",
-      "release": "r1",
-      "fulfills": [
-        "REQ-010"
-      ],
-      "narrative": "As a DevOps Engineer, I want additional diagnostics for low-confidence incidents, so that I can make informed decisions.",
-      "acceptance": [
-        "Given an incident with low confidence, When additional diagnostics are gathered, Then they must be presented to the user.",
-        "Given multiple diagnostics, When they are presented, Then they must include possible causes.",
-        "Trust: All diagnostics gathering is logged."
-      ],
-      "blocked_by": [
-        "STORY-003"
-      ],
-      "owner_agent": "DevOps",
-      "failure_paths": [
-        "Diagnostics not gathered",
-        "Incorrect diagnostics presented",
-        "Diagnostics log failure"
-      ],
-      "task_guidance": "Implement diagnostic gathering tools to collect additional data for low-confidence incidents.",
-      "due_on": "2026-09-02",
-      "due_baseline_on": "2026-09-02"
-    },
-    {
-      "id": "STORY-005",
-      "title": "Develop role-based dashboards for different user types",
-      "release": "r2",
-      "fulfills": [
-        "REQ-006",
-        "REQ-009"
-      ],
-      "narrative": "As an IT Manager, I want a dashboard tailored to my role, so that I can quickly access relevant information.",
-      "acceptance": [
-        "Given a user role, When accessing the dashboard, Then it must display role-specific information.",
-        "Given an IT Manager, When viewing the dashboard, Then it must show operational summaries.",
-        "Trust: Dashboard access is logged by user role."
-      ],
-      "blocked_by": [
-        "STORY-004"
-      ],
-      "owner_agent": "IT Manager",
-      "failure_paths": [
-        "Dashboard not loading",
-        "Incorrect role information",
-        "Access log failure"
-      ],
-      "task_guidance": "Design and implement dashboards using a UI framework that supports role-based views.",
-      "due_on": "2026-09-11",
-      "due_baseline_on": "2026-09-11"
-    },
-    {
-      "id": "STORY-006",
-      "title": "Enable SQL Server data access for AI recommendations",
-      "release": "r3",
-      "fulfills": [
-        "REQ-007",
-        "REQ-013"
-      ],
-      "narrative": "As a system, I want to access data from SQL Server, so that I can provide AI-driven recommendations to users.",
-      "acceptance": [
-        "Given the system is connected to SQL Server, when a user requests a recommendation, then the system provides an AI-driven recommendation using SQL Server data.",
-        "Given the system is unable to connect to SQL Server, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
-        "Trust: All data access attempts are logged for audit purposes."
-      ],
-      "blocked_by": [
-        "STORY-005"
-      ],
-      "owner_agent": "System",
-      "failure_paths": [
-        "SQL Server connection failure",
-        "Data retrieval timeout",
-        "Invalid data format"
-      ],
-      "task_guidance": "Utilize standardized connectors to access SQL Server data for AI processing. Ensure data is logged for audit trails.",
-      "due_on": "2026-09-11",
-      "due_baseline_on": "2026-09-11"
-    },
-    {
-      "id": "STORY-007",
-      "title": "Enable cloud service data access for AI recommendations",
-      "release": "r3",
-      "fulfills": [
-        "REQ-008",
-        "REQ-013"
-      ],
-      "narrative": "As a system, I want to access data from cloud services, so that I can provide AI-driven recommendations to users.",
-      "acceptance": [
-        "Given the system is connected to cloud services, when a user requests a recommendation, then the system provides an AI-driven recommendation using cloud service data.",
-        "Given the system is unable to connect to cloud services, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
-        "Trust: All data access attempts are logged for audit purposes."
-      ],
-      "blocked_by": [
-        "STORY-005"
-      ],
-      "owner_agent": "System",
-      "failure_paths": [
-        "Cloud service connection failure",
-        "Data retrieval timeout",
-        "Invalid data format"
-      ],
-      "task_guidance": "Utilize standardized connectors to access cloud service data for AI processing. Ensure data is logged for audit trails.",
-      "due_on": "2026-09-21",
-      "due_baseline_on": "2026-09-21"
-    },
-    {
-      "id": "STORY-008",
-      "title": "Enhance monitoring capabilities for continuous incident management",
-      "release": "r4",
-      "fulfills": [
-        "REQ-016"
-      ],
-      "narrative": "As a Windows Server Administrator, I want enhanced monitoring, so that I can manage incidents continuously.",
-      "acceptance": [
-        "Given a server, When monitoring is enabled, Then incidents must be detected continuously.",
-        "Given an incident, When detected, Then it must trigger an alert.",
-        "Trust: All monitoring actions are logged."
-      ],
-      "blocked_by": [
-        "STORY-007"
-      ],
-      "owner_agent": "Windows Server Administrator",
-      "failure_paths": [
-        "Monitoring failure",
-        "Incident not detected",
-        "Monitoring log failure"
-      ],
-      "task_guidance": "Implement monitoring tools to continuously detect and log incidents on Windows servers.",
-      "due_on": "2026-09-16",
-      "due_baseline_on": "2026-09-16"
-    },
-    {
-      "id": "STORY-009",
-      "title": "Implement incident escalation based on confidence thresholds",
-      "release": "r4",
-      "fulfills": [
-        "REQ-011"
-      ],
-      "narrative": "As an Infrastructure Engineer, I want incidents escalated based on confidence, so that I can prioritize responses.",
-      "acceptance": [
-        "Given an incident with low confidence, When escalated, Then it must notify a human operator.",
-        "Given an escalation, When it occurs, Then it must be logged with the confidence score.",
-        "Trust: All escalations are logged with timestamps."
-      ],
-      "blocked_by": [
-        "STORY-008"
-      ],
-      "owner_agent": "Infrastructure Engineer",
-      "failure_paths": [
-        "Escalation not triggered",
-        "Incorrect confidence score",
-        "Escalation log failure"
-      ],
-      "task_guidance": "Configure incident management tools to escalate incidents based on confidence thresholds and log all escalations.",
-      "due_on": "2026-09-21",
-      "due_baseline_on": "2026-09-21"
-    },
-    {
-      "id": "STORY-010",
-      "title": "Notify operators of autonomous actions",
-      "release": "r4",
-      "fulfills": [
-        "REQ-012"
-      ],
-      "narrative": "As an operator, I want to be notified immediately of any autonomous actions taken by the system, so that I can monitor and respond as needed.",
-      "acceptance": [
-        "Given an autonomous action is taken, when the action is completed, then the system immediately notifies the operators.",
-        "Given an autonomous action is taken, when the notification fails, then the system retries the notification until successful.",
-        "Trust: All autonomous actions and notifications are logged for audit purposes."
-      ],
-      "blocked_by": [
-        "STORY-009"
-      ],
-      "owner_agent": "System",
-      "failure_paths": [
-        "Notification service failure",
-        "Operator contact information missing",
-        "Network issues"
-      ],
-      "task_guidance": "Implement notification service to alert operators of autonomous actions. Ensure logging of actions and notifications.",
-      "due_on": "2026-09-26",
-      "due_baseline_on": "2026-09-26"
-    },
-    {
-      "id": "STORY-011",
-      "title": "Implement rollback capabilities for low-risk tasks",
-      "release": "r4",
-      "fulfills": [
-        "REQ-015"
-      ],
-      "narrative": "As a system administrator, I want to be able to roll back low-risk tasks, so that I can ensure system stability and correct errors.",
-      "acceptance": [
-        "Given a low-risk task is completed, when a rollback is requested, then the system successfully reverts the task.",
-        "Given a rollback is requested for a non-reversible task, when the request is made, then the system denies the rollback request.",
-        "Trust: All rollback actions are logged for audit purposes."
-      ],
-      "blocked_by": [
-        "STORY-009"
-      ],
-      "owner_agent": "System Administrator",
-      "failure_paths": [
-        "Rollback failure due to task dependency",
-        "Incorrect task identification for rollback",
-        "Insufficient permissions for rollback"
-      ],
-      "task_guidance": "Develop rollback functionality for designated low-risk tasks. Ensure all rollback actions are logged.",
-      "due_on": "2026-10-01",
-      "due_baseline_on": "2026-10-01"
-    }
-  ],
-  "agents": [],
+  "schema_version": 1,
   "project": {
     "name": "CoreOps AI Operations Dashboard",
-    "descriptor": "An enterprise-grade AI Operations Dashboard for SQL Server, SSIS, SSRS, and Windows servers, providing intelligent command center capabilities with human approval for production changes.",
-    "repo_url": "https://github.com/qninying/ai-operations-center",
-    "plan_version": 1,
-    "plan_sha256": "58a1b34f2f213852eff5fd3a4e4f26ba6d5f7d9cc7ad29c6257837c90c203d87"
+    "descriptor": "An enterprise-grade AI Operations Dashboard for SQL Server, SSIS, SSRS, and Windows servers, providing intelligent command center capabilities with human approval for production changes."
   },
   "schedule": {
     "build_start": "2026-08-13",
     "build_end": "2026-10-01",
     "demo_day": "2026-10-08",
-    "build_weeks": 7,
-    "demo_release_key": null,
-    "roadmap_release_keys": [],
-    "prep": [
-      {
-        "key": "PREP-1",
-        "title": "Write the demo narrative: the problem, the one moment, the guardrail",
-        "due_on": "2026-10-02"
-      },
-      {
-        "key": "PREP-2",
-        "title": "Record a first run-through and watch it back",
-        "due_on": "2026-10-03"
-      },
-      {
-        "key": "PREP-3",
-        "title": "Build the slides — what it does, who for, the number it moves",
-        "due_on": "2026-10-05"
-      },
-      {
-        "key": "PREP-4",
-        "title": "Rehearse with one other person and take their notes",
-        "due_on": "2026-10-06"
-      },
-      {
-        "key": "PREP-5",
-        "title": "Record the final demo video",
-        "due_on": "2026-10-07"
-      },
-      {
-        "key": "PREP-6",
-        "title": "Present at Demo Day",
-        "due_on": "2026-10-08"
-      }
-    ]
+    "demo_release_key": "r4"
   },
+  "requirements": [
+    { "id": "REQ-001", "statement": "The system must require human approval for any action that changes a production environment.", "kind": "SAFE", "priority": "must", "fulfilled_by": ["STORY-001"] },
+    { "id": "REQ-002", "statement": "The system must automatically detect, diagnose, correlate, and recommend actions without executing production changes.", "kind": "FUNC", "priority": "must", "fulfilled_by": ["STORY-003"] },
+    { "id": "REQ-003", "statement": "The system must provide confidence scores for recommended actions.", "kind": "FUNC", "priority": "must", "fulfilled_by": ["STORY-003"] },
+    { "id": "REQ-004", "statement": "The system must present evidence-backed reasoning for all recommendations.", "kind": "FUNC", "priority": "must", "fulfilled_by": ["STORY-003"] },
+    { "id": "REQ-005", "statement": "The system must log every decision and action for audit purposes.", "kind": "SAFE", "priority": "must", "fulfilled_by": ["STORY-002"] },
+    { "id": "REQ-006", "statement": "The system must provide role-based dashboards for different user types.", "kind": "FUNC", "priority": "must", "fulfilled_by": ["STORY-005"] },
+    { "id": "REQ-007", "statement": "The system must support integration with SQL Server, SSIS, SSRS, and Windows servers.", "kind": "CONSTRAINT", "priority": "must", "fulfilled_by": ["STORY-006"] },
+    { "id": "REQ-008", "statement": "The system must support integration with cloud services and enterprise applications through standardized connectors.", "kind": "CONSTRAINT", "priority": "must", "fulfilled_by": ["STORY-007"] },
+    { "id": "REQ-009", "statement": "The system must provide operational summaries for IT Managers and Engineering Leaders.", "kind": "FUNC", "priority": "must", "fulfilled_by": [] },
+    { "id": "REQ-010", "statement": "The system must gather additional diagnostics when confidence is below 80%.", "kind": "FUNC", "priority": "must", "fulfilled_by": ["STORY-004"] },
+    { "id": "REQ-011", "statement": "The system must escalate incidents to a human when confidence is below 60%.", "kind": "FUNC", "priority": "must", "fulfilled_by": ["STORY-009"] },
+    { "id": "REQ-012", "statement": "The system must notify operators immediately of any autonomous actions taken.", "kind": "SAFE", "priority": "must", "fulfilled_by": ["STORY-010"] },
+    { "id": "REQ-013", "statement": "The system must provide explainable AI recommendations for all users.", "kind": "FUNC", "priority": "must", "fulfilled_by": ["STORY-003"] },
+    { "id": "REQ-014", "statement": "The system must allow configuration of confidence thresholds for actions.", "kind": "FUNC", "priority": "should", "fulfilled_by": [] },
+    { "id": "REQ-015", "statement": "The system must support rollback capabilities for low-risk, reversible tasks.", "kind": "SAFE", "priority": "must", "fulfilled_by": ["STORY-011"] },
+    { "id": "REQ-016", "statement": "The system must provide continuous monitoring and AI-powered root cause analysis.", "kind": "FUNC", "priority": "must", "fulfilled_by": ["STORY-008"] },
+    { "id": "REQ-017", "statement": "The system must reduce manual incident correlation across systems by 50-70%.", "kind": "NFR", "priority": "should", "fulfilled_by": [] },
+    { "id": "REQ-018", "statement": "The system must provide a plug-in connector architecture for extensibility.", "kind": "CONSTRAINT", "priority": "must", "fulfilled_by": ["STORY-007"] }
+  ],
+  "stories": [
+    { "id": "STORY-001", "title": "Implement human approval workflow for production changes", "release": "r0", "narrative": "As an IT Operations Manager, I want production changes to require my approval, so that nothing autonomous touches a live environment.", "acceptance_criteria": ["Given a production change request, when the request is submitted, then it must require human approval.", "Given a denied approval, when the request is resubmitted unchanged, then it must still require approval.", "Every approval decision (approve or deny) is logged for audit, keyed by correlation ID."], "due_on": "2026-08-13", "due_baseline_on": "2026-08-13" },
+    { "id": "STORY-002", "title": "Log all decisions and actions for audit purposes", "release": "r0", "narrative": "As a Compliance Officer, I want every decision and action logged, so that the system is auditable.", "acceptance_criteria": ["Given an action is taken, when it is logged, then it must be retrievable in the audit log.", "Given a decision is made, when it is logged, then it must include the decision maker.", "Every log entry is timestamped and immutable."], "due_on": "2026-08-23", "due_baseline_on": "2026-08-23" },
+    { "id": "STORY-003", "title": "Implement AI-driven diagnostics and recommendations", "release": "r1", "narrative": "As a DBA, I want AI-driven diagnostics with confidence scores and evidence, so that I can trust and act on recommendations.", "acceptance_criteria": [], "due_on": "2026-08-23", "due_baseline_on": "2026-08-23" },
+    { "id": "STORY-004", "title": "Gather additional diagnostics for low-confidence incidents", "release": "r1", "narrative": "As a DBA, I want the system to gather more diagnostics when confidence is below 80%, so that recommendations improve before I see them.", "acceptance_criteria": [], "due_on": "2026-09-02", "due_baseline_on": "2026-09-02" },
+    { "id": "STORY-005", "title": "Develop role-based dashboards for different user types", "release": "r2", "narrative": "As an IT Manager, I want a dashboard suited to my role, so that I see operational summaries relevant to me.", "acceptance_criteria": [], "due_on": "2026-09-11", "due_baseline_on": "2026-09-11" },
+    { "id": "STORY-006", "title": "Enable SQL Server data access for AI recommendations", "release": "r3", "narrative": "As a DevOps Engineer, I want SQL Server, SSIS, SSRS, and Windows integration, so that recommendations are grounded in real telemetry.", "acceptance_criteria": [], "due_on": "2026-09-11", "due_baseline_on": "2026-09-11" },
+    { "id": "STORY-007", "title": "Enable cloud service data access for AI recommendations", "release": "r3", "narrative": "As a DevOps Engineer, I want a plug-in connector architecture for cloud services and enterprise applications, so that the system extends beyond on-prem systems.", "acceptance_criteria": [], "due_on": "2026-09-21", "due_baseline_on": "2026-09-21" },
+    { "id": "STORY-008", "title": "Enhance monitoring capabilities for continuous incident management", "release": "r4", "narrative": "As a Windows Server Administrator, I want continuous monitoring and root cause analysis, so that incidents are caught early.", "acceptance_criteria": [], "due_on": "2026-09-16", "due_baseline_on": "2026-09-16" },
+    { "id": "STORY-009", "title": "Implement incident escalation based on confidence thresholds", "release": "r4", "narrative": "As an Infrastructure Engineer, I want incidents escalated to a human when confidence is below 60%, so that low-confidence cases always get human eyes.", "acceptance_criteria": [], "due_on": "2026-09-21", "due_baseline_on": "2026-09-21" },
+    { "id": "STORY-010", "title": "Notify operators of autonomous actions", "release": "r4", "narrative": "As a System Administrator, I want to be notified immediately of any autonomous action, so that I'm never surprised by the system.", "acceptance_criteria": [], "due_on": "2026-09-26", "due_baseline_on": "2026-09-26" },
+    { "id": "STORY-011", "title": "Implement rollback capabilities for low-risk tasks", "release": "r4", "narrative": "As a System Administrator, I want rollback support for low-risk, reversible tasks, so that mistakes are cheap to undo.", "acceptance_criteria": [], "due_on": "2026-10-01", "due_baseline_on": "2026-10-01" }
+  ],
+  "releases": [
+    { "key": "r0", "name": "Initial Setup and Trust Spine", "starts_on": "2026-08-13", "ends_on": "2026-08-23", "story_ids": ["STORY-001", "STORY-002"], "is_demo_target": false },
+    { "key": "r1", "name": "AI Analysis and Recommendations", "starts_on": "2026-08-23", "ends_on": "2026-09-02", "story_ids": ["STORY-003", "STORY-004"], "is_demo_target": false },
+    { "key": "r2", "name": "User Interface and Role-based Dashboards", "starts_on": "2026-09-11", "ends_on": "2026-09-11", "story_ids": ["STORY-005"], "is_demo_target": false },
+    { "key": "r3", "name": "Integration and Extensibility", "starts_on": "2026-09-11", "ends_on": "2026-09-21", "story_ids": ["STORY-006", "STORY-007"], "is_demo_target": false },
+    { "key": "r4", "name": "Advanced Monitoring and Incident Management", "starts_on": "2026-09-16", "ends_on": "2026-10-01", "story_ids": ["STORY-008", "STORY-009", "STORY-010", "STORY-011"], "is_demo_target": true }
+  ],
+  "agents": [],
   "derived": {
     "measures": [
-      {
-        "id": "REQ-017",
-        "statement": "The system must reduce manual incident correlation across systems by 50-70%."
-      }
+      { "id": "REQ-017", "statement": "The system must reduce manual incident correlation across systems by 50-70%." }
     ],
+    "roles": ["IT Operations Manager", "Compliance Officer", "DBA", "DevOps Engineer", "IT Manager", "Windows Server Administrator"],
     "guardrails": [
-      {
-        "id": "REQ-001",
-        "statement": "The system must require human approval for any action that changes a production environment."
-      },
-      {
-        "id": "REQ-005",
-        "statement": "The system must log every decision and action for audit purposes."
-      },
-      {
-        "id": "REQ-012",
-        "statement": "The system must notify operators immediately of any autonomous actions taken."
-      },
-      {
-        "id": "REQ-015",
-        "statement": "The system must support rollback capabilities for low-risk, reversible tasks."
-      }
+      { "id": "REQ-001", "statement": "The system must require human approval for any action that changes a production environment." },
+      { "id": "REQ-005", "statement": "The system must log every decision and action for audit purposes." },
+      { "id": "REQ-012", "statement": "The system must notify operators immediately of any autonomous actions taken." },
+      { "id": "REQ-015", "statement": "The system must support rollback capabilities for low-risk, reversible tasks." }
     ],
-    "systems": [
-      "SQL Server",
-      "SSIS",
-      "SSRS",
-      "Windows"
-    ],
-    "roles": [
-      "IT Operations Manager",
-      "Compliance Officer",
-      "DBA",
-      "DevOps Engineer",
-      "IT Manager",
-      "Windows Server Administrator",
-      "Infrastructure Engineer",
-      "operator",
-      "system administrator"
-    ],
-    "counts": {
-      "requirements_total": 18,
-      "requirements_by_kind": {
-        "CONSTRAINT": 3,
-        "FUNC": 10,
-        "NFR": 1,
-        "SAFE": 4
-      },
-      "stories_total": 11,
-      "releases_total": 5,
-      "agents_total": 0,
-      "failure_paths_total": 31,
-      "agents_by_autonomy": {}
-    }
+    "systems": ["SQL Server", "SSIS", "SSRS", "Windows"],
+    "counts": { "agents_by_autonomy": {} },
+    "owners": [
+      { "name": "IT Operations", "owns": ["STORY-001"] },
+      { "name": "Compliance", "owns": ["STORY-002"] },
+      { "name": "DBA", "owns": ["STORY-003"] },
+      { "name": "DevOps", "owns": ["STORY-004"] },
+      { "name": "IT Manager", "owns": ["STORY-005"] },
+      { "name": "System", "owns": ["STORY-006", "STORY-007", "STORY-010"] },
+      { "name": "Windows Server Administrator", "owns": ["STORY-008"] },
+      { "name": "Infrastructure Engineer", "owns": ["STORY-009"] },
+      { "name": "System Administrator", "owns": ["STORY-011"] }
+    ]
   }
 }
