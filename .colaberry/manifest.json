@@ -1,4 +1,12 @@
 {
-  "schema_version": 1,
-  "generated_at": "2026-08-18T02:06:53Z"
+  "generated_at": "2026-08-18T21:14:49.836Z",
+  "plan_version": 1,
+  "plan_sha256": "58a1b34f2f213852eff5fd3a4e4f26ba6d5f7d9cc7ad29c6257837c90c203d87",
+  "correlation_id": null,
+  "files": [
+    {
+      "path": ".colaberry/plan.json",
+      "sha256": "8eddcda80b9c3456980a1165c8266fb824da8ee0dbcdd93933a6ce2158b03077"
+    }
+  ]
 }
