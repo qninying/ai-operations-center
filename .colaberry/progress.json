@@ -1,9 +1,26 @@
 {
-  "storyId": "p1786405883766-t3",
-  "storyIds": ["p1786405883766-t1", "p1786405883766-t2", "p1786405883766-t3"],
-  "repo": "qninying/ai-operations-center",
-  "updatedAt": "2026-08-17T16:35:00Z",
-  "summary": "CoreOps walking skeleton: MCP Tool Gateway (mcp-server/) over stdio + HTTP with a read-only SQL Server DMV tool, a reliability layer (timeout/retry/circuit breaker), a live dashboard, and a remediation guardrail (guardrails/) requiring human approval before any corrective action.",
+  "schema_version": 1,
+  "totals": {
+    "stories_total": 11,
+    "stories_verified": 0,
+    "criteria_total": 5,
+    "criteria_passed": 5,
+    "points_awarded": 0
+  },
+  "stories": [
+    {
+      "id": "STORY-000",
+      "criteria": [
+        { "text": "Given the Command Center, when it is opened, then every tab is reachable and every card drills down one level.", "passed": true },
+        { "text": "Given sample mode, when any tab is shown, then the sample data is visibly labelled as sample.", "passed": true },
+        { "text": "Given the data files, when any tab renders, then its content comes from .colaberry/plan.json and .colaberry/progress.json read at runtime rather than from hard-coded values.", "passed": true },
+        { "text": "Given .colaberry/manifest.json, when any tab is shown, then it displays how old the data is and warns when that age exceeds a week.", "passed": true },
+        { "text": "Trust — no tab shows a number, a connection or a result the project has not actually produced.", "passed": true }
+      ],
+      "verification": { "state": "submitted", "commit": null }
+    }
+  ],
+  "note_totals": "stories_total/stories_verified count the 11 real programme stories (plan.stories); criteria_total/criteria_passed currently reflect only STORY-000's criteria, since no other story has acceptance criteria defined yet — this will expand as later stories get built.",
   "r2McpServer": {
     "description": "MCP server built on the official @modelcontextprotocol/sdk, run over stdio (index.ts) and a thin HTTP wrapper (httpServer.ts) for local verification. One read-only resource + tool: read_sql_server_dmv, backed by dmvReader.ts/dmvLiveSource.ts, parameterized and honestly fixture-fallback when no live SQL Server is connected.",
     "stdioEntry": "mcp-server/src/index.ts",
@@ -21,6 +38,5 @@
     "mcp-server": { "files": 4, "passing": 30, "runner": "vitest" },
     "guardrails": { "files": 1, "passing": 8, "runner": "vitest" }
   },
-  "requirementsFile": "project-blueprint/requirements.md",
-  "note": "Status per requirement (UNMAPPED/PLANNED/BUILT) and the acceptance criteria backing each test are documented in requirementsFile — this summary doesn't assert a verdict, it points at the real evidence."
+  "requirementsFile": "project-blueprint/requirements.md"
 }

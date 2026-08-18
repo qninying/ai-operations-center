@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CoreOps — Systems</title>
+<link rel="stylesheet" href="assets/command-center.css?v=1" />
+</head>
+<body>
+  <header class="cc-header">
+    <div class="cc-header-top">
+      <div class="cc-brand">CoreOps Command Center</div>
+      <div class="cc-mode-toggle" id="cc-mode-toggle"></div>
+    </div>
+    <div class="cc-data-as-of" id="cc-data-as-of">Loading…</div>
+    <nav class="cc-nav" id="cc-nav"></nav>
+  </header>
+  <main id="cc-main">
+    <h1 class="cc-page-title">Systems</h1>
+    <p class="cc-page-desc">What this connects to. The plan only knows the names — whether a connection is actually live is a fact about the running system, not this repo.</p>
+    <div id="cc-content">Loading…</div>
+  </main>
+  <script src="assets/command-center.js?v=3"></script>
+  <script>
+  (function () {
+    const { esc, getParam } = CommandCenter;
+
+    // Sample overlay only — real mode always reports honestly, per the brief:
+    // "None of these are connected on day one."
+    const SAMPLE_STATUS = {
+      "SQL Server": { cls: "cc-dot-ok", label: "connected", checked: "2 minutes ago" },
+      "SSIS": { cls: "cc-dot-ok", label: "connected", checked: "2 minutes ago" },
+      "SSRS": { cls: "cc-dot-error", label: "error", checked: "5 minutes ago" },
+      "Windows": { cls: "", label: "not checked from here", checked: "never" },
+    };
+
+    function renderList({ plan, mode }) {
+      const el = document.getElementById("cc-content");
+      const systems = (plan.derived && plan.derived.systems) || [];
+      const badge = CommandCenter.sampleBadge();
+      el.innerHTML = `<div class="cc-grid">` + systems.map((sys) => {
+        const sample = SAMPLE_STATUS[sys] || { cls: "", label: "not checked from here" };
+        const dotCls = mode === "sample" ? sample.cls : "";
+        const label = mode === "sample" ? sample.label : "not checked from here";
+        return `
+          <a class="cc-card" href="systems.html?id=${encodeURIComponent(sys)}">
+            <h3><span class="cc-dot ${dotCls}"></span>${esc(sys)}${badge}</h3>
+            <p>${esc(label)}</p>
+          </a>
+        `;
+      }).join("") + `</div>`;
+    }
+
+    function renderDetail({ plan, mode }, id) {
+      const el = document.getElementById("cc-content");
+      const systems = (plan.derived && plan.derived.systems) || [];
+      if (!systems.includes(id)) {
+        el.innerHTML = `<div class="cc-empty-state">No system "${esc(id)}" in the plan.</div>`;
+        return;
+      }
+      const badge = CommandCenter.sampleBadge();
+      const sample = SAMPLE_STATUS[id] || { cls: "", label: "not checked from here", checked: "never" };
+      const dotCls = mode === "sample" ? sample.cls : "";
+      const label = mode === "sample" ? sample.label : "not checked from here";
+      const checked = mode === "sample" ? sample.checked : "never";
+      el.innerHTML = `
+        <p><a href="systems.html">← Systems</a></p>
+        <div class="cc-panel-box">
+          <h3 style="margin-top:0;"><span class="cc-dot ${dotCls}"></span>${esc(id)}${badge}</h3>
+          <p><strong>Status:</strong> ${esc(label)}</p>
+          <p><strong>Last checked:</strong> ${esc(checked)}</p>
+          <p style="color:var(--cc-muted); font-size:13px;">
+            An indicator that goes green because a name appeared in a JSON file would be a
+            lie with a colour on it. This page only knows this system was named as an
+            integration target — connecting it is separate, unbuilt work.
+          </p>
+        </div>
+      `;
+    }
+
+    CommandCenter.init("systems", (data) => {
+      const id = getParam("id");
+      if (id) renderDetail(data, id);
+      else renderList(data);
+    });
+  })();
+  </script>
+</body>
+</html>
