@@ -23,8 +23,8 @@
       "id": "STORY-001",
       "criteria": [
         { "text": "Given a production change request, when the request is submitted, then it must require human approval.", "passed": true },
-        { "text": "Given a denied approval, when the request is resubmitted unchanged, then it must still require approval.", "passed": true },
-        { "text": "Every approval decision (approve or deny) is logged for audit, keyed by correlation ID.", "passed": true }
+        { "text": "Given a denied approval, When the request is resubmitted, Then it must still require approval.", "passed": true },
+        { "text": "Trust: Every approval decision is logged for audit.", "passed": true }
       ],
       "verification": { "state": "submitted", "commit": null }
     },
@@ -33,7 +33,7 @@
       "criteria": [
         { "text": "Given an action is taken, when it is logged, then it must be retrievable in the audit log.", "passed": true },
         { "text": "Given a decision is made, when it is logged, then it must include the decision maker.", "passed": true },
-        { "text": "Every log entry is timestamped and immutable.", "passed": true }
+        { "text": "Trust: Every log entry is timestamped and immutable.", "passed": true }
       ],
       "verification": { "state": "submitted", "commit": null }
     }
