@@ -3,8 +3,8 @@
   "totals": {
     "stories_total": 11,
     "stories_verified": 0,
-    "criteria_total": 8,
-    "criteria_passed": 8,
+    "criteria_total": 11,
+    "criteria_passed": 11,
     "points_awarded": 0
   },
   "stories": [
@@ -27,9 +27,18 @@
         { "text": "Every approval decision (approve or deny) is logged for audit, keyed by correlation ID.", "passed": true }
       ],
       "verification": { "state": "submitted", "commit": null }
+    },
+    {
+      "id": "STORY-002",
+      "criteria": [
+        { "text": "Given an action is taken, when it is logged, then it must be retrievable in the audit log.", "passed": true },
+        { "text": "Given a decision is made, when it is logged, then it must include the decision maker.", "passed": true },
+        { "text": "Every log entry is timestamped and immutable.", "passed": true }
+      ],
+      "verification": { "state": "submitted", "commit": null }
     }
   ],
-  "note_totals": "stories_total/stories_verified count the 11 real programme stories (plan.stories); criteria_total/criteria_passed reflect STORY-000 and STORY-001's criteria, since those are the only two stories with acceptance criteria defined so far — this will expand as later stories get built. 'submitted' means the criteria are backed by passing tests but no reviewer/commit sign-off has moved the story to 'verified' yet.",
+  "note_totals": "stories_total/stories_verified count the 11 real programme stories (plan.stories); criteria_total/criteria_passed reflect STORY-000, STORY-001 and STORY-002's criteria, since those are the only three stories with acceptance criteria defined so far — this will expand as later stories get built. 'submitted' means the criteria are backed by passing tests but no reviewer/commit sign-off has moved the story to 'verified' yet.",
   "r2McpServer": {
     "description": "MCP server built on the official @modelcontextprotocol/sdk, run over stdio (index.ts) and a thin HTTP wrapper (httpServer.ts) for local verification. One read-only resource + tool: read_sql_server_dmv, backed by dmvReader.ts/dmvLiveSource.ts, parameterized and honestly fixture-fallback when no live SQL Server is connected.",
     "stdioEntry": "mcp-server/src/index.ts",
@@ -43,14 +52,14 @@
     "tests": "guardrails/remediationGuardrail.test.ts",
     "demo": "guardrails/demoUnsafeAction.ts"
   },
-  "story001ApprovalAudit": {
-    "description": "buildApprovalAuditEntry() + ApprovalAuditLog record every approve/deny decision, keyed by correlation ID, idempotent on repeat (STORY-001 criterion 3). Covers the approval-decision slice of REQ-005's full audit trail, not the whole trail — that's STORY-002.",
-    "module": "guardrails/approvalAuditLog.ts",
-    "tests": "guardrails/approvalAuditLog.test.ts"
+  "auditLog": {
+    "description": "AuditLog (guardrails/auditLog.ts) records two entry kinds — decisions (STORY-001: approve/deny, actor = decision maker) and actions (STORY-002: guardrail-evaluated remediation attempts, executed/blocked + violations, actor = whoever/whatever triggered it). Every entry has a required id (the idempotency key), is retrievable via retrieve(id) with an explicit found/not-found result, is frozen on write, and rejects entries missing required fields. Does not cover the full detection -> recommendation -> approval -> execution-outcome trail from R4 property 4 — no detection/recommendation subsystem exists yet (R1 is UNMAPPED).",
+    "module": "guardrails/auditLog.ts",
+    "tests": "guardrails/auditLog.test.ts"
   },
   "tests": {
     "mcp-server": { "files": 4, "passing": 30, "runner": "vitest" },
-    "guardrails": { "files": 2, "passing": 15, "runner": "vitest" }
+    "guardrails": { "files": 2, "passing": 23, "runner": "vitest" }
   },
   "requirementsFile": "project-blueprint/requirements.md"
 }

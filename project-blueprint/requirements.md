@@ -36,11 +36,12 @@ Each requirement has a status:
       `cd mcp-server && npm test`.
 - [x] **R4 — Guardrail: human-approved, evidence-based remediation:**
       `guardrails/remediationGuardrail.test.ts` (10 cases, including a denied-approval
-      case distinct from no-decision-yet) and `guardrails/approvalAuditLog.test.ts`
-      (5 cases, covering approval-decision logging and its idempotency) pass under
-      the wired test runner (`guardrails/package.json` + `guardrails/tsconfig.json`,
-      vitest 4). `cd guardrails && npm test` → 15/15 passed; `npx tsc --noEmit` also
-      passes. See PROGRESS.md 2026-08-13 and 2026-08-18 notes.
+      case distinct from no-decision-yet) and `guardrails/auditLog.test.ts` (13 cases,
+      covering both decision and action logging, retrieval, immutability, and
+      idempotency) pass under the wired test runner (`guardrails/package.json` +
+      `guardrails/tsconfig.json`, vitest 4). `cd guardrails && npm test` → 23/23
+      passed; `npx tsc --noEmit` also passes. See PROGRESS.md 2026-08-13 and
+      2026-08-18 notes.
 
 ---
 
@@ -247,10 +248,11 @@ decision, not a bare presence flag, as of STORY-001) +
 `guardrails/remediationGuardrail.test.ts` (10 cases: happy path, one per violation
 type, a denied-approval case distinct from no-decision-yet, a resubmitted-denial
 case, production-write-protected boundary reject/allow, simultaneous violations,
-purity) + `guardrails/approvalAuditLog.ts` (STORY-001 criterion 3: records each
-approval/denial decision, idempotent on repeat) + `guardrails/approvalAuditLog.test.ts`
-(5 cases) + `guardrails/package.json` / `guardrails/tsconfig.json` (vitest 4 test
-runner, wired 2026-08-13). `cd guardrails && npm test` → 15/15 passing;
+purity) + `guardrails/auditLog.ts` (STORY-001 criterion 3 + STORY-002/REQ-005:
+records both approve/deny decisions and guardrail-evaluated actions, retrievable
+by ID, frozen/immutable on write, idempotent on repeat) + `guardrails/auditLog.test.ts`
+(13 cases) + `guardrails/package.json` / `guardrails/tsconfig.json` (vitest 4 test
+runner, wired 2026-08-13). `cd guardrails && npm test` → 23/23 passing;
 `npx tsc --noEmit` clean.
 
 **What "safe" means (acceptance criterion):** A remediation action is safe only if it
@@ -274,9 +276,12 @@ R4 moved UNMAPPED → PLANNED on 2026-08-07 once the validator and its tests exi
 (see PROGRESS.md). R4 moved PLANNED → BUILT on 2026-08-13 once a test runner was
 wired in and the 8-case suite was confirmed passing (`cd guardrails && npm test`),
 per the bar stated in the Producing task line above. On 2026-08-18, STORY-001
-(REQ-001) added `guardrails/approvalAuditLog.ts`, covering the *approval-decision*
-slice of property 4 — every approve/deny decision is logged, keyed by correlation
-ID, idempotently. The full end-to-end trail (detection → recommendation →
-approval → execution outcome) is still not built — that remains the execution
-service's responsibility, as `remediationGuardrail.ts`'s header comment has said
-since 2026-08-07; this only closes the approval-logging piece of it.
+(REQ-001) added an approval-decision audit log, then STORY-002 (REQ-005) that same
+day generalized it into `guardrails/auditLog.ts`, extending property 4 to cover
+both decisions *and* actions — every approve/deny decision and every
+guardrail-evaluated action is logged, retrievable by ID, timestamped, immutable,
+and idempotent. What's still not built: the *detection* and *recommendation* legs
+of the full trail (detection → recommendation → approval → execution outcome),
+because no detection/recommendation subsystem exists yet — that's R1, still
+UNMAPPED. Property 4 is now closed for everything downstream of a proposed action;
+it isn't closed end-to-end until R1 exists to log the upstream half.
