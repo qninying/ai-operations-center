@@ -39,27 +39,6 @@
     }
   ],
   "note_totals": "stories_total/stories_verified count the 11 real programme stories (plan.stories); criteria_total/criteria_passed reflect STORY-000, STORY-001 and STORY-002's criteria, since those are the only three stories with acceptance criteria defined so far — this will expand as later stories get built. 'submitted' means the criteria are backed by passing tests but no reviewer/commit sign-off has moved the story to 'verified' yet.",
-  "r2McpServer": {
-    "description": "MCP server built on the official @modelcontextprotocol/sdk, run over stdio (index.ts) and a thin HTTP wrapper (httpServer.ts) for local verification. One read-only resource + tool: read_sql_server_dmv, backed by dmvReader.ts/dmvLiveSource.ts, parameterized and honestly fixture-fallback when no live SQL Server is connected.",
-    "stdioEntry": "mcp-server/src/index.ts",
-    "httpEntry": "mcp-server/src/httpServer.ts",
-    "tool": "mcp-server/src/dmvReader.ts",
-    "claudeCodeConfig": ".mcp.json"
-  },
-  "r4Guardrail": {
-    "description": "checkRemediationGuardrail() rejects any remediation missing evidence, an allowed action type, or an approved (not denied, not absent) human decision.",
-    "validationFunction": "guardrails/remediationGuardrail.ts",
-    "tests": "guardrails/remediationGuardrail.test.ts",
-    "demo": "guardrails/demoUnsafeAction.ts"
-  },
-  "auditLog": {
-    "description": "AuditLog (guardrails/auditLog.ts) records two entry kinds — decisions (STORY-001: approve/deny, actor = decision maker) and actions (STORY-002: guardrail-evaluated remediation attempts, executed/blocked + violations, actor = whoever/whatever triggered it). Every entry has a required id (the idempotency key), is retrievable via retrieve(id) with an explicit found/not-found result, is frozen on write, and rejects entries missing required fields. Does not cover the full detection -> recommendation -> approval -> execution-outcome trail from R4 property 4 — no detection/recommendation subsystem exists yet (R1 is UNMAPPED).",
-    "module": "guardrails/auditLog.ts",
-    "tests": "guardrails/auditLog.test.ts"
-  },
-  "tests": {
-    "mcp-server": { "files": 4, "passing": 30, "runner": "vitest" },
-    "guardrails": { "files": 2, "passing": 23, "runner": "vitest" }
-  },
-  "requirementsFile": "project-blueprint/requirements.md"
+  "requirementsFile": "project-blueprint/requirements.md",
+  "implementationNotesFile": "docs/implementation-notes.md"
 }
