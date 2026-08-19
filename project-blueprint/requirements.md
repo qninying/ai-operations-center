@@ -9,10 +9,15 @@ Each requirement has a status:
 
 ## Acceptance Checklist (reviewer-verifiable)
 
-- [ ] **R1 — Core action via Claude agent:** `guardrails/rootCauseAgent.test.ts` exists
-      and contains a passing test asserting the returned explanation cites the input
-      evidence IDs, plus a passing test asserting an insufficient-evidence input
-      returns an explicit low-confidence result (not free text).
+- [x] **R1 — Core action via Claude agent:** `mcp-server/src/rootCauseAgent.ts`
+      (`analyzeIncidentRootCause()`, real Anthropic Messages API call, Claude Sonnet 5)
+      + `mcp-server/src/rootCauseAgent.test.ts` (10 cases: evidence-grounded prompt
+      content, attributed evidence IDs, insufficient-evidence with no API call,
+      insufficient-evidence from a genuinely low model confidence, malformed/
+      out-of-range response rejection, missing-API-key, retry-then-fail, repeatability).
+      `cd mcp-server && npm test` → 40/40 passing; `npx tsc --noEmit` clean. Also run
+      once against the real Anthropic API (not mocked) with a real DMV-shaped incident
+      — see PROGRESS.md 2026-08-18 note for the actual output.
 - [x] **R2 — SQL Server DMVs data source (read-only):** `mcp-server/src/dmvReader.ts`
       + the `read_sql_server_dmv` tool in `index.ts` return well-formed DMV-shaped
       rows, and `readOnlyGuard.test.ts` asserts no *unreviewed* write-capable SQL
@@ -47,14 +52,22 @@ Each requirement has a status:
 
 ## R1 — Core action via Claude agent
 
-**Status:** UNMAPPED
+**Status:** BUILT
 
 **Requirement:** The system identifies root causes of correlated incidents using
 Claude, reasoning over live, read-only evidence gathered from the affected
 platform (SQL Server, SSIS, SSRS, Windows Servers) — not a template response
 and not a guess from telemetry alone.
 
-**Producing task:** _(none yet — this row is what we're filling in this task)_
+**Producing task:** `mcp-server/src/rootCauseAgent.ts` — the Root Cause Analysis
+Agent named in `architecture.md`'s Components table (Claude Sonnet 5 via the
+Anthropic API + the MCP Tool Gateway's read path). `analyzeIncidentRootCause()`
+takes an `Incident` (evidence items, each with its own `id`), sends the evidence
+verbatim into the prompt, and validates Claude's JSON response against a zod
+schema before trusting it. Built as `mcp-server/src/rootCauseAgent.ts`, not
+`guardrails/rootCauseAgent.ts` as an earlier draft of this row guessed —
+`guardrails/` is the approval/audit-guardrail module; this consumes
+`mcp-server`'s DMV evidence directly, so it lives alongside it instead.
 
 **What "identifies root causes using Claude" means (acceptance criterion):** A root-cause
 result is valid only if it satisfies all three properties below:
@@ -69,9 +82,15 @@ result is valid only if it satisfies all three properties below:
    doesn't support a confident root cause, the function returns an explicit
    low-confidence/no-root-cause result rather than inventing one.
 
-R1 moves UNMAPPED → PLANNED once: a root-cause function implementing this contract
-exists, its tests cover the evidence-grounded, attributed, and insufficient-evidence
-cases, and this row points at both.
+R1 moved UNMAPPED → BUILT directly on 2026-08-18 (STORY-003): the function, its
+10-case test suite, and a real (non-mocked) run against the live Anthropic API all
+landed together — see PROGRESS.md for the actual verified output. All three
+properties are enforced structurally, not just by convention: evidence-grounded
+(the prompt embeds real evidence data, asserted by inspecting what's actually sent
+to the model), attributed (the response schema requires `evidenceIdsUsed`),
+non-fabricated when thin (an empty-evidence incident never reaches the API at all,
+and a genuine upstream failure raises a typed error rather than a fabricated
+low-confidence answer standing in for a call that didn't happen).
 
 ---
 

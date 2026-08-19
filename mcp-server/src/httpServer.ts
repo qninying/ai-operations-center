@@ -1,3 +1,4 @@
+import "./loadEnv.js";
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

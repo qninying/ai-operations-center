@@ -34,12 +34,14 @@ Then open `http://localhost:8000/` — **must be served over HTTP, not opened as
 
 Every tab has a **Sample / Real** toggle. Sample fills the page with clearly-labelled
 made-up data so the finished shape is visible on day one. Real shows exactly what's
-actually been built — which right now is honestly little: 0 of 11 programme stories
-started, all four guardrails (REQ-001/005/012/015) unenforced, none of the four
-target systems connected. That's not a bug in the dashboard — it's the real state of
-a programme on day one, and the whole point of the "Trust" rule this page is built
-around: no tab shows a number, a connection, or a result the project hasn't actually
-produced.
+actually been built: 4 of 11 programme stories (STORY-000/001/002/003) with
+test-backed criteria, sitting at `"submitted"` — the guardrails those stories back
+(REQ-001/005) still show as not-yet-enforced on the Guardrails tab, because this
+repo only flips a story to `"verified"` on an external reviewer/commit sign-off, not
+a self-declaration. None of the four target systems are connected yet. That's not a
+bug in the dashboard — it's the real state of an early-stage programme, and the
+whole point of the "Trust" rule this page is built around: no tab shows a number, a
+connection, or a result the project hasn't actually produced.
 
 ## See it running
 
@@ -60,11 +62,12 @@ for a one-page technical summary.
 | Path | What it is |
 |---|---|
 | [`mcp-server/`](mcp-server/) | A real MCP server (official `@modelcontextprotocol/sdk`) over stdio and HTTP, exposing a read-only `read_sql_server_dmv` tool — parameterized queries, honest fixture-fallback when no live SQL Server is connected, a live dashboard at `/`. |
-| [`mcp-server/src/reliability/`](mcp-server/src/reliability/) | A generic, reusable timeout + capped-retry-with-backoff wrapper and circuit breaker, wired around every upstream call. |
+| [`mcp-server/src/rootCauseAgent.ts`](mcp-server/src/rootCauseAgent.ts) | The Root Cause Analysis Agent — a real Claude Sonnet 5 (Anthropic API) call over real DMV evidence, zod-validated structured output, evidence-attributed, never fabricates a result when evidence is thin or the API call itself fails. |
+| [`mcp-server/src/reliability/`](mcp-server/src/reliability/) | A generic, reusable timeout + capped-retry-with-backoff wrapper and circuit breaker, wired around every upstream call — SQL Server and the Anthropic API alike. |
 | [`guardrails/`](guardrails/) | `checkRemediationGuardrail()` — the structural rule that no remediation can execute without evidence, an allowed action type, and an approved (not denied, not absent) human decision. `auditLog.ts` records every decision and action, retrievable by ID, timestamped, immutable, idempotent. |
 | [`project-blueprint/requirements.md`](project-blueprint/requirements.md) | Per-requirement traceability (UNMAPPED / PLANNED / BUILT) with a reviewer-verifiable acceptance checklist — every claim points at a real test. |
 
-30 tests in `mcp-server/` (`cd mcp-server && npm test`), 23 in `guardrails/`
+40 tests in `mcp-server/` (`cd mcp-server && npm test`), 23 in `guardrails/`
 (`cd guardrails && npm test`).
 
 ## The design + planning layer
