@@ -49,6 +49,17 @@ export class LiveSourceUnavailableError extends Error {
 // against SUPPORTED_DMVS by the caller before this map is even consulted, so it is
 // never used to build SQL text.
 const DMV_QUERIES: Record<SupportedDmv, string> = {
+  // STORY-006: ordering by cpu_time DESC alone was a real bug, only found by
+  // running this against a real instance — a blocked session has near-zero CPU
+  // time by definition (it's waiting, not computing), so on a real server with
+  // background engine noise (Azure SQL Database serverless alone runs 40-50+
+  // internal system sessions — XE dispatchers, HADR workers, lazy writer, broker
+  // tasks, none of it real activity), a genuine blocking scenario was getting
+  // silently pushed out of TOP(3) by system housekeeping. Fixture data's clean
+  // 3-row dataset could never have exposed this. Fixed two ways: excludes
+  // status = 'background' (engine housekeeping, not application activity), and
+  // sorts any blocked session (blocking_session_id <> 0) ahead of everything
+  // else before falling back to cpu_time as the tiebreaker.
   "sys.dm_exec_requests": `
     SELECT TOP (3)
       r.session_id,
@@ -60,8 +71,11 @@ const DMV_QUERIES: Record<SupportedDmv, string> = {
       r.total_elapsed_time AS total_elapsed_time_ms,
       DB_NAME(r.database_id) AS database_name
     FROM sys.dm_exec_requests r
-    WHERE (@databaseName IS NULL OR DB_NAME(r.database_id) = @databaseName)
-    ORDER BY r.cpu_time DESC
+    WHERE r.status <> 'background'
+      AND (@databaseName IS NULL OR DB_NAME(r.database_id) = @databaseName)
+    ORDER BY
+      CASE WHEN r.blocking_session_id <> 0 THEN 0 ELSE 1 END,
+      r.cpu_time DESC
   `,
 };
 

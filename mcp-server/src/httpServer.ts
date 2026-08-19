@@ -5,6 +5,11 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { readDmv } from "./dmvReader.js";
 import { buildDashboardSummary, UnknownRoleError } from "./dashboardSummary.js";
+import {
+  generateRecommendation,
+  SqlServerUnavailableError,
+  InvalidDataFormatError,
+} from "./recommendationService.js";
 import { logEvent } from "./observability/logger.js";
 import { checkRemediationGuardrail } from "../../guardrails/remediationGuardrail.js";
 
@@ -91,6 +96,36 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       });
       sendJson(res, 500, {
         error: "DASHBOARD_SUMMARY_FAILED",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/recommendation") {
+    // STORY-006 / REQ-007 + REQ-013: unlike /dmv/exec-requests, this route never
+    // falls back to fixture data on a SQL Server failure — see
+    // recommendationService.ts's header comment for why. Every attempt is logged
+    // regardless of outcome ("Trust: all data access attempts are logged").
+    const incidentId = url.searchParams.get("incidentId") ?? crypto.randomUUID();
+    const description = url.searchParams.get("description") ?? "";
+    try {
+      const result = await generateRecommendation(incidentId, description);
+      sendJson(res, 200, { incidentId, ...result });
+    } catch (error) {
+      if (error instanceof SqlServerUnavailableError) {
+        sendJson(res, 503, {
+          error: "SQL_SERVER_UNAVAILABLE",
+          message: "Could not connect to SQL Server. No recommendation was generated.",
+        });
+        return;
+      }
+      if (error instanceof InvalidDataFormatError) {
+        sendJson(res, 502, { error: "INVALID_DATA_FORMAT", message: error.message });
+        return;
+      }
+      sendJson(res, 500, {
+        error: "RECOMMENDATION_FAILED",
         message: error instanceof Error ? error.message : String(error),
       });
     }

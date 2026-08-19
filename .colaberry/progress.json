@@ -247,21 +247,29 @@
       "criteria": [
         {
           "text": "Given the system is connected to SQL Server, when a user requests a recommendation, then the system provides an AI-driven recommendation using SQL Server data.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given the system is unable to connect to SQL Server, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: All data access attempts are logged for audit purposes.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "mcp-server/src/recommendationService.ts",
+        "mcp-server/src/dmvLiveSource.ts",
+        "mcp-server/src/httpServer.ts",
+        "mcp-server/src/seedBlockingScenario.ts"
+      ],
+      "tests_added": [
+        "mcp-server/src/recommendationService.test.ts",
+        "mcp-server/src/dmvLiveSource.test.ts (1 new regression case)"
+      ],
+      "notes": "Verified against a real, live Azure SQL Database (Free tier), not just mocked \u2014 the R2/R3 gap this repo has carried since before this session (\"the live path has never actually succeeded against a real SQL Server instance\") is now closed. Found and fixed a real bug only discoverable live: the DMV query ordered by cpu_time DESC alone, which silently buried a genuine blocking scenario under 40-50+ Azure background system sessions (all near-zero CPU by definition of being blocked, not computing). Fixed query + regression test guard it. generateRecommendation() calls queryLiveDmv() directly (bypassing dmvReader.ts fallback) so an unreachable SQL Server notifies the user honestly rather than silently substituting fixture data and calling it real.",
+      "updated_at": "2026-08-19T16:24:42.774Z",
       "verification": {
         "state": "not_started",
         "criteria_passed": 0,

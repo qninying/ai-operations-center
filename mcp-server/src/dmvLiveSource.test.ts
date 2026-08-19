@@ -117,6 +117,27 @@ describe("queryLiveDmv", () => {
     expect(queryText).toContain("@databaseName");
   });
 
+  // STORY-006 regression: caught only by actually running this against a real SQL
+  // Server (Azure SQL Database serverless runs 40-50+ background system sessions,
+  // all cpu_time_ms: 0 or near it) — a genuine blocking scenario has near-zero CPU
+  // by definition, so ordering by cpu_time DESC alone silently pushed a real block
+  // out of TOP(3). The mocked test suite couldn't have caught this on its own
+  // (there's no real background noise to be crowded out by in a mock), so this
+  // guards the query text itself against the fix being reverted, rather than
+  // asserting behavior a mock can't meaningfully exercise.
+  it("orders blocked sessions ahead of everything else and excludes engine background noise (STORY-006 regression)", async () => {
+    setSqlEnv();
+    const query = vi.fn().mockResolvedValue({ recordset: [] });
+    mockMssql(query);
+
+    const { queryLiveDmv } = await import("./dmvLiveSource.js");
+    await queryLiveDmv({ dmvName: "sys.dm_exec_requests" });
+
+    const queryText = query.mock.calls[0][0] as string;
+    expect(queryText).toContain("status <> 'background'");
+    expect(queryText).toContain("CASE WHEN r.blocking_session_id <> 0 THEN 0 ELSE 1 END");
+  });
+
   it("opens the circuit breaker once failures cross the threshold, then fails fast without attempting a connection", async () => {
     setSqlEnv();
     const query = vi.fn().mockRejectedValue(new Error("down"));

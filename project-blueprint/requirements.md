@@ -23,6 +23,8 @@ Each requirement has a status:
       rows, and `readOnlyGuard.test.ts` asserts no *unreviewed* write-capable SQL
       driver dependency and no write-statement keywords in `dmvReader.ts`,
       `dmvLiveSource.ts`, or `index.ts`. Full suite: `cd mcp-server && npm test`.
+      Confirmed against a real, live Azure SQL Database on 2026-08-19 (STORY-006) —
+      no longer fixture/mock-only.
 - [x] **R3 — Result shaping + substitutions:** `mcp-server/src/dmvLiveSource.ts`
       queries a real (parameterized) SQL Server connection, falling back to fixture
       data on failure; `mcp-server/src/dmvReader.ts` caps every response to 3 rows and
@@ -31,7 +33,10 @@ Each requirement has a status:
       `dmvLiveSource.test.ts` includes a regression test proving a `databaseName`
       containing a SQL-injection payload is bound as a parameter, never spliced into
       query text; `dmvReader.test.ts` covers the empty-input/zero-result boundary
-      cases and confirms the happy path stays silent (no message, no log).
+      cases and confirms the happy path stays silent (no message, no log). A second
+      regression test (2026-08-19) guards a real bug found only by running against a
+      live instance: ordering by `cpu_time DESC` alone buried genuine blocked
+      sessions under background system noise.
 - [x] **R5 — Retry + timeout on the upstream call:** `mcp-server/src/reliability/`
       (`withReliability.ts` + `circuitBreaker.ts`) wraps `queryLiveDmv()` with a 10s
       timeout, 3 retries with exponential backoff, and a circuit breaker that opens
@@ -96,7 +101,7 @@ low-confidence answer standing in for a call that didn't happen).
 
 ## R2 — SQL Server DMVs data source (read-only)
 
-**Status:** PLANNED
+**Status:** BUILT
 
 **Requirement:** The platform can read live operational state from SQL Server via
 Dynamic Management Views (DMVs) — currently-executing requests, blocking sessions,
@@ -119,34 +124,34 @@ valid only if it satisfies all three properties below:
 
 1. **Well-formed** — the resource returns data shaped like a real DMV query result
    (typed rows matching the target DMV's actual columns), not an arbitrary blob.
-   **Tested against the fixture shape.** The live query (R3) now derives
-   `database_name` correctly via `DB_NAME(r.database_id)` rather than assuming it's a
-   column, closing that specific gap — but the query itself has never run against a
-   real SQL Server instance in this environment, so full column fidelity is still
-   unconfirmed in practice, only by inspection of the query text.
+   **Tested against the fixture shape, and now confirmed against a real instance**
+   (STORY-006, 2026-08-19): ran against a live Azure SQL Database (Free tier),
+   real columns matched `DmvExecRequestRow` exactly, no shape surprises.
 2. **Read-only by construction** — the resource and any related tool have no code
    path capable of executing a write statement against SQL Server; this is a
    property of what the code *can* do, not a policy comment. **Tested** —
    `readOnlyGuard.test.ts` is an automated regression guard, not just a design claim.
 3. **Contract-stable under a stub** — swapping the fixture data source for a live
    connection must not change the resource's URI, shape, or the tool's input/output
-   schema. **Partially demonstrated:** R3 added the live path behind `readDmv()`
-   without changing the MCP tool's URI or output schema — but `readDmv()`'s own
-   signature *did* change (sync → async, added `source` field), because the original
-   PLANNED note assumed a signature that turned out to be insufficient once fallback
-   and result-tagging were designed. The one thing genuinely unproven is whether the
-   live path works end-to-end — no real SQL Server has ever been reachable to
-   confirm the query succeeds, only that it fails safely when unreachable.
+   schema. **Demonstrated:** R3 added the live path behind `readDmv()` without
+   changing the MCP tool's URI or output schema (`readDmv()`'s own signature did
+   change — sync → async, added `source` field — a known, accepted revision from
+   when fallback/result-tagging were first designed, not a new gap).
 
-R2 moves PLANNED → BUILT once: the live query in `dmvLiveSource.ts` has actually
-succeeded against a real SQL Server instance at least once (not just "fails safely"),
-and its returned columns are reconciled against that instance's real schema.
+R2 moved PLANNED → BUILT on 2026-08-19 (STORY-006): the live query in
+`dmvLiveSource.ts` succeeded against a real, live Azure SQL Database — not mocked,
+not fixture data. Along the way, running against a real instance surfaced a real bug
+no mock could have: `DMV_QUERIES`'s `ORDER BY r.cpu_time DESC` silently buried
+genuine blocked sessions (near-zero CPU by definition) under 40-50+ Azure background
+system sessions. Fixed (excludes `status = 'background'`, sorts blocked sessions
+first) and guarded by a new regression test in `dmvLiveSource.test.ts`. See
+`docs/implementation-notes.md` for the full account.
 
 ---
 
 ## R3 — Result shaping + substitutions
 
-**Status:** PLANNED
+**Status:** BUILT
 
 **Requirement:** The core DMV read action is backed by a real SQL Server source, not
 just fixture data — with results shaped for consumption (capped, most-relevant-first)
@@ -195,9 +200,17 @@ it satisfies all four properties below:
    both, plus a check that non-empty happy-path results stay silent (no message, no
    log), so this doesn't leak into normal responses.
 
-R3 moves PLANNED → BUILT once: the live path has succeeded against a real SQL Server
-instance at least once (same bar as R2 — they share this open item), proving the
-shaping and substitution logic runs correctly against real data, not just mocks.
+R3 moved PLANNED → BUILT on 2026-08-19 (STORY-006), the same bar as R2 since they
+share this evidence: the live path succeeded against a real Azure SQL Database,
+proving shaping and substitution run correctly against real data, not just mocks.
+Genuinely new since this requirement was written: a real consumer now exists —
+`mcp-server/src/recommendationService.ts` (STORY-006) calls `queryLiveDmv()`
+directly, deliberately bypassing `readDmv()`'s fallback-to-fixture behavior, because
+presenting an AI recommendation generated from fixture data as if it reflected real
+SQL Server state would be exactly the kind of fabrication R1's own design refuses.
+An unreachable SQL Server there means an honest connectivity notification, not a
+silent substitution — `readDmv()`'s own fallback behavior is unchanged for its
+existing callers (the dashboard, `/dmv/exec-requests`).
 
 ---
 

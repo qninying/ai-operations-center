@@ -12,20 +12,75 @@ See `project-blueprint/requirements.md` for the full R1–R5 requirement
 traceability these notes summarize; this file is a shorter, implementation-
 focused index into the same code.
 
-## R2 — MCP server
+## R1 — Root Cause Analysis Agent (STORY-003)
 
-MCP server built on the official `@modelcontextprotocol/sdk`, run over stdio
-(`index.ts`) and a thin HTTP wrapper (`httpServer.ts`) for local verification.
-One read-only resource + tool: `read_sql_server_dmv`, backed by
-`dmvReader.ts`/`dmvLiveSource.ts`, parameterized and honestly fixture-fallback
-when no live SQL Server is connected.
+`mcp-server/src/rootCauseAgent.ts` — a real Claude Sonnet 5 (Anthropic API) call
+over real evidence, zod-validated structured output, evidence-attributed. Empty
+evidence never reaches the API (deterministic low-confidence result instead); a
+genuine API failure surfaces as a typed error, never a fabricated answer.
 
 | | |
 |---|---|
-| stdio entry | `mcp-server/src/index.ts` |
-| HTTP entry | `mcp-server/src/httpServer.ts` |
-| tool | `mcp-server/src/dmvReader.ts` |
-| Claude Code config | `.mcp.json` |
+| module | `mcp-server/src/rootCauseAgent.ts` |
+| tests | `mcp-server/src/rootCauseAgent.test.ts` |
+
+## Additional diagnostics (STORY-004)
+
+`mcp-server/src/diagnosticsGatherer.ts` — when the Root Cause Agent's confidence
+is below 80% (REQ-010), asks Claude for a differential (several distinct
+possible causes over the same evidence) instead of one under-confident guess.
+
+| | |
+|---|---|
+| module | `mcp-server/src/diagnosticsGatherer.ts` |
+| tests | `mcp-server/src/diagnosticsGatherer.test.ts` |
+
+## Role-based dashboard (STORY-005)
+
+`mcp-server/src/dashboardSummary.ts` + `GET /api/dashboard/summary` — an IT
+Manager gets real DMV data reshaped into operational counts, not raw technical
+rows. An unrecognized role is rejected (400), never rendered wrong. The
+Operations Console (`frontend/`, Vite + React + TypeScript) consumes this over
+a dev-only proxy — see `frontend/vite.config.ts`.
+
+| | |
+|---|---|
+| module | `mcp-server/src/dashboardSummary.ts` |
+| tests | `mcp-server/src/dashboardSummary.test.ts`, `frontend/src/App.test.tsx` |
+
+## SQL Server → AI recommendation (STORY-006)
+
+`mcp-server/src/recommendationService.ts` + `GET /api/recommendation` — wires
+real SQL Server data into a real AI recommendation. Calls `queryLiveDmv()`
+directly, deliberately bypassing `dmvReader.ts`'s fallback-to-fixture behavior:
+presenting an AI recommendation generated from fixture data as if it reflected
+real SQL Server state would be exactly the kind of fabrication R1 was built to
+refuse. No live connection means an honest connectivity notification, not a
+silent substitution. Rows are zod-validated before being trusted as evidence.
+
+**Verified against a real, live Azure SQL Database (Free tier) on 2026-08-19**
+— not mocked. This closed a gap this repo had carried since before this
+session: R2/R3's live path had never actually succeeded against a real SQL
+Server instance. Doing so surfaced a real bug no mock could have: the DMV
+query's `ORDER BY r.cpu_time DESC` silently buried genuine blocked sessions
+(near-zero CPU by definition — they're waiting, not computing) under 40-50+
+Azure background system sessions (XE dispatchers, HADR workers, lazy writer,
+broker tasks). Fixed in `dmvLiveSource.ts`: excludes `status = 'background'`,
+sorts any blocked session ahead of everything else. Guarded by a new
+regression test.
+
+`mcp-server/src/seedBlockingScenario.ts` is demo/dev tooling (not part of the
+app) that deliberately creates a real blocking scenario — two concurrent
+sessions, one holding a lock the other waits on — so a live demo has something
+incident-shaped to show instead of an idle database. It's the one place in
+this repo that writes to a monitored SQL Server, and deliberately so; run by
+hand, never imported by application code.
+
+| | |
+|---|---|
+| module | `mcp-server/src/recommendationService.ts` |
+| tests | `mcp-server/src/recommendationService.test.ts`, `dmvLiveSource.test.ts` (regression case) |
+| demo tooling | `mcp-server/src/seedBlockingScenario.ts` (run: `npx tsx src/seedBlockingScenario.ts [holdSeconds]`) |
 
 ## R4 — Remediation guardrail
 
@@ -46,9 +101,10 @@ guardrail-evaluated remediation attempts, executed/blocked + violations,
 actor = whoever/whatever triggered it). Every entry has a required `id` (the
 idempotency key), is retrievable via `retrieve(id)` with an explicit
 found/not-found result, is frozen on write, and rejects entries missing
-required fields. Does not cover the full detection → recommendation →
-approval → execution-outcome trail from R4 property 4 — no
-detection/recommendation subsystem exists yet (R1 is UNMAPPED).
+required fields. Still does not cover the full detection → recommendation →
+approval → execution-outcome trail from R4 property 4 — no detection/
+recommendation subsystem existed when this was written; R1 now does
+(above), but nothing yet wires an approval/execution step onto it.
 
 | | |
 |---|---|
@@ -59,9 +115,11 @@ detection/recommendation subsystem exists yet (R1 is UNMAPPED).
 
 | Package | Files | Passing | Runner |
 |---|---|---|---|
-| `mcp-server/` | 4 | 30 | vitest |
+| `mcp-server/` | 9 | 62 | vitest |
 | `guardrails/` | 2 | 23 | vitest |
+| `frontend/` | 1 | 5 | vitest |
 
-Run with `cd mcp-server && npm test` / `cd guardrails && npm test`. Keep these
-counts current when either suite changes — they're referenced from
-`README.md` and `project-blueprint/requirements.md` too.
+Run with `cd mcp-server && npm test` / `cd guardrails && npm test` /
+`cd frontend && npm test`. Keep these counts current when any suite
+changes — they're referenced from `README.md` and
+`project-blueprint/requirements.md` too.
