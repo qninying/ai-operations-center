@@ -15,6 +15,8 @@ import {
   CloudServiceUnavailableError,
   InvalidCloudDataFormatError,
 } from "./cloudRecommendationService.js";
+import { startMonitoring } from "./monitoringService.js";
+import type { MonitoringHandle, MonitoringCycleResult } from "./monitoringService.js";
 import { logEvent } from "./observability/logger.js";
 import { checkRemediationGuardrail } from "../../guardrails/remediationGuardrail.js";
 
@@ -29,6 +31,15 @@ const REQUEST_TIMEOUT_MS = 5000;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dashboardHtml = readFileSync(join(__dirname, "dashboard.html"), "utf-8");
+
+// STORY-008 / REQ-016: single monitoring instance for the process, exposed via the
+// routes below so a demo can toggle it live and see it running, rather than reading
+// server logs. This module-level state is the process's only monitoring instance —
+// monitoringService.ts itself stays instance-agnostic and stateless.
+const RECENT_ALERTS_LIMIT = 10;
+let monitoringHandle: MonitoringHandle | null = null;
+let lastMonitoringCycle: MonitoringCycleResult | null = null;
+let recentAlerts: MonitoringCycleResult[] = [];
 
 function sendJson(res: ServerResponse, status: number, body: unknown) {
   const payload = JSON.stringify(body, null, 2);
@@ -164,6 +175,48 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         message: error instanceof Error ? error.message : String(error),
       });
     }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/monitoring/start") {
+    // STORY-008 / REQ-016: idempotent by construction — calling start while already
+    // running does not spin up a second interval loop (that would double every
+    // cycle's log lines and alerts), matching this repo's idempotency rule.
+    if (monitoringHandle) {
+      sendJson(res, 200, { running: true, message: "Monitoring is already running." });
+      return;
+    }
+    monitoringHandle = startMonitoring({
+      onCycle: (result) => {
+        lastMonitoringCycle = result;
+        if (result.alert) {
+          recentAlerts = [result, ...recentAlerts].slice(0, RECENT_ALERTS_LIMIT);
+        }
+      },
+    });
+    logEvent({ level: "info", event: "monitoring_control", context: { action: "start" } });
+    sendJson(res, 200, { running: true });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/monitoring/stop") {
+    if (!monitoringHandle) {
+      sendJson(res, 200, { running: false, message: "Monitoring is already stopped." });
+      return;
+    }
+    monitoringHandle.stop();
+    monitoringHandle = null;
+    logEvent({ level: "info", event: "monitoring_control", context: { action: "stop" } });
+    sendJson(res, 200, { running: false });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/monitoring/status") {
+    sendJson(res, 200, {
+      running: monitoringHandle !== null,
+      lastCycle: lastMonitoringCycle,
+      recentAlerts,
+    });
     return;
   }
 

@@ -333,21 +333,26 @@
       "criteria": [
         {
           "text": "Given a server, When monitoring is enabled, Then incidents must be detected continuously.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given an incident, When detected, Then it must trigger an alert.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: All monitoring actions are logged.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "mcp-server/src/monitoringService.ts",
+        "mcp-server/src/httpServer.ts"
+      ],
+      "tests_added": [
+        "mcp-server/src/monitoringService.test.ts"
+      ],
+      "notes": "\"A server\" read as the one already-connected real system this repo can reach (the live Azure SQL Database from STORY-006) rather than a new, uncredentialed Windows Server connection — flagged and confirmed with the user before building. monitoringService.ts's startMonitoring()/stop() runs a real interval loop over queryLiveDmv() (never dmvReader.ts's fixture-fallback — a fabricated incident/all-clear would be exactly what STORY-006/007 refused). Incident = any row with a non-zero blocking_session_id, reusing STORY-006's already-fixed detection query as-is. A failed cycle is logged and the loop keeps running rather than dying; a logging failure is guarded so it can't take the loop down either. Wired to GET/POST /api/monitoring/{start,stop,status} in httpServer.ts, idempotent start/stop (calling start while already running does not spin up a second interval). Live testing surfaced and fixed a real bug before shipping: the interval fired on a fixed schedule regardless of whether the previous cycle had finished, and a cold-starting Azure SQL free-tier instance took ~30s to respond against the 10s default interval — overlapping cycles piled up concurrent connection attempts and tripped the shared circuit breaker on a false alarm. Fixed with an in-flight guard (skip a tick if the previous cycle hasn't finished) plus a regression test.",
+      "updated_at": "2026-08-19T21:58:17.000Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,
