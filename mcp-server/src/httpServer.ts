@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { readDmv } from "./dmvReader.js";
+import { buildDashboardSummary, UnknownRoleError } from "./dashboardSummary.js";
+import { logEvent } from "./observability/logger.js";
 import { checkRemediationGuardrail } from "../../guardrails/remediationGuardrail.js";
 
 // Thin HTTP transport for R2's DMV read path, alongside the existing stdio MCP
@@ -46,6 +48,49 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     } catch (error) {
       sendJson(res, 500, {
         error: "DMV_READ_FAILED",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/dashboard/summary") {
+    // STORY-005 / REQ-006 + REQ-009: role-based dashboard views. Same thin-wrapper
+    // pattern as /dmv/exec-requests — buildDashboardSummary() holds the actual logic
+    // and is unit-tested; this route is just plumbing plus the access-log call
+    // ("Trust: Dashboard access is logged by user role") that a pure function can't
+    // do for itself.
+    const role = url.searchParams.get("role") ?? "";
+    try {
+      const dmvResult = await readDmv({ dmvName: "sys.dm_exec_requests" });
+      const summary = buildDashboardSummary(role, dmvResult);
+      logEvent({
+        level: "info",
+        event: "dashboard_access",
+        context: { role, outcome: "success" },
+      });
+      sendJson(res, 200, summary);
+    } catch (error) {
+      if (error instanceof UnknownRoleError) {
+        logEvent({
+          level: "warn",
+          event: "dashboard_access",
+          context: { role, outcome: "failure", errorClass: "UnknownRoleError" },
+        });
+        sendJson(res, 400, { error: "UNKNOWN_ROLE", message: error.message });
+        return;
+      }
+      logEvent({
+        level: "error",
+        event: "dashboard_access",
+        context: {
+          role,
+          outcome: "failure",
+          errorClass: error instanceof Error ? error.name : "Error",
+        },
+      });
+      sendJson(res, 500, {
+        error: "DASHBOARD_SUMMARY_FAILED",
         message: error instanceof Error ? error.message : String(error),
       });
     }

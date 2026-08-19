@@ -1,0 +1,154 @@
+/* Reuses the exact palette from assets/command-center.css so CoreOps's two UIs
+   (the Command Center meta-dashboard and this Operations Console) read as one
+   product, not two disconnected prototypes. Kept as its own copy rather than a
+   shared import — separate build pipelines (static HTML/JS vs. Vite) — so keep
+   these tokens in sync with assets/command-center.css by hand if that palette
+   ever changes. */
+:root {
+  --oc-bg: #f4f5f7;
+  --oc-panel: #ffffff;
+  --oc-border: #e2e4e9;
+  --oc-text: #1a1d26;
+  --oc-muted: #6b7280;
+  --oc-accent: #2f5fd6;
+  --oc-accent-weak: #eaf0ff;
+  --oc-ok: #1a8a5f;
+  --oc-ok-bg: #e7f5ee;
+  --oc-warn: #b5680a;
+  --oc-warn-bg: #fdf3e3;
+  --oc-radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--oc-bg);
+  color: var(--oc-text);
+  font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.oc-page {
+  min-height: 100vh;
+}
+
+.oc-header {
+  background: var(--oc-panel);
+  border-bottom: 1px solid var(--oc-border);
+  padding: 16px 32px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.oc-brand {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+.oc-header-role {
+  color: var(--oc-muted);
+  font-size: 13px;
+}
+
+.dashboard {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.dashboard h1 {
+  font-size: 22px;
+  line-height: 1.3;
+  margin: 0 0 24px;
+}
+
+.summary-grid {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.summary-card {
+  flex: 1;
+  background: var(--oc-panel);
+  border: 1px solid var(--oc-border);
+  border-left: 3px solid var(--oc-accent);
+  border-radius: var(--oc-radius);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.summary-value {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--oc-text);
+}
+
+.summary-label {
+  color: var(--oc-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-badge-live {
+  background: var(--oc-ok-bg);
+  color: var(--oc-ok);
+}
+
+.status-badge-live .status-dot {
+  background: var(--oc-ok);
+}
+
+.status-badge-fallback {
+  background: var(--oc-warn-bg);
+  color: var(--oc-warn);
+}
+
+.status-badge-fallback .status-dot {
+  background: var(--oc-warn);
+}
+
+.summary-message {
+  margin-top: 16px;
+  color: var(--oc-muted);
+  font-style: italic;
+}
+
+.dashboard-error {
+  max-width: 480px;
+  margin: 48px auto;
+  padding: 0 24px;
+}
+
+.dashboard-error h1 {
+  font-size: 20px;
+}
+
+.dashboard-error p {
+  color: var(--oc-muted);
+}
