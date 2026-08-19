@@ -5,8 +5,8 @@
     "stories_total": 13,
     "stories_verified": 7,
     "stories_submitted": 0,
-    "stories_in_progress": 5,
-    "stories_not_started": 1,
+    "stories_in_progress": 6,
+    "stories_not_started": 0,
     "criteria_total": 41,
     "criteria_passed": 23,
     "points_awarded": 469
@@ -310,9 +310,9 @@
         "commit_at": null,
         "points_awarded": null,
         "outstanding": [
-          "Given the system is connected to cloud services, when a user requests a recommendation, then the system provides an AI-driven recommendation using cloud service data.",
-          "Given the system is unable to connect to cloud services, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
-          "Trust: All data access attempts are logged for audit purposes."
+          "Given a policy, when it is created, then it defines token scopes and constraints.",
+          "Given a policy, when it is modified, then changes are applied.",
+          "Trust: Policy actions are logged."
         ]
       }
     },
@@ -348,9 +348,9 @@
         "commit_at": null,
         "points_awarded": null,
         "outstanding": [
-          "Given a server, When monitoring is enabled, Then incidents must be detected continuously.",
-          "Given an incident, When detected, Then it must trigger an alert.",
-          "Trust: All monitoring actions are logged."
+          "Given a developer, when they use the SDK, then they can request a token.",
+          "Given a token request, when it is invalid, then an error is returned.",
+          "Trust: SDK usage is logged."
         ]
       }
     },
@@ -386,9 +386,9 @@
         "commit_at": null,
         "points_awarded": null,
         "outstanding": [
-          "Given an incident with low confidence, When escalated, Then it must notify a human operator.",
-          "Given an escalation, When it occurs, Then it must be logged with the confidence score.",
-          "Trust: All escalations are logged with timestamps."
+          "Given the Policy & Token Store is unreachable, when a request is made, then it is denied.",
+          "Given the Store is reachable, when a request is made, then it is processed.",
+          "Trust: Circuit-breaker actions are logged."
         ]
       }
     },
@@ -424,9 +424,9 @@
         "commit_at": null,
         "points_awarded": null,
         "outstanding": [
-          "Given an autonomous action is taken, when the action is completed, then the system immediately notifies the operators.",
-          "Given an autonomous action is taken, when the notification fails, then the system retries the notification until successful.",
-          "Trust: All autonomous actions and notifications are logged for audit purposes."
+          "Given a rejected token, when it is used, then a detailed error message is returned.",
+          "Given a valid token, when it is used, then no error message is returned.",
+          "Trust: Error message actions are logged."
         ]
       }
     },
@@ -462,9 +462,9 @@
         "commit_at": null,
         "points_awarded": null,
         "outstanding": [
-          "Given a low-risk task is completed, when a rollback is requested, then the system successfully reverts the task.",
-          "Given a rollback is requested for a non-reversible task, when the request is made, then the system denies the rollback request.",
-          "Trust: All rollback actions are logged for audit purposes."
+          "Given a request for customer data, when the data is accessed, then sensitive fields are redacted.",
+          "Given a request for customer data, when the request lacks proper authorization, then access is denied.",
+          "Trust: Given any data access, when the data is accessed, then the access and redaction actions are logged in the Audit Log."
         ]
       }
     },
@@ -490,7 +490,21 @@
       "tests_added": [],
       "notes": null,
       "updated_at": null,
-      "verification": null
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": null,
+        "outstanding": [
+          "Given a denied action, when the action is logged, then a distinct reason code is recorded.",
+          "Given a denied action due to token expiration, when the action is logged, then the reason code indicates token expiration.",
+          "Trust: Given any denied action, when the action is logged, then the reason code is included in the Audit Log."
+        ]
+      }
     }
   ]
 }
