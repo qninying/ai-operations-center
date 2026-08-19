@@ -10,6 +10,11 @@ import {
   SqlServerUnavailableError,
   InvalidDataFormatError,
 } from "./recommendationService.js";
+import {
+  generateCloudRecommendation,
+  CloudServiceUnavailableError,
+  InvalidCloudDataFormatError,
+} from "./cloudRecommendationService.js";
 import { logEvent } from "./observability/logger.js";
 import { checkRemediationGuardrail } from "../../guardrails/remediationGuardrail.js";
 
@@ -121,6 +126,36 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         return;
       }
       if (error instanceof InvalidDataFormatError) {
+        sendJson(res, 502, { error: "INVALID_DATA_FORMAT", message: error.message });
+        return;
+      }
+      sendJson(res, 500, {
+        error: "RECOMMENDATION_FAILED",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/cloud-recommendation") {
+    // STORY-007 / REQ-008 + REQ-013: cloud-service counterpart to /api/recommendation
+    // above — same rule, never falls back to fixture data on a cloud-service failure.
+    // Every attempt is logged regardless of outcome by cloudRecommendationService.ts
+    // itself ("Trust: all data access attempts are logged").
+    const incidentId = url.searchParams.get("incidentId") ?? crypto.randomUUID();
+    const description = url.searchParams.get("description") ?? "";
+    try {
+      const result = await generateCloudRecommendation(incidentId, description);
+      sendJson(res, 200, { incidentId, ...result });
+    } catch (error) {
+      if (error instanceof CloudServiceUnavailableError) {
+        sendJson(res, 503, {
+          error: "CLOUD_SERVICE_UNAVAILABLE",
+          message: "Could not connect to the cloud service. No recommendation was generated.",
+        });
+        return;
+      }
+      if (error instanceof InvalidCloudDataFormatError) {
         sendJson(res, 502, { error: "INVALID_DATA_FORMAT", message: error.message });
         return;
       }

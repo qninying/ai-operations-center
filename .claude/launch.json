@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "mcp-server-http",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "mcp-server", "run", "http"],
+      "port": 8787
     }
   ]
 }

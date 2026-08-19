@@ -285,21 +285,31 @@
       "criteria": [
         {
           "text": "Given the system is connected to cloud services, when a user requests a recommendation, then the system provides an AI-driven recommendation using cloud service data.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given the system is unable to connect to cloud services, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: All data access attempts are logged for audit purposes.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "mcp-server/package.json",
+        "mcp-server/.env.example",
+        "mcp-server/src/cloudBlobSource.ts",
+        "mcp-server/src/cloudRecommendationService.ts",
+        "mcp-server/src/httpServer.ts",
+        ".claude/launch.json"
+      ],
+      "tests_added": [
+        "mcp-server/src/cloudBlobSource.test.ts",
+        "mcp-server/src/cloudRecommendationService.test.ts"
+      ],
+      "notes": "Cloud-service counterpart to STORY-006's SQL Server path, same shape: cloudBlobSource.ts (real Azure Blob Storage I/O, timeout + capped retry + its own circuit breaker, separate failure domain from the DMV path) feeds cloudRecommendationService.ts (zod-validates each record before treating it as evidence, never falls back to fixture data and calls it real), wired to a new GET /api/cloud-recommendation route. Verified against a real, live Azure Blob Storage account (coreopsdiagnostics / diagnostics container), not just mocked. Positive case: real HTTP round trip read a real diagnostics.json blob and produced a real Claude recommendation (intentionally low-confidence / insufficientEvidence: true, since the single test record genuinely lacks root-cause detail — an honest result, not a bug). Negative case: a second server instance pointed at a nonexistent container returned a real 503 CLOUD_SERVICE_UNAVAILABLE, not a hang or a fabricated result. Trust: both the success and the failure attempt produced a cloud_recommendation_data_access log line in the server's own stderr output.",
+      "updated_at": "2026-08-19T21:33:39.000Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,
