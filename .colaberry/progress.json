@@ -3,8 +3,8 @@
   "totals": {
     "stories_total": 11,
     "stories_verified": 0,
-    "criteria_total": 14,
-    "criteria_passed": 14,
+    "criteria_total": 17,
+    "criteria_passed": 17,
     "points_awarded": 0
   },
   "stories": [
@@ -45,9 +45,18 @@
         { "text": "Trust: All recommendations are logged with confidence scores.", "passed": true }
       ],
       "verification": { "state": "submitted", "commit": null }
+    },
+    {
+      "id": "STORY-004",
+      "criteria": [
+        { "text": "Given an incident with low confidence, When additional diagnostics are gathered, Then they must be presented to the user.", "passed": true },
+        { "text": "Given multiple diagnostics, When they are presented, Then they must include possible causes.", "passed": true },
+        { "text": "Trust: All diagnostics gathering is logged.", "passed": true }
+      ],
+      "verification": { "state": "submitted", "commit": null }
     }
   ],
-  "note_totals": "stories_total/stories_verified count the 11 real programme stories (plan.stories); criteria_total/criteria_passed reflect STORY-000 through STORY-003's criteria, since those are the only four stories with acceptance criteria defined so far — this will expand as later stories get built. 'submitted' means the criteria are backed by passing tests but no reviewer/commit sign-off has moved the story to 'verified' yet.",
+  "note_totals": "stories_total/stories_verified count the 11 real programme stories (plan.stories); criteria_total/criteria_passed reflect STORY-000 through STORY-004's criteria, since those are the only five stories with acceptance criteria defined so far — this will expand as later stories get built. 'submitted' means the criteria are backed by passing tests but no reviewer/commit sign-off has moved the story to 'verified' yet.",
   "requirementsFile": "project-blueprint/requirements.md",
   "implementationNotesFile": "docs/implementation-notes.md"
 }

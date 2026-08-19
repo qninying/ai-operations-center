@@ -34,7 +34,7 @@ Then open `http://localhost:8000/` — **must be served over HTTP, not opened as
 
 Every tab has a **Sample / Real** toggle. Sample fills the page with clearly-labelled
 made-up data so the finished shape is visible on day one. Real shows exactly what's
-actually been built: 4 of 11 programme stories (STORY-000/001/002/003) with
+actually been built: 5 of 11 programme stories (STORY-000/001/002/003/004) with
 test-backed criteria, sitting at `"submitted"` — the guardrails those stories back
 (REQ-001/005) still show as not-yet-enforced on the Guardrails tab, because this
 repo only flips a story to `"verified"` on an external reviewer/commit sign-off, not
@@ -63,11 +63,12 @@ for a one-page technical summary.
 |---|---|
 | [`mcp-server/`](mcp-server/) | A real MCP server (official `@modelcontextprotocol/sdk`) over stdio and HTTP, exposing a read-only `read_sql_server_dmv` tool — parameterized queries, honest fixture-fallback when no live SQL Server is connected, a live dashboard at `/`. |
 | [`mcp-server/src/rootCauseAgent.ts`](mcp-server/src/rootCauseAgent.ts) | The Root Cause Analysis Agent — a real Claude Sonnet 5 (Anthropic API) call over real DMV evidence, zod-validated structured output, evidence-attributed, never fabricates a result when evidence is thin or the API call itself fails. |
+| [`mcp-server/src/diagnosticsGatherer.ts`](mcp-server/src/diagnosticsGatherer.ts) | When the Root Cause Agent's confidence is below 80%, gathers a differential — several distinct possible causes over the same evidence, each attributed — instead of presenting one under-confident guess. |
 | [`mcp-server/src/reliability/`](mcp-server/src/reliability/) | A generic, reusable timeout + capped-retry-with-backoff wrapper and circuit breaker, wired around every upstream call — SQL Server and the Anthropic API alike. |
 | [`guardrails/`](guardrails/) | `checkRemediationGuardrail()` — the structural rule that no remediation can execute without evidence, an allowed action type, and an approved (not denied, not absent) human decision. `auditLog.ts` records every decision and action, retrievable by ID, timestamped, immutable, idempotent. |
 | [`project-blueprint/requirements.md`](project-blueprint/requirements.md) | Per-requirement traceability (UNMAPPED / PLANNED / BUILT) with a reviewer-verifiable acceptance checklist — every claim points at a real test. |
 
-40 tests in `mcp-server/` (`cd mcp-server && npm test`), 23 in `guardrails/`
+51 tests in `mcp-server/` (`cd mcp-server && npm test`), 23 in `guardrails/`
 (`cd guardrails && npm test`).
 
 ## The design + planning layer
