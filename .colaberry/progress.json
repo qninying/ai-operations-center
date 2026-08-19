@@ -3,13 +3,13 @@
   "project": "CoreOps AI Operations Dashboard",
   "totals": {
     "stories_total": 12,
-    "stories_verified": 5,
+    "stories_verified": 7,
     "stories_submitted": 0,
-    "stories_in_progress": 0,
-    "stories_not_started": 7,
+    "stories_in_progress": 5,
+    "stories_not_started": 0,
     "criteria_total": 38,
-    "criteria_passed": 17,
-    "points_awarded": 335
+    "criteria_passed": 23,
+    "points_awarded": 469
   },
   "stories": [
     {
@@ -34,7 +34,7 @@
           "passed": true
         },
         {
-          "text": "Trust \u2014 no tab shows a number, a connection or a result the project has not actually produced.",
+          "text": "Trust — no tab shows a number, a connection or a result the project has not actually produced.",
           "passed": true
         }
       ],
@@ -225,19 +225,15 @@
       "notes": "IT Manager role reshapes real DMV data into operational counts (incidents, blocked sessions); unrecognized roles rejected with 400, never rendered wrong. New frontend/ (Vite+React+TS) fetches via a dev-only Vite proxy, no CORS added to the backend. Every dashboard access logged by role. Verified end-to-end in a real browser against both real servers, not just unit-tested.",
       "updated_at": "2026-08-19T15:19:39.170Z",
       "verification": {
-        "state": "not_started",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": null,
-        "outstanding": [
-          "Given a user role, When accessing the dashboard, Then it must display role-specific information.",
-          "Given an IT Manager, When viewing the dashboard, Then it must show operational summaries.",
-          "Trust: Dashboard access is logged by user role."
-        ]
+        "verified_at": "2026-08-19T15:21:25.630Z",
+        "commit_sha": "b899a7ddcab1797818ac2bf760b8e22259398ca0",
+        "commit_url": "https://github.com/qninying/ai-operations-center/commit/b899a7ddcab1797818ac2bf760b8e22259398ca0",
+        "commit_at": "2026-08-19T15:21:11Z",
+        "points_awarded": 67,
+        "outstanding": []
       }
     },
     {
@@ -268,22 +264,18 @@
         "mcp-server/src/recommendationService.test.ts",
         "mcp-server/src/dmvLiveSource.test.ts (1 new regression case)"
       ],
-      "notes": "Verified against a real, live Azure SQL Database (Free tier), not just mocked \u2014 the R2/R3 gap this repo has carried since before this session (\"the live path has never actually succeeded against a real SQL Server instance\") is now closed. Found and fixed a real bug only discoverable live: the DMV query ordered by cpu_time DESC alone, which silently buried a genuine blocking scenario under 40-50+ Azure background system sessions (all near-zero CPU by definition of being blocked, not computing). Fixed query + regression test guard it. generateRecommendation() calls queryLiveDmv() directly (bypassing dmvReader.ts fallback) so an unreachable SQL Server notifies the user honestly rather than silently substituting fixture data and calling it real.",
+      "notes": "Verified against a real, live Azure SQL Database (Free tier), not just mocked — the R2/R3 gap this repo has carried since before this session (\"the live path has never actually succeeded against a real SQL Server instance\") is now closed. Found and fixed a real bug only discoverable live: the DMV query ordered by cpu_time DESC alone, which silently buried a genuine blocking scenario under 40-50+ Azure background system sessions (all near-zero CPU by definition of being blocked, not computing). Fixed query + regression test guard it. generateRecommendation() calls queryLiveDmv() directly (bypassing dmvReader.ts fallback) so an unreachable SQL Server notifies the user honestly rather than silently substituting fixture data and calling it real.",
       "updated_at": "2026-08-19T16:24:42.774Z",
       "verification": {
-        "state": "not_started",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": null,
-        "outstanding": [
-          "Given the system is connected to SQL Server, when a user requests a recommendation, then the system provides an AI-driven recommendation using SQL Server data.",
-          "Given the system is unable to connect to SQL Server, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
-          "Trust: All data access attempts are logged for audit purposes."
-        ]
+        "verified_at": "2026-08-19T16:31:11.258Z",
+        "commit_sha": "a49e90dbac0587be7d80234222ad8127398af522",
+        "commit_url": "https://github.com/qninying/ai-operations-center/commit/a49e90dbac0587be7d80234222ad8127398af522",
+        "commit_at": "2026-08-19T16:30:58Z",
+        "points_awarded": 67,
+        "outstanding": []
       }
     },
     {
@@ -309,7 +301,7 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
         "criteria_total": 3,
         "verified_at": null,
@@ -347,7 +339,7 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
         "criteria_total": 3,
         "verified_at": null,
@@ -385,7 +377,7 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
         "criteria_total": 3,
         "verified_at": null,
@@ -423,7 +415,7 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
         "criteria_total": 3,
         "verified_at": null,
@@ -461,7 +453,7 @@
       "notes": null,
       "updated_at": null,
       "verification": {
-        "state": "not_started",
+        "state": "in_progress",
         "criteria_passed": 0,
         "criteria_total": 3,
         "verified_at": null,
