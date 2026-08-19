@@ -1,13 +1,13 @@
 {
   "schema_version": 2,
-  "project": "CoreOps AI Operations Dashboard",
+  "project": "Ambit",
   "totals": {
-    "stories_total": 12,
+    "stories_total": 13,
     "stories_verified": 7,
     "stories_submitted": 0,
     "stories_in_progress": 5,
-    "stories_not_started": 0,
-    "criteria_total": 38,
+    "stories_not_started": 1,
+    "criteria_total": 41,
     "criteria_passed": 23,
     "points_awarded": 469
   },
@@ -60,16 +60,16 @@
       "acceptance_total": 3,
       "criteria": [
         {
-          "text": "Given a production change request, When the request is submitted, Then it must require human approval.",
-          "passed": true
+          "text": "Given a token request, when it is approved, then the token is issued and enforced.",
+          "passed": false
         },
         {
-          "text": "Given a denied approval, When the request is resubmitted, Then it must still require approval.",
-          "passed": true
+          "text": "Given a revoked token, when it is used, then the action is blocked.",
+          "passed": false
         },
         {
-          "text": "Trust: Every approval decision is logged for audit.",
-          "passed": true
+          "text": "Trust: Every action is logged in the Audit Log.",
+          "passed": false
         }
       ],
       "files_touched": [],
@@ -94,16 +94,16 @@
       "acceptance_total": 3,
       "criteria": [
         {
-          "text": "Given an action is taken, When it is logged, Then it must be retrievable in the audit log.",
-          "passed": true
+          "text": "Given a token, when it is revoked, then its next call fails immediately.",
+          "passed": false
         },
         {
-          "text": "Given a decision is made, When it is logged, Then it must include the decision maker.",
-          "passed": true
+          "text": "Given a revoked token, when it is used, then the action is blocked.",
+          "passed": false
         },
         {
-          "text": "Trust: Every log entry is timestamped and immutable.",
-          "passed": true
+          "text": "Trust: Revocation is logged with a reason code.",
+          "passed": false
         }
       ],
       "files_touched": [],
@@ -128,16 +128,16 @@
       "acceptance_total": 3,
       "criteria": [
         {
-          "text": "Given an incident, When AI analyzes it, Then it must provide a recommendation with a confidence score.",
-          "passed": true
+          "text": "Given a token request, when it is displayed, then the approver can approve or deny it.",
+          "passed": false
         },
         {
-          "text": "Given a recommendation, When it is viewed, Then it must include evidence-backed reasoning.",
-          "passed": true
+          "text": "Given a denied request, when it is submitted, then the token is not issued.",
+          "passed": false
         },
         {
-          "text": "Trust: All recommendations are logged with confidence scores.",
-          "passed": true
+          "text": "Trust: Approval actions are logged.",
+          "passed": false
         }
       ],
       "files_touched": [],
@@ -162,16 +162,16 @@
       "acceptance_total": 3,
       "criteria": [
         {
-          "text": "Given an incident with low confidence, When additional diagnostics are gathered, Then they must be presented to the user.",
-          "passed": true
+          "text": "Given a subagent request, when it is processed, then it inherits a subset of the parent's scope.",
+          "passed": false
         },
         {
-          "text": "Given multiple diagnostics, When they are presented, Then they must include possible causes.",
-          "passed": true
+          "text": "Given a subagent request, when it exceeds the parent's scope, then it is denied.",
+          "passed": false
         },
         {
-          "text": "Trust: All diagnostics gathering is logged.",
-          "passed": true
+          "text": "Trust: Delegation actions are logged.",
+          "passed": false
         }
       ],
       "files_touched": [],
@@ -196,16 +196,16 @@
       "acceptance_total": 3,
       "criteria": [
         {
-          "text": "Given a user role, When accessing the dashboard, Then it must display role-specific information.",
-          "passed": true
+          "text": "Given a valid token, when the token is used to access a mock endpoint, then the action is allowed.",
+          "passed": false
         },
         {
-          "text": "Given an IT Manager, When viewing the dashboard, Then it must show operational summaries.",
-          "passed": true
+          "text": "Given an invalid token, when the token is used to access a mock endpoint, then the action is denied.",
+          "passed": false
         },
         {
-          "text": "Trust: Dashboard access is logged by user role.",
-          "passed": true
+          "text": "Trust: Given any token, when the token is used, then the action and its outcome are logged in the Audit Log.",
+          "passed": false
         }
       ],
       "files_touched": [
@@ -238,20 +238,20 @@
     },
     {
       "id": "STORY-006",
-      "release": "r3",
+      "release": "r2",
       "acceptance_total": 3,
       "criteria": [
         {
-          "text": "Given the system is connected to SQL Server, when a user requests a recommendation, then the system provides an AI-driven recommendation using SQL Server data.",
-          "passed": true
+          "text": "Given a token request, when it is anomalous, then an alert is triggered.",
+          "passed": false
         },
         {
-          "text": "Given the system is unable to connect to SQL Server, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
-          "passed": true
+          "text": "Given a normal request, when it is processed, then no alert is triggered.",
+          "passed": false
         },
         {
-          "text": "Trust: All data access attempts are logged for audit purposes.",
-          "passed": true
+          "text": "Trust: Anomaly detection actions are logged.",
+          "passed": false
         }
       ],
       "files_touched": [
@@ -284,15 +284,15 @@
       "acceptance_total": 3,
       "criteria": [
         {
-          "text": "Given the system is connected to cloud services, when a user requests a recommendation, then the system provides an AI-driven recommendation using cloud service data.",
+          "text": "Given a policy, when it is created, then it defines token scopes and constraints.",
           "passed": false
         },
         {
-          "text": "Given the system is unable to connect to cloud services, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
+          "text": "Given a policy, when it is modified, then changes are applied.",
           "passed": false
         },
         {
-          "text": "Trust: All data access attempts are logged for audit purposes.",
+          "text": "Trust: Policy actions are logged.",
           "passed": false
         }
       ],
@@ -318,19 +318,19 @@
     },
     {
       "id": "STORY-008",
-      "release": "r4",
+      "release": "r3",
       "acceptance_total": 3,
       "criteria": [
         {
-          "text": "Given a server, When monitoring is enabled, Then incidents must be detected continuously.",
+          "text": "Given a developer, when they use the SDK, then they can request a token.",
           "passed": false
         },
         {
-          "text": "Given an incident, When detected, Then it must trigger an alert.",
+          "text": "Given a token request, when it is invalid, then an error is returned.",
           "passed": false
         },
         {
-          "text": "Trust: All monitoring actions are logged.",
+          "text": "Trust: SDK usage is logged.",
           "passed": false
         }
       ],
@@ -360,15 +360,15 @@
       "acceptance_total": 3,
       "criteria": [
         {
-          "text": "Given an incident with low confidence, When escalated, Then it must notify a human operator.",
+          "text": "Given the Policy & Token Store is unreachable, when a request is made, then it is denied.",
           "passed": false
         },
         {
-          "text": "Given an escalation, When it occurs, Then it must be logged with the confidence score.",
+          "text": "Given the Store is reachable, when a request is made, then it is processed.",
           "passed": false
         },
         {
-          "text": "Trust: All escalations are logged with timestamps.",
+          "text": "Trust: Circuit-breaker actions are logged.",
           "passed": false
         }
       ],
@@ -398,15 +398,15 @@
       "acceptance_total": 3,
       "criteria": [
         {
-          "text": "Given an autonomous action is taken, when the action is completed, then the system immediately notifies the operators.",
+          "text": "Given a rejected token, when it is used, then a detailed error message is returned.",
           "passed": false
         },
         {
-          "text": "Given an autonomous action is taken, when the notification fails, then the system retries the notification until successful.",
+          "text": "Given a valid token, when it is used, then no error message is returned.",
           "passed": false
         },
         {
-          "text": "Trust: All autonomous actions and notifications are logged for audit purposes.",
+          "text": "Trust: Error message actions are logged.",
           "passed": false
         }
       ],
@@ -436,15 +436,15 @@
       "acceptance_total": 3,
       "criteria": [
         {
-          "text": "Given a low-risk task is completed, when a rollback is requested, then the system successfully reverts the task.",
+          "text": "Given a request for customer data, when the data is accessed, then sensitive fields are redacted.",
           "passed": false
         },
         {
-          "text": "Given a rollback is requested for a non-reversible task, when the request is made, then the system denies the rollback request.",
+          "text": "Given a request for customer data, when the request lacks proper authorization, then access is denied.",
           "passed": false
         },
         {
-          "text": "Trust: All rollback actions are logged for audit purposes.",
+          "text": "Trust: Given any data access, when the data is accessed, then the access and redaction actions are logged in the Audit Log.",
           "passed": false
         }
       ],
@@ -467,6 +467,30 @@
           "Trust: All rollback actions are logged for audit purposes."
         ]
       }
+    },
+    {
+      "id": "STORY-012",
+      "release": "r4",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a denied action, when the action is logged, then a distinct reason code is recorded.",
+          "passed": false
+        },
+        {
+          "text": "Given a denied action due to token expiration, when the action is logged, then the reason code indicates token expiration.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Given any denied action, when the action is logged, then the reason code is included in the Audit Log.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": null
     }
   ]
 }

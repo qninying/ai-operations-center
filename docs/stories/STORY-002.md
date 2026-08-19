@@ -1,24 +1,24 @@
-# STORY-002 — Log all decisions and actions for audit purposes
+# STORY-002 — Implement real-time revocation handling
 
-As a Compliance Officer, I want all decisions and actions logged, so that I can audit them later.
+As a security officer, I want revoked tokens to fail immediately, so that unauthorized access is prevented.
 
-**Release:** r0 · Initial Setup and Trust Spine (weeks 0–1)
-**Owner:** Compliance
+**Release:** r0 · Initial Skeleton (weeks 0–1)
+**Owner:** Security Officer
 **Blocked by:** nothing — you can start this now
 
 ## The requirement this satisfies
 
-- **REQ-005** (Safety, must) — The system must log every decision and action for audit purposes.
+- **REQ-015** (Safety, must) — The system must ensure that a revoked token's next call fails within the same request cycle.
 
 ## How to build it
 
-Use a secure logging service to store audit logs with timestamps.
+Ensure the Enforcement Gateway checks revocation status in real-time.
 
 ## Failure paths you must handle
 
-- Log entry missing
-- Log entry incorrect
-- Log retrieval failure
+- Revocation status check fails.
+- Revoked token is not blocked.
+- Revocation log entry fails.
 
 ## Acceptance — your stop condition
 
@@ -27,8 +27,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given an action is taken, When it is logged, Then it must be retrievable in the audit log.
-- [ ] Given a decision is made, When it is logged, Then it must include the decision maker.
-- [ ] Trust: Every log entry is timestamped and immutable.
+- [ ] Given a token, when it is revoked, then its next call fails immediately.
+- [ ] Given a revoked token, when it is used, then the action is blocked.
+- [ ] Trust: Revocation is logged with a reason code.
 
 When every box above is ticked, stop and show the demo.

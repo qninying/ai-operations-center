@@ -1,6 +1,6 @@
-# CoreOps AI Operations Dashboard — Requirements
+# Ambit — Requirements
 
-An enterprise-grade AI Operations Dashboard for SQL Server, SSIS, SSRS, and Windows servers, providing intelligent command center capabilities with human approval for production changes.
+An OAuth-style identity and access management system for autonomous AI agents, providing short-lived, narrowly-scoped tokens with human approval and real-time enforcement.
 
 This is the source of truth for what you are building. Your Claude Code prompts
 point here. If you sharpen a requirement, edit it — your version is the real one.
@@ -12,128 +12,130 @@ point here. If you sharpen a requirement, edit it — your version is the real o
 | Reliability | how it behaves when something fails |
 | Constraint | a technology or vendor you must use — context, not a task |
 
-## AI Analysis
+## Audit Logging
 
-### REQ-002 — Functional · must
+### REQ-005 — Functional · must
 
-The system must automatically detect, diagnose, correlate, and recommend actions without executing production changes.
-
-Fulfilled by: STORY-003
-
-### REQ-003 — Functional · must
-
-The system must provide confidence scores for recommended actions.
-
-Fulfilled by: STORY-003
-
-### REQ-004 — Functional · must
-
-The system must present evidence-backed reasoning for all recommendations.
-
-Fulfilled by: STORY-003
-
-### REQ-010 — Functional · must
-
-The system must gather additional diagnostics when confidence is below 80%.
-
-Fulfilled by: STORY-004
-
-### REQ-011 — Functional · must
-
-The system must escalate incidents to a human when confidence is below 60%.
-
-Fulfilled by: STORY-009
-
-### REQ-013 — Functional · must
-
-The system must provide explainable AI recommendations for all users.
-
-Fulfilled by: STORY-006, STORY-007
-
-## Approval Workflow
-
-### REQ-001 — Safety · must
-
-The system must require human approval for any action that changes a production environment.
+The system must log every allowed and blocked action to an immutable audit log.
 
 Fulfilled by: STORY-001
 
-### REQ-015 — Safety · must
+### REQ-010 — Functional · must
 
-The system must support rollback capabilities for low-risk, reversible tasks.
+The system must provide distinct reason codes for denied actions in the Audit Log.
+
+Fulfilled by: STORY-012
+
+## Consent Management
+
+### REQ-002 — Functional · must
+
+The system must allow human approval for every token request via a plain-language consent screen.
+
+Fulfilled by: STORY-003
+
+### REQ-013 — Functional · must
+
+The system must provide a Consent UI for approvers to review and approve token requests.
+
+Fulfilled by: STORY-003
+
+## Data Management
+
+### REQ-009 — Functional · must
+
+The system must support field-level redaction for customer data access.
 
 Fulfilled by: STORY-011
 
-## Audit Trail
+## Delegation Management
 
-### REQ-005 — Safety · must
+### REQ-003 — Functional · must
 
-The system must log every decision and action for audit purposes.
+The system must enforce that a subagent can only inherit a strict subset of its parent's scope.
+
+Fulfilled by: STORY-004
+
+### REQ-012 — Safety · must
+
+The system must ensure zero instances of a subagent obtaining a scope broader than its parent.
+
+Fulfilled by: STORY-004
+
+## Developer Experience
+
+### REQ-014 — Functional · must
+
+The system must provide a client SDK for developers to request and present tokens.
+
+Fulfilled by: STORY-008
+
+### REQ-018 — Functional · must
+
+The system must provide error messages for rejected tokens indicating the reason (out of scope, expired, revoked).
+
+Fulfilled by: STORY-010
+
+## Enforcement
+
+### REQ-004 — Functional · must
+
+The system must validate token scope and revocation status in real-time at the Enforcement Gateway.
+
+Fulfilled by: STORY-001
+
+### REQ-006 — Safety · must
+
+The system must deny actions when token validity or scope cannot be confirmed.
+
+Fulfilled by: STORY-005
+
+### REQ-008 — Safety · must
+
+The system must provide a fail-closed circuit-breaker state when the Policy & Token Store is unreachable.
+
+Fulfilled by: STORY-009
+
+### REQ-015 — Safety · must
+
+The system must ensure that a revoked token's next call fails within the same request cycle.
 
 Fulfilled by: STORY-002
-
-## Configuration
-
-### REQ-014 — Functional · should
-
-The system must allow configuration of confidence thresholds for actions.
-
-_Not yet fulfilled by any story._
-
-## Efficiency
-
-### REQ-017 — Non-functional · should
-
-The system must reduce manual incident correlation across systems by 50-70%.
-
-_Not yet fulfilled by any story._
 
 ## Integration
 
 ### REQ-007 — Constraint
 
-The system must support integration with SQL Server, SSIS, SSRS, and Windows servers.
+The system must integrate with mock endpoints for email, code hosting, payment, and CRM systems.
 
-Fulfilled by: STORY-006
+Fulfilled by: STORY-005
 
-### REQ-008 — Constraint
+## Policy Management
 
-The system must support integration with cloud services and enterprise applications through standardized connectors.
+### REQ-011 — Functional · must
+
+The system must allow policy definition for token scopes and constraints.
 
 Fulfilled by: STORY-007
 
-### REQ-018 — Constraint
+### REQ-017 — Functional · must
 
-The system must provide a plug-in connector architecture for extensibility.
+The system must provide a mechanism for human policy authorship and approval.
 
-Context for the stories that use it — constraints do not get their own story.
+Fulfilled by: STORY-007
 
-## Monitoring
+## Security
 
 ### REQ-016 — Functional · must
 
-The system must provide continuous monitoring and AI-powered root cause analysis.
+The system must support anomaly detection for token requests.
 
-Fulfilled by: STORY-008
+Fulfilled by: STORY-006
 
-## Notification
+## Token Issuance
 
-### REQ-012 — Safety · must
+### REQ-001 — Functional · must
 
-The system must notify operators immediately of any autonomous actions taken.
+The system must issue short-lived, narrowly-scoped tokens for AI agents.
 
-Fulfilled by: STORY-010
-
-## User Interface
-
-### REQ-006 — Functional · must
-
-The system must provide role-based dashboards for different user types.
-
-Fulfilled by: STORY-005
-
-### REQ-009 — Functional · must
-
-The system must provide operational summaries for IT Managers and Engineering Leaders.
-
-Fulfilled by: STORY-005
+Fulfilled by: STORY-001

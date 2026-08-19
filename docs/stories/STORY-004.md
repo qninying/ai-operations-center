@@ -1,24 +1,25 @@
-# STORY-004 — Gather additional diagnostics for low-confidence incidents
+# STORY-004 — Implement delegation narrowing for subagents
 
-As a DevOps Engineer, I want additional diagnostics for low-confidence incidents, so that I can make informed decisions.
+As a security officer, I want subagents to inherit a strict subset of their parent's scope, so that privilege escalation is prevented.
 
-**Release:** r1 · AI Analysis and Recommendations (weeks 1–2)
-**Owner:** DevOps
-**Blocked by:** STORY-003
+**Release:** r1 · Consent and Delegation (weeks 2–3)
+**Owner:** Security Officer
+**Blocked by:** STORY-001
 
 ## The requirement this satisfies
 
-- **REQ-010** (Functional, must) — The system must gather additional diagnostics when confidence is below 80%.
+- **REQ-003** (Functional, must) — The system must enforce that a subagent can only inherit a strict subset of its parent's scope.
+- **REQ-012** (Safety, must) — The system must ensure zero instances of a subagent obtaining a scope broader than its parent.
 
 ## How to build it
 
-Implement diagnostic gathering tools to collect additional data for low-confidence incidents.
+Implement delegation logic to enforce scope narrowing for subagents.
 
 ## Failure paths you must handle
 
-- Diagnostics not gathered
-- Incorrect diagnostics presented
-- Diagnostics log failure
+- Subagent inherits full scope instead of subset.
+- Delegation action is not logged.
+- Excessive scope is incorrectly approved.
 
 ## Acceptance — your stop condition
 
@@ -27,8 +28,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given an incident with low confidence, When additional diagnostics are gathered, Then they must be presented to the user.
-- [ ] Given multiple diagnostics, When they are presented, Then they must include possible causes.
-- [ ] Trust: All diagnostics gathering is logged.
+- [ ] Given a subagent request, when it is processed, then it inherits a subset of the parent's scope.
+- [ ] Given a subagent request, when it exceeds the parent's scope, then it is denied.
+- [ ] Trust: Delegation actions are logged.
 
 When every box above is ticked, stop and show the demo.

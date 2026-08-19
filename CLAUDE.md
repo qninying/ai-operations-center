@@ -1,11 +1,11 @@
 <!-- COLABERRY:BEGIN — managed by the build pipeline. Edits inside this block are overwritten. -->
-# CLAUDE.md — CoreOps AI Operations Dashboard
+# CLAUDE.md — Ambit
 
 Conventions for this build. Claude Code reads this automatically.
 
 ## What this is
 
-An enterprise-grade AI Operations Dashboard for SQL Server, SSIS, SSRS, and Windows servers, providing intelligent command center capabilities with human approval for production changes.
+An OAuth-style identity and access management system for autonomous AI agents, providing short-lived, narrowly-scoped tokens with human approval and real-time enforcement.
 
 ## Where the truth lives
 

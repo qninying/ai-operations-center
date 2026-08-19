@@ -1,26 +1,25 @@
-# STORY-003 — Implement AI-driven diagnostics and recommendations
+# STORY-003 — Implement Consent UI for token approval
 
-As a DBA, I want AI to diagnose issues and recommend actions, so that I can resolve incidents faster.
+As an approver, I want to approve token requests via a Consent UI, so that I can control access securely.
 
-**Release:** r1 · AI Analysis and Recommendations (weeks 1–2)
-**Owner:** DBA
-**Blocked by:** STORY-001, STORY-002
+**Release:** r1 · Consent and Delegation (weeks 2–3)
+**Owner:** Approver
+**Blocked by:** STORY-001
 
 ## The requirement this satisfies
 
-- **REQ-002** (Functional, must) — The system must automatically detect, diagnose, correlate, and recommend actions without executing production changes.
-- **REQ-003** (Functional, must) — The system must provide confidence scores for recommended actions.
-- **REQ-004** (Functional, must) — The system must present evidence-backed reasoning for all recommendations.
+- **REQ-002** (Functional, must) — The system must allow human approval for every token request via a plain-language consent screen.
+- **REQ-013** (Functional, must) — The system must provide a Consent UI for approvers to review and approve token requests.
 
 ## How to build it
 
-Develop AI models to analyze incidents and generate recommendations with confidence scores.
+Develop the Consent UI for token approval and integrate with the token issuance process.
 
 ## Failure paths you must handle
 
-- AI fails to diagnose
-- Recommendation lacks evidence
-- Confidence score incorrect
+- Consent UI fails to load.
+- Approval action is not logged.
+- Denied request is incorrectly issued.
 
 ## Acceptance — your stop condition
 
@@ -29,8 +28,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given an incident, When AI analyzes it, Then it must provide a recommendation with a confidence score.
-- [ ] Given a recommendation, When it is viewed, Then it must include evidence-backed reasoning.
-- [ ] Trust: All recommendations are logged with confidence scores.
+- [ ] Given a token request, when it is displayed, then the approver can approve or deny it.
+- [ ] Given a denied request, when it is submitted, then the token is not issued.
+- [ ] Trust: Approval actions are logged.
 
 When every box above is ticked, stop and show the demo.

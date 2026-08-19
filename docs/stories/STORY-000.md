@@ -70,7 +70,7 @@ Work from what you just found rather than from a blank page. Everything after th
 - **Running this a second time on a finished build must change nothing.** If every tab is already there and every criterion already holds, say exactly that and stop — no reformatting, no "while I was in there", no empty commit.
 
 ## What you are building it for
-**CoreOps AI Operations Dashboard** — An enterprise-grade AI Operations Dashboard for SQL Server, SSIS, SSRS, and Windows servers, providing intelligent command center capabilities with human approval for production changes.
+**Ambit** — An OAuth-style identity and access management system for autonomous AI agents, providing short-lived, narrowly-scoped tokens with human approval and real-time enforcement.
 
 ## Where the data comes from
 Read it from your own repo. There is no API to call and no key to hold: this page is static, and a static page cannot keep a secret, so the data ships beside it as files the platform commits. Fetch them at runtime, do not paste their contents into your components — they are rewritten every time you sync, and a copy you typed out will silently go stale.
@@ -98,56 +98,47 @@ Source: `plan.project` for the name and descriptor, `plan.schedule` for where yo
 
 ### 2. Outcomes — the numbers this has to move
 Source: `plan.derived.measures` — each entry has `id` and `statement`.
-These are the measures you committed to. Each one is a card, each drills into how it is calculated:
-- **REQ-017** — The system must reduce manual incident correlation across systems by 50-70%.
-
-On sample data, show a plausible trend toward the target. On real data, show the real figure — and where there is no measurement yet, show "not measured yet" rather than a zero, because a zero reads as a real result.
-Note what is NOT in your files: the actual value of any of these. Your files know what you promised to move, never how far it has moved — that number comes from the system you are building, once it is running and measuring. Until then every one of these cards reads "not measured yet", and that is correct rather than unfinished.
+Your plan carries no numeric target yet. Build the tab with an empty state that says so, and leave room for one card per measure.
 
 ### 3. Users and use case
-Who this is for and what they are trying to get done. Take the roles from your own stories — they are written "As a <role>, I want …". Roles in your plan: IT Operations Manager, Compliance Officer, DBA, DevOps Engineer, IT Manager, Windows Server Administrator.
+Who this is for and what they are trying to get done. Take the roles from your own stories — they are written "As a <role>, I want …". Roles in your plan: developer, security officer, approver, system administrator, policy manager, data privacy officer.
 Source: `plan.derived.roles`, already extracted. `plan.stories[].narrative` has the full sentence each role came from, for the drill-down.
 
 ### 4. Guardrails — what must never happen
 Source: `plan.derived.guardrails` — `id` and `statement` each. To show whether anything enforces one, follow `plan.requirements[].fulfilled_by` to the story ids, then read those stories' `verification.state` in the progress file. A guardrail whose stories are not verified is a promise you have made and not yet kept, and the page should say so in those words.
 These are the promises your system makes. Show each one, and whether anything in the build currently enforces it:
-- **REQ-001** — The system must require human approval for any action that changes a production environment.
-- **REQ-005** — The system must log every decision and action for audit purposes.
-- **REQ-012** — The system must notify operators immediately of any autonomous actions taken.
-- **REQ-015** — The system must support rollback capabilities for low-risk, reversible tasks.
+- **REQ-006** — The system must deny actions when token validity or scope cannot be confirmed.
+- **REQ-008** — The system must provide a fail-closed circuit-breaker state when the Policy & Token Store is unreachable.
+- **REQ-012** — The system must ensure zero instances of a subagent obtaining a scope broader than its parent.
+- **REQ-015** — The system must ensure that a revoked token's next call fails within the same request cycle.
 
 ### 5. Systems — what this connects to
 Source: `plan.derived.systems` — a list of names. That is ALL your files know about them. Whether any one of them is actually connected right now is a fact about your running system, and nothing in this repo can tell you it. Render every indicator grey and labelled "not checked from here" until your own system reports otherwise. An indicator that goes green because a name appeared in a JSON file is a lie with a colour on it.
 One row per system, each with a live indicator (connected / not connected / error) and the time it was last checked:
-- SQL Server
-- SSIS
-- SSRS
-- Windows
+- CRM
 
 None of these are connected on day one. The indicator must show that honestly rather than defaulting to green.
 
 ### 6. Project management
 Source: `plan.releases[]` for the bars — each carries `starts_on`, `ends_on`, `story_ids` and `is_demo_target`. `plan.schedule` has `build_start`, `build_end`, `demo_day` and `demo_release_key`. Per story, `plan.stories[].due_on` is the current date and `due_baseline_on` is the date it was FIRST given: show both, because the gap between them is slippage and a chart that quietly moves the target hides it. Status per story comes from the progress file, `stories[].verification.state`, which is one of `not_started`, `in_progress`, `submitted`, `verified`.
 A Gantt view of your releases, and under it every task with its due date. Tasks are clickable and open their own detail. Your releases:
-- **r0** Initial Setup and Trust Spine — 2 stories
-- **r1** AI Analysis and Recommendations — 2 stories
-- **r2** User Interface and Role-based Dashboards — 1 story
-- **r3** Integration and Extensibility — 2 stories
-- **r4** Advanced Monitoring and Incident Management — 4 stories
+- **r0** Initial Skeleton — 2 stories
+- **r1** Consent and Delegation — 2 stories
+- **r2** Integration and Anomaly Detection — 2 stories
+- **r3** Policy Management and SDK — 2 stories
+- **r4** Final Enhancements — 4 stories
 
 ### 7. AI agents
 Source: `plan.agents[]` — one card each, with `name`, `purpose`, `trigger_type`, `trigger`, `inputs`, `outputs`, `autonomy_level`, `approval_gates`, `escalation_rules`, `skills` and `owns` (the story ids it owns, which you join back to the plan and the progress file). `plan.derived.counts.agents_by_autonomy` gives you the roster breakdown without counting them yourself.
 What is NOT there: whether any agent has ever run. There is no run history, no last-run time and no success rate in these files, because none of that exists until you build the agent and it starts running. Show the design, and show "no runs recorded" — never a zero success rate, which reads as an agent that ran and failed.
 Your plan does not carry a scoped agent roster yet, so build this tab from who owns each story:
-- **IT Operations** — owns STORY-001
-- **Compliance** — owns STORY-002
-- **DBA** — owns STORY-003
-- **DevOps** — owns STORY-004
-- **IT Manager** — owns STORY-005
-- **System** — owns STORY-006, STORY-007, STORY-010
-- **Windows Server Administrator** — owns STORY-008
-- **Infrastructure Engineer** — owns STORY-009
-- **System Administrator** — owns STORY-011
+- **Developer** — owns STORY-001, STORY-008, STORY-010
+- **Security Officer** — owns STORY-002, STORY-004, STORY-006, STORY-009
+- **Approver** — owns STORY-003
+- **System Administrator** — owns STORY-005
+- **Policy Manager** — owns STORY-007
+- **Data Privacy Officer** — owns STORY-011
+- **Compliance Officer** — owns STORY-012
 
 These are owners, not scoped agents — say so on the tab rather than presenting a job title as an AI agent.
 
@@ -181,42 +172,43 @@ Use the brand colours you chose for this project. If you have not chosen any yet
 
 ## The requirements this has to reflect
 Your full set, so the Command Center can show all of it:
-- **REQ-001** (SAFE, must) — The system must require human approval for any action that changes a production environment.
-- **REQ-002** (FUNC, must) — The system must automatically detect, diagnose, correlate, and recommend actions without executing production changes.
-- **REQ-003** (FUNC, must) — The system must provide confidence scores for recommended actions.
-- **REQ-004** (FUNC, must) — The system must present evidence-backed reasoning for all recommendations.
-- **REQ-005** (SAFE, must) — The system must log every decision and action for audit purposes.
-- **REQ-006** (FUNC, must) — The system must provide role-based dashboards for different user types.
-- **REQ-007** (CONSTRAINT, must) — The system must support integration with SQL Server, SSIS, SSRS, and Windows servers.
-- **REQ-008** (CONSTRAINT, must) — The system must support integration with cloud services and enterprise applications through standardized connectors.
-- **REQ-009** (FUNC, must) — The system must provide operational summaries for IT Managers and Engineering Leaders.
-- **REQ-010** (FUNC, must) — The system must gather additional diagnostics when confidence is below 80%.
-- **REQ-011** (FUNC, must) — The system must escalate incidents to a human when confidence is below 60%.
-- **REQ-012** (SAFE, must) — The system must notify operators immediately of any autonomous actions taken.
-- **REQ-013** (FUNC, must) — The system must provide explainable AI recommendations for all users.
-- **REQ-014** (FUNC, should) — The system must allow configuration of confidence thresholds for actions.
-- **REQ-015** (SAFE, must) — The system must support rollback capabilities for low-risk, reversible tasks.
-- **REQ-016** (FUNC, must) — The system must provide continuous monitoring and AI-powered root cause analysis.
-- **REQ-017** (NFR, should) — The system must reduce manual incident correlation across systems by 50-70%.
-- **REQ-018** (CONSTRAINT, must) — The system must provide a plug-in connector architecture for extensibility.
+- **REQ-001** (FUNC, must) — The system must issue short-lived, narrowly-scoped tokens for AI agents.
+- **REQ-002** (FUNC, must) — The system must allow human approval for every token request via a plain-language consent screen.
+- **REQ-003** (FUNC, must) — The system must enforce that a subagent can only inherit a strict subset of its parent's scope.
+- **REQ-004** (FUNC, must) — The system must validate token scope and revocation status in real-time at the Enforcement Gateway.
+- **REQ-005** (FUNC, must) — The system must log every allowed and blocked action to an immutable audit log.
+- **REQ-006** (SAFE, must) — The system must deny actions when token validity or scope cannot be confirmed.
+- **REQ-007** (CONSTRAINT, must) — The system must integrate with mock endpoints for email, code hosting, payment, and CRM systems.
+- **REQ-008** (SAFE, must) — The system must provide a fail-closed circuit-breaker state when the Policy & Token Store is unreachable.
+- **REQ-009** (FUNC, must) — The system must support field-level redaction for customer data access.
+- **REQ-010** (FUNC, must) — The system must provide distinct reason codes for denied actions in the Audit Log.
+- **REQ-011** (FUNC, must) — The system must allow policy definition for token scopes and constraints.
+- **REQ-012** (SAFE, must) — The system must ensure zero instances of a subagent obtaining a scope broader than its parent.
+- **REQ-013** (FUNC, must) — The system must provide a Consent UI for approvers to review and approve token requests.
+- **REQ-014** (FUNC, must) — The system must provide a client SDK for developers to request and present tokens.
+- **REQ-015** (SAFE, must) — The system must ensure that a revoked token's next call fails within the same request cycle.
+- **REQ-016** (FUNC, must) — The system must support anomaly detection for token requests.
+- **REQ-017** (FUNC, must) — The system must provide a mechanism for human policy authorship and approval.
+- **REQ-018** (FUNC, must) — The system must provide error messages for rejected tokens indicating the reason (out of scope, expired, revoked).
 
 ## Your stories, in build order
-**r0 · Initial Setup and Trust Spine**
-- STORY-001 — Implement human approval workflow for production changes
-- STORY-002 — Log all decisions and actions for audit purposes
-**r1 · AI Analysis and Recommendations**
-- STORY-003 — Implement AI-driven diagnostics and recommendations
-- STORY-004 — Gather additional diagnostics for low-confidence incidents
-**r2 · User Interface and Role-based Dashboards**
-- STORY-005 — Develop role-based dashboards for different user types
-**r3 · Integration and Extensibility**
-- STORY-006 — Enable SQL Server data access for AI recommendations
-- STORY-007 — Enable cloud service data access for AI recommendations
-**r4 · Advanced Monitoring and Incident Management**
-- STORY-008 — Enhance monitoring capabilities for continuous incident management
-- STORY-009 — Implement incident escalation based on confidence thresholds
-- STORY-010 — Notify operators of autonomous actions
-- STORY-011 — Implement rollback capabilities for low-risk tasks
+**r0 · Initial Skeleton**
+- STORY-001 — Issue and enforce a token with audit logging
+- STORY-002 — Implement real-time revocation handling
+**r1 · Consent and Delegation**
+- STORY-003 — Implement Consent UI for token approval
+- STORY-004 — Implement delegation narrowing for subagents
+**r2 · Integration and Anomaly Detection**
+- STORY-005 — Integrate with mock endpoints and deny actions when token validity or scope cannot be confirmed
+- STORY-006 — Implement anomaly detection for token requests
+**r3 · Policy Management and SDK**
+- STORY-007 — Develop policy management features
+- STORY-008 — Provide a client SDK for token requests
+**r4 · Final Enhancements**
+- STORY-009 — Implement fail-closed circuit-breaker for Policy & Token Store
+- STORY-010 — Provide detailed error messages for rejected tokens
+- STORY-011 — Support field-level redaction for customer data access
+- STORY-012 — Provide distinct reason codes for denied actions in the Audit Log
 
 ## Done means — these exact lines
 These are the acceptance criteria the platform checks. They go into `.colaberry/progress.json` **word for word** — they are matched by text, so a reworded line does not count.

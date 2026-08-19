@@ -1,24 +1,24 @@
-# STORY-008 — Enhance monitoring capabilities for continuous incident management
+# STORY-008 — Provide a client SDK for token requests
 
-As a Windows Server Administrator, I want enhanced monitoring, so that I can manage incidents continuously.
+As a developer, I want a client SDK to request and present tokens, so that I can easily integrate with Ambit.
 
-**Release:** r4 · Advanced Monitoring and Incident Management (weeks 4–5)
-**Owner:** Windows Server Administrator
-**Blocked by:** STORY-007
+**Release:** r3 · Policy Management and SDK (weeks 6–7)
+**Owner:** Developer
+**Blocked by:** STORY-006
 
 ## The requirement this satisfies
 
-- **REQ-016** (Functional, must) — The system must provide continuous monitoring and AI-powered root cause analysis.
+- **REQ-014** (Functional, must) — The system must provide a client SDK for developers to request and present tokens.
 
 ## How to build it
 
-Implement monitoring tools to continuously detect and log incidents on Windows servers.
+Develop a client SDK for token requests and ensure it handles errors appropriately.
 
 ## Failure paths you must handle
 
-- Monitoring failure
-- Incident not detected
-- Monitoring log failure
+- SDK fails to request token.
+- Invalid token request does not return error.
+- SDK usage is not logged.
 
 ## Acceptance — your stop condition
 
@@ -27,8 +27,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given a server, When monitoring is enabled, Then incidents must be detected continuously.
-- [ ] Given an incident, When detected, Then it must trigger an alert.
-- [ ] Trust: All monitoring actions are logged.
+- [ ] Given a developer, when they use the SDK, then they can request a token.
+- [ ] Given a token request, when it is invalid, then an error is returned.
+- [ ] Trust: SDK usage is logged.
 
 When every box above is ticked, stop and show the demo.

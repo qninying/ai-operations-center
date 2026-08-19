@@ -1,6 +1,6 @@
-# CoreOps AI Operations Dashboard — Stories
+# Ambit — Stories
 
-11 stories across 5 releases, walking-skeleton first:
+12 stories across 5 releases, walking-skeleton first:
 the earliest release proves the thinnest end-to-end path including the trust
 spine, and later releases stack features on top of something already working.
 
@@ -13,43 +13,44 @@ the page you keep open for the rest of the programme and demo from. It belongs t
 release and fulfils none of your requirements, because it is the window onto your
 system rather than a part of it.
 
-## r0 · Initial Setup and Trust Spine — weeks 0–1
+## r0 · Initial Skeleton — weeks 0–1
 
-**Goal:** Establish the core system with audit and approval workflows.
-**Done when you can show:** Show a production change requiring human approval and logging the decision.
+**Goal:** Establish the core token issuance and enforcement mechanism with audit logging.
+**Done when you can show:** Show a token being issued, approved, enforced, and logged with real-time revocation handling.
 
-- **[STORY-001](stories/STORY-001.md)** — Implement human approval workflow for production changes
-- **[STORY-002](stories/STORY-002.md)** — Log all decisions and actions for audit purposes
+- **[STORY-001](stories/STORY-001.md)** — Issue and enforce a token with audit logging
+- **[STORY-002](stories/STORY-002.md)** — Implement real-time revocation handling
 
-## r1 · AI Analysis and Recommendations — weeks 1–2
+## r1 · Consent and Delegation — weeks 2–3
 
-**Goal:** Implement AI-driven diagnostics and recommendations with confidence scores.
-**Done when you can show:** Demonstrate AI recommendations with confidence scores and evidence-backed reasoning.
+**Goal:** Implement consent management and delegation narrowing features.
+**Done when you can show:** Demonstrate human approval via Consent UI and subagent scope narrowing in action.
 
-- **[STORY-003](stories/STORY-003.md)** — Implement AI-driven diagnostics and recommendations _(waits on STORY-001, STORY-002)_
-- **[STORY-004](stories/STORY-004.md)** — Gather additional diagnostics for low-confidence incidents _(waits on STORY-003)_
+- **[STORY-003](stories/STORY-003.md)** — Implement Consent UI for token approval _(waits on STORY-001)_
+- **[STORY-004](stories/STORY-004.md)** — Implement delegation narrowing for subagents _(waits on STORY-001)_
 
-## r2 · User Interface and Role-based Dashboards — weeks 2–3
+## r2 · Integration and Anomaly Detection — weeks 4–5
 
-**Goal:** Develop role-based dashboards and operational summaries.
-**Done when you can show:** Display role-based dashboards for DBAs and IT Managers.
+**Goal:** Integrate with mock endpoints and implement anomaly detection.
+**Done when you can show:** Show integration with mock systems and anomaly detection triggering alerts.
 
-- **[STORY-005](stories/STORY-005.md)** — Develop role-based dashboards for different user types _(waits on STORY-004)_
+- **[STORY-005](stories/STORY-005.md)** — Integrate with mock endpoints and deny actions when token validity or scope cannot be confirmed _(waits on STORY-006)_
+- **[STORY-006](stories/STORY-006.md)** — Implement anomaly detection for token requests _(waits on STORY-004)_
 
-## r3 · Integration and Extensibility — weeks 3–4
+## r3 · Policy Management and SDK — weeks 6–7
 
-**Goal:** Enable integration with SQL Server, SSIS, SSRS, Windows servers, and cloud services.
-**Done when you can show:** Show integration with SQL Server and a cloud service using standardized connectors.
+**Goal:** Develop policy management features and provide a client SDK.
+**Done when you can show:** Show policy creation and a developer using the SDK to request tokens.
 
-- **[STORY-006](stories/STORY-006.md)** — Enable SQL Server data access for AI recommendations _(waits on STORY-005)_
-- **[STORY-007](stories/STORY-007.md)** — Enable cloud service data access for AI recommendations _(waits on STORY-005)_
+- **[STORY-007](stories/STORY-007.md)** — Develop policy management features _(waits on STORY-006)_
+- **[STORY-008](stories/STORY-008.md)** — Provide a client SDK for token requests _(waits on STORY-006)_
 
-## r4 · Advanced Monitoring and Incident Management — weeks 4–5
+## r4 · Final Enhancements — weeks 8–9
 
-**Goal:** Enhance monitoring capabilities and incident management workflows.
-**Done when you can show:** Demonstrate continuous monitoring and incident escalation based on confidence thresholds.
+**Goal:** Implement final safety and usability enhancements.
+**Done when you can show:** Demonstrate fail-closed circuit-breaker and detailed error messages for developers.
 
-- **[STORY-008](stories/STORY-008.md)** — Enhance monitoring capabilities for continuous incident management _(waits on STORY-007)_
-- **[STORY-009](stories/STORY-009.md)** — Implement incident escalation based on confidence thresholds _(waits on STORY-008)_
-- **[STORY-010](stories/STORY-010.md)** — Notify operators of autonomous actions _(waits on STORY-009)_
-- **[STORY-011](stories/STORY-011.md)** — Implement rollback capabilities for low-risk tasks _(waits on STORY-009)_
+- **[STORY-009](stories/STORY-009.md)** — Implement fail-closed circuit-breaker for Policy & Token Store _(waits on STORY-008)_
+- **[STORY-010](stories/STORY-010.md)** — Provide detailed error messages for rejected tokens _(waits on STORY-008)_
+- **[STORY-011](stories/STORY-011.md)** — Support field-level redaction for customer data access _(waits on STORY-010)_
+- **[STORY-012](stories/STORY-012.md)** — Provide distinct reason codes for denied actions in the Audit Log _(waits on STORY-011)_

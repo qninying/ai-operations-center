@@ -1,25 +1,25 @@
-# STORY-005 — Develop role-based dashboards for different user types
+# STORY-005 — Integrate with mock endpoints and deny actions when token validity or scope cannot be confirmed
 
-As an IT Manager, I want a dashboard tailored to my role, so that I can quickly access relevant information.
+As a system administrator, I want the system to deny actions when token validity or scope cannot be confirmed, so that unauthorized actions are prevented.
 
-**Release:** r2 · User Interface and Role-based Dashboards (weeks 2–3)
-**Owner:** IT Manager
-**Blocked by:** STORY-004
+**Release:** r2 · Integration and Anomaly Detection (weeks 4–5)
+**Owner:** System Administrator
+**Blocked by:** STORY-006
 
 ## The requirement this satisfies
 
-- **REQ-006** (Functional, must) — The system must provide role-based dashboards for different user types.
-- **REQ-009** (Functional, must) — The system must provide operational summaries for IT Managers and Engineering Leaders.
+- **REQ-006** (Safety, must) — The system must deny actions when token validity or scope cannot be confirmed.
+- **REQ-007** (Constraint, must) — The system must integrate with mock endpoints for email, code hosting, payment, and CRM systems.
 
 ## How to build it
 
-Design and implement dashboards using a UI framework that supports role-based views.
+Ensure integration with mock endpoints includes checks for token validity and scope. Implement logging for all actions and outcomes in the Audit Log.
 
 ## Failure paths you must handle
 
-- Dashboard not loading
-- Incorrect role information
-- Access log failure
+- Token is expired
+- Token scope is insufficient
+- Endpoint is unreachable
 
 ## Acceptance — your stop condition
 
@@ -28,8 +28,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given a user role, When accessing the dashboard, Then it must display role-specific information.
-- [ ] Given an IT Manager, When viewing the dashboard, Then it must show operational summaries.
-- [ ] Trust: Dashboard access is logged by user role.
+- [ ] Given a valid token, when the token is used to access a mock endpoint, then the action is allowed.
+- [ ] Given an invalid token, when the token is used to access a mock endpoint, then the action is denied.
+- [ ] Trust: Given any token, when the token is used, then the action and its outcome are logged in the Audit Log.
 
 When every box above is ticked, stop and show the demo.

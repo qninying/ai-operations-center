@@ -1,24 +1,24 @@
-# STORY-011 — Implement rollback capabilities for low-risk tasks
+# STORY-011 — Support field-level redaction for customer data access
 
-As a system administrator, I want to be able to roll back low-risk tasks, so that I can ensure system stability and correct errors.
+As a data privacy officer, I want field-level redaction for customer data access, so that sensitive information is protected.
 
-**Release:** r4 · Advanced Monitoring and Incident Management (weeks 4–5)
-**Owner:** System Administrator
-**Blocked by:** STORY-009
+**Release:** r4 · Final Enhancements (weeks 8–9)
+**Owner:** Data Privacy Officer
+**Blocked by:** STORY-010
 
 ## The requirement this satisfies
 
-- **REQ-015** (Safety, must) — The system must support rollback capabilities for low-risk, reversible tasks.
+- **REQ-009** (Functional, must) — The system must support field-level redaction for customer data access.
 
 ## How to build it
 
-Develop rollback functionality for designated low-risk tasks. Ensure all rollback actions are logged.
+Implement field-level redaction in the data access layer. Ensure all access and redaction actions are logged.
 
 ## Failure paths you must handle
 
-- Rollback failure due to task dependency
-- Incorrect task identification for rollback
-- Insufficient permissions for rollback
+- Unauthorized access attempt
+- Redaction rule misconfiguration
+- Data access layer failure
 
 ## Acceptance — your stop condition
 
@@ -27,8 +27,8 @@ the same criteria out of `.colaberry/progress.json`, which Claude Code keeps in
 step (see the managed block in CLAUDE.md). Ticking something you have not
 actually met only misleads you.
 
-- [ ] Given a low-risk task is completed, when a rollback is requested, then the system successfully reverts the task.
-- [ ] Given a rollback is requested for a non-reversible task, when the request is made, then the system denies the rollback request.
-- [ ] Trust: All rollback actions are logged for audit purposes.
+- [ ] Given a request for customer data, when the data is accessed, then sensitive fields are redacted.
+- [ ] Given a request for customer data, when the request lacks proper authorization, then access is denied.
+- [ ] Trust: Given any data access, when the data is accessed, then the access and redaction actions are logged in the Audit Log.
 
 When every box above is ticked, stop and show the demo.
