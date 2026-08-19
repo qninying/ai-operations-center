@@ -376,21 +376,26 @@
       "criteria": [
         {
           "text": "Given an incident with low confidence, When escalated, Then it must notify a human operator.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given an escalation, When it occurs, Then it must be logged with the confidence score.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: All escalations are logged with timestamps.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "mcp-server/src/escalationService.ts",
+        "mcp-server/src/httpServer.ts"
+      ],
+      "tests_added": [
+        "mcp-server/src/escalationService.test.ts"
+      ],
+      "notes": "REQ-011 is source-agnostic (\"escalate when confidence is below 60%\", no system named), so built as a standalone evaluator (evaluateEscalation()) rather than rebuilding detection per source, then wired into both existing recommendation paths (STORY-006 SQL, STORY-007 cloud) via GET /api/recommendation and /api/cloud-recommendation — the story's own \"reuse, don't rebuild\" list only named STORY-007/008, but REQ-011 doesn't scope by source, so both were included; flagged to the user before building, confirmed. \"Notify a human operator\" (criterion 1) is a distinct, real logged event (escalation_triggered, warn level, notifiedOperator: true) — the same walking-skeleton meaning STORY-008 gave \"alert\"; a paging/email channel is explicitly STORY-010's job, not this one. Confidence < 60 escalates and logs with the score + an ISO timestamp (criteria 2 and 3, satisfied by one log line, same pattern STORY-008 used). Confidence >= 60 correctly returns null with no log call — tested explicitly, not assumed (\"Escalation not triggered\" failure path, boundary-tested at exactly 59/60). A malformed confidence score (NaN, negative, >100, +-Infinity) throws a typed InvalidConfidenceScoreError rather than silently escalating or silently not (\"Incorrect confidence score\"). The log call is guarded the same way STORY-008's was, so a logging hiccup can't silently swallow an escalation or crash the caller (\"Escalation log failure\").",
+      "updated_at": "2026-08-19T23:35:47.000Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

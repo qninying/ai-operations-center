@@ -17,6 +17,7 @@ import {
 } from "./cloudRecommendationService.js";
 import { startMonitoring } from "./monitoringService.js";
 import type { MonitoringHandle, MonitoringCycleResult } from "./monitoringService.js";
+import { evaluateEscalation } from "./escalationService.js";
 import { logEvent } from "./observability/logger.js";
 import { checkRemediationGuardrail } from "../../guardrails/remediationGuardrail.js";
 
@@ -127,7 +128,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     const description = url.searchParams.get("description") ?? "";
     try {
       const result = await generateRecommendation(incidentId, description);
-      sendJson(res, 200, { incidentId, ...result });
+      // STORY-009 / REQ-011: escalate to a human operator when the agent's own
+      // confidence in this recommendation is below 60% — evaluateEscalation() logs
+      // the escalation itself; this just surfaces it in the response for a demo.
+      const escalation = evaluateEscalation(incidentId, result.confidence, result.rootCause);
+      sendJson(res, 200, { incidentId, ...result, escalation });
     } catch (error) {
       if (error instanceof SqlServerUnavailableError) {
         sendJson(res, 503, {
@@ -157,7 +162,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     const description = url.searchParams.get("description") ?? "";
     try {
       const result = await generateCloudRecommendation(incidentId, description);
-      sendJson(res, 200, { incidentId, ...result });
+      // STORY-009 / REQ-011: same escalation check as /api/recommendation — REQ-011
+      // is source-agnostic, so a low-confidence cloud-service recommendation escalates
+      // exactly the same way a low-confidence SQL Server one does.
+      const escalation = evaluateEscalation(incidentId, result.confidence, result.rootCause);
+      sendJson(res, 200, { incidentId, ...result, escalation });
     } catch (error) {
       if (error instanceof CloudServiceUnavailableError) {
         sendJson(res, 503, {
