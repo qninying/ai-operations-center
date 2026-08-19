@@ -1,62 +1,460 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "project": "CoreOps AI Operations Dashboard",
   "totals": {
-    "stories_total": 11,
-    "stories_verified": 0,
-    "criteria_total": 17,
+    "stories_total": 12,
+    "stories_verified": 5,
+    "stories_submitted": 0,
+    "stories_in_progress": 0,
+    "stories_not_started": 7,
+    "criteria_total": 38,
     "criteria_passed": 17,
-    "points_awarded": 0
+    "points_awarded": 335
   },
   "stories": [
     {
       "id": "STORY-000",
+      "release": null,
+      "acceptance_total": 5,
       "criteria": [
-        { "text": "Given the Command Center, when it is opened, then every tab is reachable and every card drills down one level.", "passed": true },
-        { "text": "Given sample mode, when any tab is shown, then the sample data is visibly labelled as sample.", "passed": true },
-        { "text": "Given the data files, when any tab renders, then its content comes from .colaberry/plan.json and .colaberry/progress.json read at runtime rather than from hard-coded values.", "passed": true },
-        { "text": "Given .colaberry/manifest.json, when any tab is shown, then it displays how old the data is and warns when that age exceeds a week.", "passed": true },
-        { "text": "Trust — no tab shows a number, a connection or a result the project has not actually produced.", "passed": true }
+        {
+          "text": "Given the Command Center, when it is opened, then every tab is reachable and every card drills down one level.",
+          "passed": true
+        },
+        {
+          "text": "Given sample mode, when any tab is shown, then the sample data is visibly labelled as sample.",
+          "passed": true
+        },
+        {
+          "text": "Given the data files, when any tab renders, then its content comes from .colaberry/plan.json and .colaberry/progress.json read at runtime rather than from hard-coded values.",
+          "passed": true
+        },
+        {
+          "text": "Given .colaberry/manifest.json, when any tab is shown, then it displays how old the data is and warns when that age exceeds a week.",
+          "passed": true
+        },
+        {
+          "text": "Trust — no tab shows a number, a connection or a result the project has not actually produced.",
+          "passed": true
+        }
       ],
-      "verification": { "state": "submitted", "commit": null }
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "verified",
+        "criteria_passed": 5,
+        "criteria_total": 5,
+        "verified_at": "2026-08-18T13:36:30.575Z",
+        "commit_sha": "aaac8b84bde6873879e8e0f317518fd63c8c7395",
+        "commit_url": "https://github.com/qninying/ai-operations-center/commit/aaac8b84bde6873879e8e0f317518fd63c8c7395",
+        "commit_at": "2026-08-18T02:47:34Z",
+        "points_awarded": 67,
+        "outstanding": []
+      }
     },
     {
       "id": "STORY-001",
+      "release": "r0",
+      "acceptance_total": 3,
       "criteria": [
-        { "text": "Given a production change request, when the request is submitted, then it must require human approval.", "passed": true },
-        { "text": "Given a denied approval, When the request is resubmitted, Then it must still require approval.", "passed": true },
-        { "text": "Trust: Every approval decision is logged for audit.", "passed": true }
+        {
+          "text": "Given a production change request, When the request is submitted, Then it must require human approval.",
+          "passed": true
+        },
+        {
+          "text": "Given a denied approval, When the request is resubmitted, Then it must still require approval.",
+          "passed": true
+        },
+        {
+          "text": "Trust: Every approval decision is logged for audit.",
+          "passed": true
+        }
       ],
-      "verification": { "state": "submitted", "commit": null }
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "verified",
+        "criteria_passed": 3,
+        "criteria_total": 3,
+        "verified_at": "2026-08-18T21:38:59.945Z",
+        "commit_sha": "b55c1179827f3bed3b174e795e72ceaff770d6fe",
+        "commit_url": "https://github.com/qninying/ai-operations-center/commit/b55c1179827f3bed3b174e795e72ceaff770d6fe",
+        "commit_at": "2026-08-18T13:36:23Z",
+        "points_awarded": 67,
+        "outstanding": []
+      }
     },
     {
       "id": "STORY-002",
+      "release": "r0",
+      "acceptance_total": 3,
       "criteria": [
-        { "text": "Given an action is taken, when it is logged, then it must be retrievable in the audit log.", "passed": true },
-        { "text": "Given a decision is made, when it is logged, then it must include the decision maker.", "passed": true },
-        { "text": "Trust: Every log entry is timestamped and immutable.", "passed": true }
+        {
+          "text": "Given an action is taken, When it is logged, Then it must be retrievable in the audit log.",
+          "passed": true
+        },
+        {
+          "text": "Given a decision is made, When it is logged, Then it must include the decision maker.",
+          "passed": true
+        },
+        {
+          "text": "Trust: Every log entry is timestamped and immutable.",
+          "passed": true
+        }
       ],
-      "verification": { "state": "submitted", "commit": null }
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "verified",
+        "criteria_passed": 3,
+        "criteria_total": 3,
+        "verified_at": "2026-08-18T21:38:59.994Z",
+        "commit_sha": "5d47099cc413f096500677aeb91448d2d1277321",
+        "commit_url": "https://github.com/qninying/ai-operations-center/commit/5d47099cc413f096500677aeb91448d2d1277321",
+        "commit_at": "2026-08-18T14:28:57Z",
+        "points_awarded": 67,
+        "outstanding": []
+      }
     },
     {
       "id": "STORY-003",
+      "release": "r1",
+      "acceptance_total": 3,
       "criteria": [
-        { "text": "Given an incident, When AI analyzes it, Then it must provide a recommendation with a confidence score.", "passed": true },
-        { "text": "Given a recommendation, When it is viewed, Then it must include evidence-backed reasoning.", "passed": true },
-        { "text": "Trust: All recommendations are logged with confidence scores.", "passed": true }
+        {
+          "text": "Given an incident, When AI analyzes it, Then it must provide a recommendation with a confidence score.",
+          "passed": true
+        },
+        {
+          "text": "Given a recommendation, When it is viewed, Then it must include evidence-backed reasoning.",
+          "passed": true
+        },
+        {
+          "text": "Trust: All recommendations are logged with confidence scores.",
+          "passed": true
+        }
       ],
-      "verification": { "state": "submitted", "commit": null }
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "verified",
+        "criteria_passed": 3,
+        "criteria_total": 3,
+        "verified_at": "2026-08-19T00:32:52.167Z",
+        "commit_sha": "08ce1a202c23ce11c42c0f4d388c1edd8b0eb853",
+        "commit_url": "https://github.com/qninying/ai-operations-center/commit/08ce1a202c23ce11c42c0f4d388c1edd8b0eb853",
+        "commit_at": "2026-08-19T00:32:43Z",
+        "points_awarded": 67,
+        "outstanding": []
+      }
     },
     {
       "id": "STORY-004",
+      "release": "r1",
+      "acceptance_total": 3,
       "criteria": [
-        { "text": "Given an incident with low confidence, When additional diagnostics are gathered, Then they must be presented to the user.", "passed": true },
-        { "text": "Given multiple diagnostics, When they are presented, Then they must include possible causes.", "passed": true },
-        { "text": "Trust: All diagnostics gathering is logged.", "passed": true }
+        {
+          "text": "Given an incident with low confidence, When additional diagnostics are gathered, Then they must be presented to the user.",
+          "passed": true
+        },
+        {
+          "text": "Given multiple diagnostics, When they are presented, Then they must include possible causes.",
+          "passed": true
+        },
+        {
+          "text": "Trust: All diagnostics gathering is logged.",
+          "passed": true
+        }
       ],
-      "verification": { "state": "submitted", "commit": null }
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "verified",
+        "criteria_passed": 3,
+        "criteria_total": 3,
+        "verified_at": "2026-08-19T01:44:31.100Z",
+        "commit_sha": "08da6efc5353c1292c4f6db782cd7f160a279b77",
+        "commit_url": "https://github.com/qninying/ai-operations-center/commit/08da6efc5353c1292c4f6db782cd7f160a279b77",
+        "commit_at": "2026-08-19T01:44:22Z",
+        "points_awarded": 67,
+        "outstanding": []
+      }
+    },
+    {
+      "id": "STORY-005",
+      "release": "r2",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a user role, When accessing the dashboard, Then it must display role-specific information.",
+          "passed": false
+        },
+        {
+          "text": "Given an IT Manager, When viewing the dashboard, Then it must show operational summaries.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Dashboard access is logged by user role.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": null,
+        "outstanding": [
+          "Given a user role, When accessing the dashboard, Then it must display role-specific information.",
+          "Given an IT Manager, When viewing the dashboard, Then it must show operational summaries.",
+          "Trust: Dashboard access is logged by user role."
+        ]
+      }
+    },
+    {
+      "id": "STORY-006",
+      "release": "r3",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given the system is connected to SQL Server, when a user requests a recommendation, then the system provides an AI-driven recommendation using SQL Server data.",
+          "passed": false
+        },
+        {
+          "text": "Given the system is unable to connect to SQL Server, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
+          "passed": false
+        },
+        {
+          "text": "Trust: All data access attempts are logged for audit purposes.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": null,
+        "outstanding": [
+          "Given the system is connected to SQL Server, when a user requests a recommendation, then the system provides an AI-driven recommendation using SQL Server data.",
+          "Given the system is unable to connect to SQL Server, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
+          "Trust: All data access attempts are logged for audit purposes."
+        ]
+      }
+    },
+    {
+      "id": "STORY-007",
+      "release": "r3",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given the system is connected to cloud services, when a user requests a recommendation, then the system provides an AI-driven recommendation using cloud service data.",
+          "passed": false
+        },
+        {
+          "text": "Given the system is unable to connect to cloud services, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
+          "passed": false
+        },
+        {
+          "text": "Trust: All data access attempts are logged for audit purposes.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": null,
+        "outstanding": [
+          "Given the system is connected to cloud services, when a user requests a recommendation, then the system provides an AI-driven recommendation using cloud service data.",
+          "Given the system is unable to connect to cloud services, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
+          "Trust: All data access attempts are logged for audit purposes."
+        ]
+      }
+    },
+    {
+      "id": "STORY-008",
+      "release": "r4",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a server, When monitoring is enabled, Then incidents must be detected continuously.",
+          "passed": false
+        },
+        {
+          "text": "Given an incident, When detected, Then it must trigger an alert.",
+          "passed": false
+        },
+        {
+          "text": "Trust: All monitoring actions are logged.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": null,
+        "outstanding": [
+          "Given a server, When monitoring is enabled, Then incidents must be detected continuously.",
+          "Given an incident, When detected, Then it must trigger an alert.",
+          "Trust: All monitoring actions are logged."
+        ]
+      }
+    },
+    {
+      "id": "STORY-009",
+      "release": "r4",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given an incident with low confidence, When escalated, Then it must notify a human operator.",
+          "passed": false
+        },
+        {
+          "text": "Given an escalation, When it occurs, Then it must be logged with the confidence score.",
+          "passed": false
+        },
+        {
+          "text": "Trust: All escalations are logged with timestamps.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": null,
+        "outstanding": [
+          "Given an incident with low confidence, When escalated, Then it must notify a human operator.",
+          "Given an escalation, When it occurs, Then it must be logged with the confidence score.",
+          "Trust: All escalations are logged with timestamps."
+        ]
+      }
+    },
+    {
+      "id": "STORY-010",
+      "release": "r4",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given an autonomous action is taken, when the action is completed, then the system immediately notifies the operators.",
+          "passed": false
+        },
+        {
+          "text": "Given an autonomous action is taken, when the notification fails, then the system retries the notification until successful.",
+          "passed": false
+        },
+        {
+          "text": "Trust: All autonomous actions and notifications are logged for audit purposes.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": null,
+        "outstanding": [
+          "Given an autonomous action is taken, when the action is completed, then the system immediately notifies the operators.",
+          "Given an autonomous action is taken, when the notification fails, then the system retries the notification until successful.",
+          "Trust: All autonomous actions and notifications are logged for audit purposes."
+        ]
+      }
+    },
+    {
+      "id": "STORY-011",
+      "release": "r4",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a low-risk task is completed, when a rollback is requested, then the system successfully reverts the task.",
+          "passed": false
+        },
+        {
+          "text": "Given a rollback is requested for a non-reversible task, when the request is made, then the system denies the rollback request.",
+          "passed": false
+        },
+        {
+          "text": "Trust: All rollback actions are logged for audit purposes.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "not_started",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": null,
+        "outstanding": [
+          "Given a low-risk task is completed, when a rollback is requested, then the system successfully reverts the task.",
+          "Given a rollback is requested for a non-reversible task, when the request is made, then the system denies the rollback request.",
+          "Trust: All rollback actions are logged for audit purposes."
+        ]
+      }
     }
-  ],
-  "note_totals": "stories_total/stories_verified count the 11 real programme stories (plan.stories); criteria_total/criteria_passed reflect STORY-000 through STORY-004's criteria, since those are the only five stories with acceptance criteria defined so far — this will expand as later stories get built. 'submitted' means the criteria are backed by passing tests but no reviewer/commit sign-off has moved the story to 'verified' yet.",
-  "requirementsFile": "project-blueprint/requirements.md",
-  "implementationNotesFile": "docs/implementation-notes.md"
+  ]
 }
