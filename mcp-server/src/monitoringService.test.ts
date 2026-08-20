@@ -161,6 +161,59 @@ describe("startMonitoring", () => {
     expect(queryFn).toHaveBeenCalledTimes(2);
   });
 
+  it("STORY-010: notifies operators when an incident is detected", async () => {
+    const notifyFn = vi.fn().mockResolvedValue(undefined);
+    const queryFn = vi.fn().mockResolvedValue([quietRow, blockedRow]);
+
+    const handle = startMonitoring({ queryFn, notifyFn });
+    await vi.advanceTimersByTimeAsync(0);
+    handle.stop();
+
+    expect(notifyFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionType: "incident_alert",
+        incidentId: "sql:sys.dm_exec_requests:61",
+        summary: expect.stringContaining("Session 61"),
+      })
+    );
+  });
+
+  it("does not notify operators on a quiet cycle with no incident", async () => {
+    const notifyFn = vi.fn().mockResolvedValue(undefined);
+    const queryFn = vi.fn().mockResolvedValue([quietRow]);
+
+    const handle = startMonitoring({ queryFn, notifyFn });
+    await vi.advanceTimersByTimeAsync(0);
+    handle.stop();
+
+    expect(notifyFn).not.toHaveBeenCalled();
+  });
+
+  it("failure path — a rejected notification dispatch is logged and does not crash the monitoring loop", async () => {
+    const logSpy = vi.spyOn(logger, "logEvent");
+    const notifyFn = vi.fn().mockRejectedValue(new Error("OPERATOR_CONTACTS not configured"));
+    const queryFn = vi.fn().mockResolvedValue([quietRow, blockedRow]);
+
+    const handle = startMonitoring({ intervalMs: 1000, queryFn, notifyFn });
+    await vi.advanceTimersByTimeAsync(0);
+    // The notifyFn promise rejection is caught asynchronously — give its .catch()
+    // handler a microtask/tick to run before asserting.
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "error",
+        event: "operator_notification_dispatch_failed",
+        context: expect.objectContaining({ errorClass: "Error" }),
+      })
+    );
+
+    // Loop must still be alive after the rejection.
+    await vi.advanceTimersByTimeAsync(1000);
+    handle.stop();
+    expect(queryFn).toHaveBeenCalledTimes(2);
+  });
+
   it("invokes onCycle with a structured result after every cycle, success and failure alike", async () => {
     const onCycle = vi.fn();
     const queryFn = vi

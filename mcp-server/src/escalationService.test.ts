@@ -67,6 +67,45 @@ describe("evaluateEscalation", () => {
     expect(call.context?.escalatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
+  it("STORY-010: dispatches a real operator notification when it escalates", async () => {
+    const notifyFn = vi.fn().mockResolvedValue(undefined);
+
+    const record = evaluateEscalation("incident-9", 30, "Session 90 blocked", { notifyFn });
+
+    expect(record).not.toBeNull();
+    expect(notifyFn).toHaveBeenCalledWith({
+      actionType: "escalation",
+      incidentId: "incident-9",
+      summary: "Session 90 blocked",
+    });
+    await notifyFn.mock.results[0].value;
+  });
+
+  it("does not dispatch a notification when confidence does not escalate", () => {
+    const notifyFn = vi.fn();
+
+    expect(evaluateEscalation("incident-10", 75, "fine", { notifyFn })).toBeNull();
+    expect(notifyFn).not.toHaveBeenCalled();
+  });
+
+  it("failure path — a rejected notification dispatch is logged, not thrown, and the escalation record is still returned", async () => {
+    const logSpy = vi.spyOn(logger, "logEvent");
+    const notifyFn = vi.fn().mockRejectedValue(new Error("OPERATOR_CONTACTS not configured"));
+
+    const record = evaluateEscalation("incident-11", 20, "desc", { notifyFn });
+    expect(record).not.toBeNull();
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "error",
+        event: "operator_notification_dispatch_failed",
+        context: expect.objectContaining({ incidentId: "incident-11", errorClass: "Error" }),
+      })
+    );
+  });
+
   it("failure path — escalation log failure: a logging failure is guarded and the escalation record is still returned", () => {
     vi.spyOn(logger, "logEvent").mockImplementationOnce(() => {
       throw new Error("stdout write failed");

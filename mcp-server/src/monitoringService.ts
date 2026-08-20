@@ -1,6 +1,8 @@
 import { queryLiveDmv } from "./dmvLiveSource.js";
 import type { DmvExecRequestRow } from "./dmvFixtures.js";
-import { logEvent, type LogEventInput } from "./observability/logger.js";
+import { notifyOperators } from "./notificationService.js";
+import { safeLogEvent as sharedSafeLogEvent } from "./observability/safeLogEvent.js";
+import type { LogEventInput } from "./observability/logger.js";
 
 // STORY-008 / REQ-016: continuous monitoring for incident management. Calls
 // queryLiveDmv() directly, the same as recommendationService.ts and
@@ -41,6 +43,8 @@ export interface MonitoringOptions {
   // for a caller that wants to surface live status (e.g. an HTTP status route); it is
   // never the audit trail itself, logEvent remains that.
   onCycle?: (result: MonitoringCycleResult) => void;
+  // STORY-010: injection point for tests. Defaults to the real notifyOperators().
+  notifyFn?: typeof notifyOperators;
 }
 
 export interface MonitoringHandle {
@@ -53,21 +57,16 @@ function hasIncident(rows: DmvExecRequestRow[]): DmvExecRequestRow | undefined {
 
 // A monitoring loop that dies because its own logging call threw would be worse than
 // one that occasionally fails to log — this is the last line of defense for the
-// "Monitoring log failure" path, deliberately never re-throwing.
+// "Monitoring log failure" path, deliberately never re-throwing. Extracted to
+// observability/safeLogEvent.ts as of STORY-010 (third occurrence of this exact
+// guard); this thin wrapper keeps this file's call sites and existing tests unchanged.
 function safeLogEvent(input: LogEventInput): void {
-  try {
-    logEvent(input);
-  } catch (error) {
-    try {
-      console.error("monitoringService: logEvent failed", error);
-    } catch {
-      // Truly nothing more can be done here; never let a log failure escape the loop.
-    }
-  }
+  sharedSafeLogEvent("monitoringService", input);
 }
 
 async function runMonitoringCycle(
   queryFn: typeof queryLiveDmv,
+  notifyFn: typeof notifyOperators,
   onCycle?: (result: MonitoringCycleResult) => void
 ): Promise<void> {
   let rows: DmvExecRequestRow[];
@@ -107,6 +106,26 @@ async function runMonitoringCycle(
         databaseName: incident.database_name,
       },
     });
+
+    // STORY-010 / REQ-012: incident_alert is one of this system's two real
+    // autonomous actions. Fire-and-forget deliberately — notifyOperators() has its
+    // own capped retry (up to ~10s+ across attempts), and awaiting it here would
+    // extend this cycle well past the monitoring interval, risking the exact
+    // overlapping-cycle problem the in-flight guard above was built to prevent.
+    // notifyOperators() itself never throws except for missing operator config
+    // (thrown before any attempt), which is caught here so it can't produce an
+    // unhandled rejection.
+    notifyFn({
+      actionType: "incident_alert",
+      incidentId: `sql:sys.dm_exec_requests:${incident.session_id}`,
+      summary: `Session ${incident.session_id} is blocked by session ${incident.blocking_session_id} on ${incident.database_name}.`,
+    }).catch((error) => {
+      safeLogEvent({
+        level: "error",
+        event: "operator_notification_dispatch_failed",
+        context: { errorClass: error instanceof Error ? error.name : "Error" },
+      });
+    });
   }
 
   onCycle?.({
@@ -139,6 +158,7 @@ async function runMonitoringCycle(
 export function startMonitoring(options: MonitoringOptions = {}): MonitoringHandle {
   const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS;
   const queryFn = options.queryFn ?? queryLiveDmv;
+  const notifyFn = options.notifyFn ?? notifyOperators;
 
   let cycleInFlight = false;
   async function runIfIdle(): Promise<void> {
@@ -147,7 +167,7 @@ export function startMonitoring(options: MonitoringOptions = {}): MonitoringHand
     }
     cycleInFlight = true;
     try {
-      await runMonitoringCycle(queryFn, options.onCycle);
+      await runMonitoringCycle(queryFn, notifyFn, options.onCycle);
     } finally {
       cycleInFlight = false;
     }
