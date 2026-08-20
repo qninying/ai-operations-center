@@ -8,8 +8,15 @@
 // execution-outcome trail from R4's property 4 in requirements.md: there is no
 // detection/recommendation subsystem yet (R1 is UNMAPPED), so there is nothing further
 // upstream to log yet. This closes the decision+action half of that trail, not all of it.
+//
+// Extended (no platform STORY id) to also carry ABAC policy-evaluation and HITL-queue
+// events — abacEvaluator.ts and hitlQueue.ts write here rather than standing up a
+// second, parallel audit trail. Existing DecisionAuditEntry/ActionAuditEntry consumers
+// are unaffected: this only widens the AuditEntry union and adds two new builders.
 
 import { ApprovalDecision, GuardrailResult, RemediationAction } from "./remediationGuardrail.js";
+import { AbacDecision } from "./abacEvaluator.js";
+import { AbacRequest } from "./abacPolicy.js";
 
 interface AuditEntryEnvelope {
   id: string;
@@ -33,7 +40,23 @@ export interface ActionAuditEntry extends AuditEntryEnvelope {
   violations: GuardrailResult["violations"];
 }
 
-export type AuditEntry = DecisionAuditEntry | ActionAuditEntry;
+export interface PolicyEvaluationAuditEntry extends AuditEntryEnvelope {
+  entryType: "policy_evaluation";
+  request: AbacRequest;
+  decision: AbacDecision;
+}
+
+export type HitlEventType = "hitl_enqueued" | "hitl_decision" | "hitl_escalated" | "hitl_decision_rejected";
+
+export interface HitlAuditEntry extends AuditEntryEnvelope {
+  entryType: "hitl_event";
+  hitlEventType: HitlEventType;
+  itemId: string;
+  outcome: string;
+  detail: Record<string, unknown>;
+}
+
+export type AuditEntry = DecisionAuditEntry | ActionAuditEntry | PolicyEvaluationAuditEntry | HitlAuditEntry;
 
 export function buildDecisionAuditEntry(
   action: RemediationAction,
@@ -75,6 +98,48 @@ export function buildActionAuditEntry(
   };
 }
 
+export function buildPolicyEvaluationAuditEntry(
+  request: AbacRequest,
+  decision: AbacDecision,
+  actor: string,
+  id: string,
+  correlationId: string,
+  now: () => string = () => new Date().toISOString()
+): PolicyEvaluationAuditEntry {
+  return {
+    id,
+    entryType: "policy_evaluation",
+    correlationId,
+    actor,
+    request,
+    decision,
+    loggedAt: now(),
+  };
+}
+
+export function buildHitlAuditEntry(
+  hitlEventType: HitlEventType,
+  itemId: string,
+  outcome: string,
+  actor: string,
+  detail: Record<string, unknown>,
+  id: string,
+  correlationId: string,
+  now: () => string = () => new Date().toISOString()
+): HitlAuditEntry {
+  return {
+    id,
+    entryType: "hitl_event",
+    correlationId,
+    actor,
+    hitlEventType,
+    itemId,
+    outcome,
+    detail,
+    loggedAt: now(),
+  };
+}
+
 export class AuditLogValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -101,11 +166,25 @@ function sameContent(a: AuditEntry, b: AuditEntry): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+// Explicit per-type branches, not an if/else -- adding a fifth AuditEntry variant
+// with a nested mutable field later should force a compile error here (an
+// unhandled `entryType` falls through with nothing frozen) rather than silently
+// shipping a new entry type whose nested object stays mutable.
 function freezeEntry(entry: AuditEntry): AuditEntry {
-  if (entry.entryType === "decision") {
-    Object.freeze(entry.decision);
-  } else {
-    Object.freeze(entry.violations);
+  switch (entry.entryType) {
+    case "decision":
+      Object.freeze(entry.decision);
+      break;
+    case "action":
+      Object.freeze(entry.violations);
+      break;
+    case "policy_evaluation":
+      Object.freeze(entry.decision);
+      Object.freeze(entry.request);
+      break;
+    case "hitl_event":
+      Object.freeze(entry.detail);
+      break;
   }
   return Object.freeze(entry);
 }

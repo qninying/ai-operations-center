@@ -5,8 +5,11 @@ import {
   AuditLogValidationError,
   buildActionAuditEntry,
   buildDecisionAuditEntry,
+  buildHitlAuditEntry,
+  buildPolicyEvaluationAuditEntry,
 } from "./auditLog.js";
 import { checkRemediationGuardrail, RemediationAction } from "./remediationGuardrail.js";
+import { evaluateAbacPolicy } from "./abacEvaluator.js";
 
 function baseAction(overrides: Partial<RemediationAction> = {}): RemediationAction {
   return {
@@ -210,5 +213,95 @@ describe("AuditLog — STORY-002 criterion 3 (Trust): every log entry is timesta
     log.record(original);
     expect(() => log.record(conflicting)).toThrow(AuditLogConflictError);
     expect(log.retrieve("entry-11")).toMatchObject({ entry: { actor: "jsmith" } });
+  });
+});
+
+// No platform STORY id — governance-engine extension (ABAC evaluator + HITL queue),
+// reusing this same audit log rather than a second, parallel one.
+describe("AuditLog — governance engine: policy_evaluation entries", () => {
+  it("logs an ABAC decision with the actor and matched rule", () => {
+    const log = new AuditLog();
+    const request = { role: "engineer" as const, resourceType: "incident_detail" as const, action: "view" as const };
+    const decision = evaluateAbacPolicy(request);
+    const entry = buildPolicyEvaluationAuditEntry(request, decision, "engineer", "pe-1", "corr-pe-1", () => "2026-08-20T12:00:00Z");
+
+    log.record(entry);
+
+    expect(log.all()).toEqual([entry]);
+    expect(entry.decision.decision).toBe("allow");
+  });
+
+  it("failure path — log entry incorrect: an entry missing a required field is rejected at write time", () => {
+    const log = new AuditLog();
+    const request = { role: "engineer" as const, resourceType: "incident_detail" as const, action: "view" as const };
+    const decision = evaluateAbacPolicy(request);
+    const entry = buildPolicyEvaluationAuditEntry(request, decision, "", "pe-2", "corr-pe-2");
+
+    expect(() => log.record(entry)).toThrow(AuditLogValidationError);
+  });
+});
+
+describe("AuditLog — governance engine: hitl_event entries", () => {
+  it("logs an enqueue event and retrieves it by id", () => {
+    const log = new AuditLog();
+    const entry = buildHitlAuditEntry(
+      "hitl_enqueued",
+      "item-1",
+      "pending",
+      "governance_engine",
+      { notified: "alex" },
+      "hitl-1",
+      "corr-hitl-1",
+      () => "2026-08-20T12:00:00Z"
+    );
+
+    log.record(entry);
+
+    expect(log.retrieve("hitl-1")).toEqual({ found: true, entry });
+  });
+
+  it("is idempotent: recording the identical hitl event twice does not duplicate the trail", () => {
+    const log = new AuditLog();
+    const entry = buildHitlAuditEntry(
+      "hitl_decision",
+      "item-2",
+      "approved",
+      "alex",
+      { decision: "approve" },
+      "hitl-2",
+      "corr-hitl-2",
+      () => "2026-08-20T12:00:00Z"
+    );
+
+    log.record(entry);
+    log.record(entry);
+
+    expect(log.all().length).toBe(1);
+  });
+
+  it("a stored hitl entry is frozen, including its nested detail object", () => {
+    const log = new AuditLog();
+    const entry = buildHitlAuditEntry(
+      "hitl_escalated",
+      "item-3",
+      "escalated",
+      "governance_engine",
+      { escalatedTo: "jordan" },
+      "hitl-3",
+      "corr-hitl-3"
+    );
+    log.record(entry);
+
+    const stored = log.retrieve("hitl-3");
+    expect(stored.found).toBe(true);
+    if (stored.found && stored.entry.entryType === "hitl_event") {
+      const detail = stored.entry.detail;
+      expect(Object.isFrozen(detail)).toBe(true);
+      expect(() => {
+        (detail as Record<string, unknown>).escalatedTo = "tampered";
+      }).toThrow();
+    } else {
+      throw new Error("expected a found hitl_event entry");
+    }
   });
 });
