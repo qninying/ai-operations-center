@@ -6,12 +6,11 @@ import { safeLogEvent } from "./observability/safeLogEvent.js";
 // STORY-008's incident alert and STORY-009's escalation — both wired to this module
 // rather than a third invented action; that's what "reuse, don't rebuild" means here.
 //
-// No real notification channel exists (no email/Slack/paging credentials anywhere in
-// this repo). Rather than fabricate one, `channel` is an injectable function — same
-// dependency-injection pattern this repo already uses for queryFn/analyzeFn — defaulting
-// to the same real, distinct log event STORY-008/009 used for "alert"/"escalation".
-// What's new here, and why this story isn't redundant with those: real retry logic
-// around delivery, not just a single guarded log write.
+// Default delivery is a real ntfy.sh push notification (free, no signup, no API key —
+// a plain HTTP POST to a topic name; see https://ntfy.sh/docs/). `channel` stays
+// injectable — same dependency-injection pattern this repo already uses for
+// queryFn/analyzeFn — so tests and any future real channel (Slack, email, paging) can
+// swap it out without touching notifyOperators() itself.
 //
 // "Retries the notification until successful" is read as capped retry, not literal
 // infinite retry — this repo's own rules explicitly prohibit unbounded retry loops.
@@ -46,6 +45,15 @@ export class OperatorContactMissingError extends Error {
   }
 }
 
+export class NotificationChannelUnconfiguredError extends Error {
+  readonly errorClass = "NotificationChannelUnconfiguredError" as const;
+
+  constructor() {
+    super("No ntfy topic configured (NTFY_TOPIC env var is unset or empty).");
+    this.name = "NotificationChannelUnconfiguredError";
+  }
+}
+
 export interface NotifyOperatorsOptions {
   channel?: NotificationChannel;
 }
@@ -63,12 +71,39 @@ function readOperators(): string[] {
   return operators;
 }
 
-// Walking-skeleton delivery: succeeding here means only "logged," since no real
-// channel exists yet — this is the swap point for a real email/Slack/paging
-// integration later. Deliberately does no logging of its own: the Trust log (below)
-// applies uniformly to whichever channel actually ran, default or caller-supplied,
-// rather than being buried inside one specific channel implementation.
-const defaultChannel: NotificationChannel = async () => {};
+const NTFY_SERVER = process.env.NTFY_SERVER ?? "https://ntfy.sh";
+
+// Real delivery via ntfy.sh — a public POST-to-a-topic push service; the topic name
+// is the only "credential," so NTFY_TOPIC should be an unguessable value, not
+// something like "coreops-alerts" (anyone who knows the topic can publish or
+// subscribe to it). Deliberately does no logging of its own: the Trust log in
+// notifyOperators() below applies uniformly to whichever channel actually ran,
+// default or caller-supplied, rather than being buried in one specific
+// implementation. A missing topic throws before any network call — same "don't
+// retry a config problem" rule as this repo's other missing-config errors, though
+// here the check runs inside the retried function itself (a local, no-network check
+// is cheap enough that a few pointless retries before that surfaces cost nothing
+// real, unlike retrying an actual failed connection attempt).
+const defaultChannel: NotificationChannel = async (action, operators) => {
+  const topic = (process.env.NTFY_TOPIC ?? "").trim();
+  if (!topic) {
+    throw new NotificationChannelUnconfiguredError();
+  }
+
+  const response = await fetch(`${NTFY_SERVER}/${encodeURIComponent(topic)}`, {
+    method: "POST",
+    headers: {
+      Title: `CoreOps: ${action.actionType}`,
+      Priority: "high",
+      Tags: "rotating_light",
+    },
+    body: `${action.summary}\n\nIncident: ${action.incidentId}\nFor: ${operators.join(", ")}`,
+  });
+
+  if (!response.ok) {
+    throw new Error(`ntfy responded with HTTP ${response.status}`);
+  }
+};
 
 // Throws OperatorContactMissingError immediately, before any delivery attempt —
 // missing config won't fix itself on retry, same rule as this repo's other

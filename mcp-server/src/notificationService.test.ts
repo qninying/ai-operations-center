@@ -129,3 +129,64 @@ describe("notifyOperators", () => {
     expect(failureCall![0].context?.errorClass).toBe("UpstreamCallFailedError");
   });
 });
+
+// The real default channel (ntfy.sh) — previously an untested no-op, now real I/O.
+// Exercised through notifyOperators() with no `channel` override, same as production.
+describe("notifyOperators (default ntfy channel)", () => {
+  const originalEnv = { ...process.env };
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    setOperators();
+    process.env.NTFY_TOPIC = "test-topic-abc123";
+    fetchSpy = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetchSpy);
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("posts a real ntfy request with the topic, title, and summary", async () => {
+    await notifyOperators(action);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, requestInit] = fetchSpy.mock.calls[0];
+    expect(url).toBe("https://ntfy.sh/test-topic-abc123");
+    expect(requestInit.method).toBe("POST");
+    expect(requestInit.headers.Title).toContain("incident_alert");
+    expect(requestInit.body).toContain(action.summary);
+    expect(requestInit.body).toContain("ops-oncall@example.com");
+  });
+
+  it("failure path — a non-ok ntfy response is treated as a delivery failure and eventually logged", async () => {
+    const logSpy = vi.spyOn(logger, "logEvent");
+    fetchSpy.mockResolvedValue({ ok: false, status: 503 });
+
+    const resultPromise = notifyOperators(action);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await resultPromise;
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "operator_notification_failed" })
+    );
+  });
+
+  it("failure path — a missing NTFY_TOPIC never calls fetch and is eventually logged", async () => {
+    delete process.env.NTFY_TOPIC;
+    const logSpy = vi.spyOn(logger, "logEvent");
+
+    const resultPromise = notifyOperators(action);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await resultPromise;
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "operator_notification_failed" })
+    );
+  });
+});
