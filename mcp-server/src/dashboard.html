@@ -616,7 +616,9 @@
             </div>
             <div class="panel-body">
               <div class="btn-row">
-                <button class="btn btn-secondary" id="recommend-btn">Propose: restart_service on prod-app-server-03</button>
+                <button class="btn btn-secondary" id="propose-btn">Propose: restart monitoring collector service</button>
+                <button class="btn btn-primary" id="approve-btn" style="display:none;">Approve</button>
+                <button class="btn btn-danger" id="reject-btn" style="display:none;">Reject</button>
               </div>
               <div class="banner" id="guardrail-result"></div>
             </div>
@@ -939,14 +941,17 @@ async function getAiRecommendation() {
 }
 
 /* ---------- guardrail demo ---------- */
-async function recommendRemediation() {
-  const btn = $('recommend-btn');
+let currentGuardrailItemId = null;
+
+async function proposeRemediation() {
+  const btn = $('propose-btn');
   const resultEl = $('guardrail-result');
   btn.disabled = true;
-  btn.textContent = 'Checking guardrail…';
+  btn.textContent = 'Proposing…';
   try {
-    const res = await fetch('/guardrail/check-demo', { method: 'POST' });
+    const res = await fetch('/api/guardrail/propose', { method: 'POST' });
     const body = await res.json();
+    currentGuardrailItemId = body.itemId;
     const allowed = body.result.allowed;
     resultEl.className = 'banner shown ' + (allowed ? 'allowed' : 'blocked');
     let html = '<div class="banner-title">' + (allowed ? 'Allowed' : 'Blocked') + '</div>';
@@ -954,10 +959,61 @@ async function recommendRemediation() {
       for (const v of body.result.violations) html += '<div class="violation">' + v + '</div>';
     }
     resultEl.innerHTML = html;
-    pushActivity(allowed ? 'success' : 'danger', '<strong>Guardrail</strong> ' + (allowed ? 'allowed' : 'blocked') + ' restart_service');
+    pushActivity(
+      allowed ? 'success' : 'danger',
+      '<strong>Guardrail</strong> ' + (allowed ? 'allowed' : 'blocked') + ' a monitoring collector restart — awaiting ' + body.approver
+    );
+    $('approve-btn').style.display = allowed ? 'none' : 'inline-flex';
+    $('reject-btn').style.display = allowed ? 'none' : 'inline-flex';
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Propose: restart_service on prod-app-server-03';
+    btn.textContent = 'Propose: restart monitoring collector service';
+  }
+}
+
+async function decideRemediation(decision) {
+  if (!currentGuardrailItemId) return;
+  const approveBtn = $('approve-btn');
+  const rejectBtn = $('reject-btn');
+  const resultEl = $('guardrail-result');
+  approveBtn.disabled = true;
+  rejectBtn.disabled = true;
+  try {
+    const res = await fetch('/api/guardrail/decide', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemId: currentGuardrailItemId, decision }),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      resultEl.className = 'banner shown blocked';
+      resultEl.innerHTML = '<div class="banner-title">' + body.error + '</div>' + body.message;
+      return;
+    }
+    if (decision === 'reject') {
+      resultEl.className = 'banner shown blocked';
+      resultEl.innerHTML = '<div class="banner-title">Rejected</div>No action was taken.';
+      pushActivity('warning', '<strong>Guardrail</strong> remediation rejected');
+    } else if (body.executed) {
+      resultEl.className = 'banner shown allowed';
+      resultEl.innerHTML =
+        '<div class="banner-title">Allowed — executed</div>Monitoring collector restarted at ' +
+        new Date(body.executedAt).toLocaleTimeString() +
+        ' (task ' + body.taskId.slice(0, 8) + ').';
+      pushActivity('success', '<strong>Guardrail</strong> approved — monitoring collector restarted');
+      loadMonitorStatus();
+    } else {
+      resultEl.className = 'banner shown blocked';
+      let html = '<div class="banner-title">Approved but not executed</div>';
+      for (const v of body.result.violations) html += '<div class="violation">' + v + '</div>';
+      resultEl.innerHTML = html;
+    }
+    $('approve-btn').style.display = 'none';
+    $('reject-btn').style.display = 'none';
+    currentGuardrailItemId = null;
+  } finally {
+    approveBtn.disabled = false;
+    rejectBtn.disabled = false;
   }
 }
 
@@ -975,7 +1031,9 @@ const commands = [
   { label: 'Start monitoring', hint: 'POST /api/monitoring/start', run: startMonitoring },
   { label: 'Stop monitoring', hint: 'POST /api/monitoring/stop', run: stopMonitoring },
   { label: 'Get AI recommendation', hint: 'GET /api/recommendation', run: getAiRecommendation },
-  { label: 'Run guardrail check', hint: 'POST /guardrail/check-demo', run: recommendRemediation },
+  { label: 'Propose remediation', hint: 'POST /api/guardrail/propose', run: proposeRemediation },
+  { label: 'Approve remediation', hint: 'POST /api/guardrail/decide', run: () => decideRemediation('approve') },
+  { label: 'Reject remediation', hint: 'POST /api/guardrail/decide', run: () => decideRemediation('reject') },
   { label: 'Roll back this session', hint: 'POST /api/rollback', run: rollbackMonitoring },
   { label: 'Jump to Overview', hint: '#overview', run: () => location.hash = '#overview' },
   { label: 'Jump to Monitoring', hint: '#monitoring', run: () => location.hash = '#monitoring' },
@@ -1037,7 +1095,9 @@ $('monitor-start-btn').addEventListener('click', startMonitoring);
 $('monitor-stop-btn').addEventListener('click', stopMonitoring);
 $('monitor-rollback-btn').addEventListener('click', rollbackMonitoring);
 $('recommend-ai-btn').addEventListener('click', getAiRecommendation);
-$('recommend-btn').addEventListener('click', recommendRemediation);
+$('propose-btn').addEventListener('click', proposeRemediation);
+$('approve-btn').addEventListener('click', () => decideRemediation('approve'));
+$('reject-btn').addEventListener('click', () => decideRemediation('reject'));
 $('notif-btn').addEventListener('click', () => {
   const panel = $('activity-panel');
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });

@@ -28,6 +28,9 @@ import {
 import type { TaskRegistration } from "./rollbackService.js";
 import { logEvent } from "./observability/logger.js";
 import { checkRemediationGuardrail } from "../../guardrails/remediationGuardrail.js";
+import type { RemediationAction, ApprovalDecision } from "../../guardrails/remediationGuardrail.js";
+import { AuditLog } from "../../guardrails/auditLog.js";
+import { HitlQueue, HitlItemNotFoundError, UnauthorizedDeciderError, MfaRequiredError } from "../../guardrails/hitlQueue.js";
 
 // Thin HTTP transport for R2's DMV read path, alongside the existing stdio MCP
 // transport in index.ts. Both call the same readDmv() orchestrator — this file adds
@@ -50,6 +53,45 @@ let monitoringHandle: MonitoringHandle | null = null;
 let currentMonitoringTaskId: string | null = null;
 let lastMonitoringCycle: MonitoringCycleResult | null = null;
 let recentAlerts: MonitoringCycleResult[] = [];
+
+function startMonitoringInternal(): string {
+  currentMonitoringTaskId = crypto.randomUUID();
+  monitoringHandle = startMonitoring({
+    onCycle: (result) => {
+      lastMonitoringCycle = result;
+      if (result.alert) {
+        recentAlerts = [result, ...recentAlerts].slice(0, RECENT_ALERTS_LIMIT);
+      }
+    },
+  });
+  logEvent({ level: "info", event: "monitoring_control", context: { action: "start", taskId: currentMonitoringTaskId } });
+  return currentMonitoringTaskId;
+}
+
+function stopMonitoringInternal(): void {
+  if (!monitoringHandle) return;
+  monitoringHandle.stop();
+  monitoringHandle = null;
+  currentMonitoringTaskId = null;
+  logEvent({ level: "info", event: "monitoring_control", context: { action: "stop" } });
+}
+
+// Guardrail + HITL approval: this process's one real, safe, reversible action
+// (the same monitoring service STORY-011's rollback already targets) is what a
+// human-approved remediation actually executes. There is no real production-write
+// execution path in this codebase — approving a fictional "restart prod-app-server-03"
+// would have nothing real to do, so the proposed action is a genuinely restartable
+// service instead. See PROGRESS.md for the decision and why.
+const auditLog = new AuditLog();
+const hitlQueue = new HitlQueue(auditLog);
+const GUARDRAIL_PRIMARY_APPROVER = (process.env.OPERATOR_CONTACTS ?? "on-call operator").split(",")[0].trim();
+const GUARDRAIL_BACKUP_APPROVER = "sre-oncall";
+
+interface PendingRemediation {
+  action: RemediationAction;
+  executedAt: string | null;
+}
+const pendingRemediations = new Map<string, PendingRemediation>();
 
 function sendJson(res: ServerResponse, status: number, body: unknown) {
   const payload = JSON.stringify(body, null, 2);
@@ -248,19 +290,10 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       sendJson(res, 200, { running: true, message: "Monitoring is already running." });
       return;
     }
-    currentMonitoringTaskId = crypto.randomUUID();
-    monitoringHandle = startMonitoring({
-      onCycle: (result) => {
-        lastMonitoringCycle = result;
-        if (result.alert) {
-          recentAlerts = [result, ...recentAlerts].slice(0, RECENT_ALERTS_LIMIT);
-        }
-      },
-    });
-    logEvent({ level: "info", event: "monitoring_control", context: { action: "start", taskId: currentMonitoringTaskId } });
+    const taskId = startMonitoringInternal();
     // STORY-011: taskId is what a later POST /api/rollback call names to revert
     // this specific monitoring session.
-    sendJson(res, 200, { running: true, taskId: currentMonitoringTaskId });
+    sendJson(res, 200, { running: true, taskId });
     return;
   }
 
@@ -269,10 +302,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       sendJson(res, 200, { running: false, message: "Monitoring is already stopped." });
       return;
     }
-    monitoringHandle.stop();
-    monitoringHandle = null;
-    currentMonitoringTaskId = null;
-    logEvent({ level: "info", event: "monitoring_control", context: { action: "stop" } });
+    stopMonitoringInternal();
     sendJson(res, 200, { running: false });
     return;
   }
@@ -347,18 +377,118 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  if (req.method === "POST" && url.pathname === "/guardrail/check-demo") {
+  if (req.method === "POST" && url.pathname === "/api/guardrail/propose") {
     // Same real scenario as guardrails/demoUnsafeAction.ts: a recommendation that's
     // evidence-linked and of a valid, reversible type, missing only human approval.
-    const proposedAction = {
+    // Enqueues into the real HITL queue (guardrails/hitlQueue.ts) rather than doing a
+    // single stateless check — a human can now actually act on this specific item.
+    const action: RemediationAction = {
       actionType: "restart_service",
       evidenceIds: ["evt-4471"],
       approval: null,
-      targetSystem: { name: "prod-app-server-03", productionWriteProtected: true },
+      targetSystem: { name: "monitoring-collector", productionWriteProtected: true },
     };
-    const result = checkRemediationGuardrail(proposedAction);
-    sendJson(res, 200, { proposedAction, result });
+    const correlationId = crypto.randomUUID();
+    const item = hitlQueue.enqueue({
+      request: { ...action },
+      correlationId,
+      contextPackage: "Monitoring collector restart, evidence-linked, awaiting approval.",
+      primaryApprover: GUARDRAIL_PRIMARY_APPROVER,
+      backupApprover: GUARDRAIL_BACKUP_APPROVER,
+    });
+    pendingRemediations.set(item.itemId, { action, executedAt: null });
+    const result = checkRemediationGuardrail(action);
+    logEvent({ level: "info", event: "guardrail_proposed", context: { itemId: item.itemId, correlationId } });
+    sendJson(res, 200, { itemId: item.itemId, correlationId, proposedAction: action, result, approver: GUARDRAIL_PRIMARY_APPROVER });
     return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/guardrail/decide") {
+    let body: { itemId?: unknown; decision?: unknown };
+    try {
+      body = (await readJsonBody(req)) as typeof body;
+    } catch (error) {
+      sendJson(res, 400, {
+        error: "INVALID_JSON_BODY",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+
+    const { itemId, decision } = body;
+    if (typeof itemId !== "string" || !itemId || (decision !== "approve" && decision !== "reject")) {
+      sendJson(res, 400, {
+        error: "MISSING_FIELDS",
+        message: "itemId (string) and decision ('approve' | 'reject') are required.",
+      });
+      return;
+    }
+
+    const pending = pendingRemediations.get(itemId);
+    if (!pending) {
+      sendJson(res, 404, { error: "UNKNOWN_ITEM", message: `No pending remediation with id "${itemId}".` });
+      return;
+    }
+
+    try {
+      // Demo-grade: the actor deciding is always the same primary approver the item
+      // was enqueued for, with MFA supplied as true — there's no real session/MFA
+      // concept in this walking skeleton, so this is an honest stand-in, not a claim
+      // that a real MFA challenge happened.
+      const item = hitlQueue.decide(itemId, decision, GUARDRAIL_PRIMARY_APPROVER, true);
+
+      if (decision === "reject") {
+        sendJson(res, 200, { itemId, status: item.status, executed: false });
+        return;
+      }
+
+      const approval: ApprovalDecision = {
+        status: "approved",
+        decidedBy: item.decidedBy!,
+        decidedAt: new Date().toISOString(),
+      };
+      const approvedAction: RemediationAction = { ...pending.action, approval };
+      const result = checkRemediationGuardrail(approvedAction);
+
+      if (!result.allowed) {
+        sendJson(res, 200, { itemId, status: item.status, result, executed: false });
+        return;
+      }
+
+      // Real execution: restart the one real, reversible service this process has.
+      stopMonitoringInternal();
+      const taskId = startMonitoringInternal();
+      pending.executedAt = new Date().toISOString();
+      logEvent({
+        level: "info",
+        event: "guardrail_executed",
+        context: { itemId, actionType: approvedAction.actionType, taskId },
+      });
+
+      sendJson(res, 200, {
+        itemId,
+        status: item.status,
+        result,
+        executed: true,
+        executedAt: pending.executedAt,
+        taskId,
+      });
+      return;
+    } catch (error) {
+      if (error instanceof HitlItemNotFoundError) {
+        sendJson(res, 404, { error: "UNKNOWN_ITEM", message: error.message });
+        return;
+      }
+      if (error instanceof UnauthorizedDeciderError) {
+        sendJson(res, 403, { error: "UNAUTHORIZED_DECIDER", message: error.message });
+        return;
+      }
+      if (error instanceof MfaRequiredError) {
+        sendJson(res, 403, { error: "MFA_REQUIRED", message: error.message });
+        return;
+      }
+      throw error;
+    }
   }
 
   sendJson(res, 404, { error: "NOT_FOUND", path: url.pathname });
