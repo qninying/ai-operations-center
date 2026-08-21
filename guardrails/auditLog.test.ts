@@ -7,6 +7,7 @@ import {
   buildDecisionAuditEntry,
   buildHitlAuditEntry,
   buildPolicyEvaluationAuditEntry,
+  buildSystemEventAuditEntry,
 } from "./auditLog.js";
 import { checkRemediationGuardrail, RemediationAction } from "./remediationGuardrail.js";
 import { evaluateAbacPolicy } from "./abacEvaluator.js";
@@ -303,5 +304,124 @@ describe("AuditLog — governance engine: hitl_event entries", () => {
     } else {
       throw new Error("expected a found hitl_event entry");
     }
+  });
+});
+
+// docs/audit-trail-design.md: mcp-server/'s operational events (recommendation,
+// monitoring, escalation, notification), sharing one correlation ID with the rest of
+// this audit log rather than living only in process stderr logs under a mismatched
+// incidentId. No mcp-server/ wiring yet — this covers the entry type itself.
+describe("AuditLog — system_event entries (docs/audit-trail-design.md)", () => {
+  it("logs a successful operational event and retrieves it by id", () => {
+    const log = new AuditLog();
+    const entry = buildSystemEventAuditEntry(
+      "escalation_triggered",
+      "success",
+      { incidentId: "demo-1", confidence: 20 },
+      "escalationService",
+      "sys-1",
+      "corr-sys-1",
+      () => "2026-08-20T12:00:00Z"
+    );
+
+    log.record(entry);
+
+    expect(log.retrieve("sys-1")).toEqual({ found: true, entry });
+    expect(entry.actor).toBe("escalationService");
+  });
+
+  it("logs a failed operational event distinctly from a successful one", () => {
+    const entry = buildSystemEventAuditEntry(
+      "operator_notification_failed",
+      "failure",
+      { errorClass: "UpstreamCallFailedError" },
+      "notificationService",
+      "sys-2",
+      "corr-sys-2"
+    );
+    expect(entry.outcome).toBe("failure");
+  });
+
+  it("is idempotent: recording the identical system event twice does not duplicate the trail", () => {
+    const log = new AuditLog();
+    const entry = buildSystemEventAuditEntry(
+      "monitoring_cycle",
+      "success",
+      { incidentDetected: false },
+      "monitoringService",
+      "sys-3",
+      "corr-sys-3",
+      () => "2026-08-20T12:00:00Z"
+    );
+
+    log.record(entry);
+    log.record(entry);
+
+    expect(log.all().length).toBe(1);
+  });
+
+  it("a stored system event is frozen, including its nested context object", () => {
+    const log = new AuditLog();
+    const entry = buildSystemEventAuditEntry(
+      "incident_alert",
+      "success",
+      { sessionId: 92, blockingSessionId: 66 },
+      "monitoringService",
+      "sys-4",
+      "corr-sys-4"
+    );
+    log.record(entry);
+
+    const stored = log.retrieve("sys-4");
+    expect(stored.found).toBe(true);
+    if (stored.found && stored.entry.entryType === "system_event") {
+      const context = stored.entry.context;
+      expect(Object.isFrozen(context)).toBe(true);
+      expect(() => {
+        (context as Record<string, unknown>).sessionId = "tampered";
+      }).toThrow();
+    } else {
+      throw new Error("expected a found system_event entry");
+    }
+  });
+
+  it("failure path — log entry incorrect: a system event missing a required field (actor) is rejected at write time", () => {
+    const log = new AuditLog();
+    const entry = buildSystemEventAuditEntry(
+      "monitoring_cycle",
+      "success",
+      {},
+      "",
+      "sys-5",
+      "corr-sys-5"
+    );
+
+    expect(() => log.record(entry)).toThrow(AuditLogValidationError);
+    expect(log.all().length).toBe(0);
+  });
+
+  it("system_event entries are retrievable alongside other entry types under the same correlation ID", () => {
+    const log = new AuditLog();
+    const decision = buildDecisionAuditEntry(
+      { actionType: "restart_service", evidenceIds: ["evt-1"], approval: null, targetSystem: { name: "prod-app-server-03", productionWriteProtected: true } },
+      { status: "approved", decidedBy: "jsmith", decidedAt: "2026-08-20T12:00:00Z" },
+      "sys-6a",
+      "corr-shared"
+    );
+    const systemEvent = buildSystemEventAuditEntry(
+      "escalation_triggered",
+      "success",
+      { confidence: 15 },
+      "escalationService",
+      "sys-6b",
+      "corr-shared"
+    );
+
+    log.record(decision);
+    log.record(systemEvent);
+
+    const trail = log.forCorrelationId("corr-shared");
+    expect(trail).toHaveLength(2);
+    expect(trail.map((e) => e.entryType).sort()).toEqual(["decision", "system_event"]);
   });
 });

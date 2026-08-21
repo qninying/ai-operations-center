@@ -13,6 +13,15 @@
 // events — abacEvaluator.ts and hitlQueue.ts write here rather than standing up a
 // second, parallel audit trail. Existing DecisionAuditEntry/ActionAuditEntry consumers
 // are unaffected: this only widens the AuditEntry union and adds two new builders.
+//
+// Extended again (docs/audit-trail-design.md) to carry mcp-server/'s operational
+// events — recommendation generation, monitoring cycles, escalations, notifications —
+// under one shared correlation ID, closing the gap that document identifies: those
+// events previously only reached process stderr via logEvent(), with no queryable,
+// immutable record and no correlation ID shared with this audit log. SystemEventAuditEntry
+// is deliberately a thin adapter over logEvent()'s existing {event, context} shape
+// rather than a new rigid schema — unlike a decision or an ABAC check, an operational
+// event's shape genuinely varies per event type, so this type doesn't pretend it's fixed.
 
 import { ApprovalDecision, GuardrailResult, RemediationAction } from "./remediationGuardrail.js";
 import { AbacDecision } from "./abacEvaluator.js";
@@ -56,7 +65,24 @@ export interface HitlAuditEntry extends AuditEntryEnvelope {
   detail: Record<string, unknown>;
 }
 
-export type AuditEntry = DecisionAuditEntry | ActionAuditEntry | PolicyEvaluationAuditEntry | HitlAuditEntry;
+// actor for a system_event is whichever service observed/decided it (e.g.
+// "recommendationService", "monitoringService") — this system is autonomous by
+// design at this layer, so "actor" here means "what part of the system," the same
+// way ActionAuditEntry already uses "execution-service" as an actor for a
+// system-triggered action rather than requiring a human name.
+export interface SystemEventAuditEntry extends AuditEntryEnvelope {
+  entryType: "system_event";
+  event: string;
+  outcome: "success" | "failure";
+  context: Record<string, unknown>;
+}
+
+export type AuditEntry =
+  | DecisionAuditEntry
+  | ActionAuditEntry
+  | PolicyEvaluationAuditEntry
+  | HitlAuditEntry
+  | SystemEventAuditEntry;
 
 export function buildDecisionAuditEntry(
   action: RemediationAction,
@@ -140,6 +166,27 @@ export function buildHitlAuditEntry(
   };
 }
 
+export function buildSystemEventAuditEntry(
+  event: string,
+  outcome: "success" | "failure",
+  context: Record<string, unknown>,
+  actor: string,
+  id: string,
+  correlationId: string,
+  now: () => string = () => new Date().toISOString()
+): SystemEventAuditEntry {
+  return {
+    id,
+    entryType: "system_event",
+    correlationId,
+    actor,
+    event,
+    outcome,
+    context,
+    loggedAt: now(),
+  };
+}
+
 export class AuditLogValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -184,6 +231,9 @@ function freezeEntry(entry: AuditEntry): AuditEntry {
       break;
     case "hitl_event":
       Object.freeze(entry.detail);
+      break;
+    case "system_event":
+      Object.freeze(entry.context);
       break;
   }
   return Object.freeze(entry);
