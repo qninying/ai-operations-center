@@ -13,6 +13,6 @@
     "requirement_statements": false,
     "measures": false,
     "systems": false,
-    "narrative": false
+    "narrative": true
   }
 }
