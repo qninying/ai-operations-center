@@ -468,20 +468,26 @@
       "criteria": [
         {
           "text": "Given a low-risk task is completed, when a rollback is requested, then the system successfully reverts the task.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a rollback is requested for a non-reversible task, when the request is made, then the system denies the rollback request.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: All rollback actions are logged for audit purposes.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
+      "files_touched": [
+        "mcp-server/src/rollbackService.ts",
+        "mcp-server/src/httpServer.ts"
+      ],
+      "tests_added": [
+        "mcp-server/src/rollbackService.test.ts"
+      ],
+      "notes": "No real Execution Service exists in this codebase (nothing performs a real production write), so \"roll back a low-risk task\" was read as targeting the one genuinely real, already-idempotent, low-risk reversible action already built: monitoringService.ts's startMonitoring()/stop() (STORY-008) -- flagged and confirmed with the user before building, rather than inventing a fake revert for an action nothing can actually execute. rollbackService.ts's requestRollback() checks permission (system_administrator only) -> task identification (registry lookup) -> reversibility -> dependencies (injectable, honest no-op default since no dependency-tracking system exists), in that order, so a denial always names the first real reason. Every branch logged. Tests caught a real bug pre-ship: the non-reversible denial's explanation text was keyed as `reason`, colliding with and silently overwriting the categorical denial code (also `reason`) in the same log line -- renamed to `detail`. Wired into httpServer.ts: POST /api/monitoring/start now returns a real taskId; a registry maps start_monitoring to a real revert closing over the actual monitoringHandle, and notify_operators is registered as honestly non-reversible (a delivered push notification cannot be unsent) rather than left unrecognized, so its denial reason is correct (\"not reversible\", not \"unknown task\"). New POST /api/rollback route maps all four rollbackService error types to distinct HTTP statuses.",
+      "updated_at": "2026-08-21T15:15:34.000Z",
       "updated_at": null,
       "verification": {
         "state": "in_progress",

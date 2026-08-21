@@ -18,6 +18,14 @@ import {
 import { startMonitoring } from "./monitoringService.js";
 import type { MonitoringHandle, MonitoringCycleResult } from "./monitoringService.js";
 import { evaluateEscalation } from "./escalationService.js";
+import {
+  requestRollback,
+  InsufficientPermissionsError,
+  UnknownTaskTypeError,
+  TaskNotReversibleError,
+  RollbackDependencyError,
+} from "./rollbackService.js";
+import type { TaskRegistration } from "./rollbackService.js";
 import { logEvent } from "./observability/logger.js";
 import { checkRemediationGuardrail } from "../../guardrails/remediationGuardrail.js";
 
@@ -39,6 +47,7 @@ const dashboardHtml = readFileSync(join(__dirname, "dashboard.html"), "utf-8");
 // monitoringService.ts itself stays instance-agnostic and stateless.
 const RECENT_ALERTS_LIMIT = 10;
 let monitoringHandle: MonitoringHandle | null = null;
+let currentMonitoringTaskId: string | null = null;
 let lastMonitoringCycle: MonitoringCycleResult | null = null;
 let recentAlerts: MonitoringCycleResult[] = [];
 
@@ -46,6 +55,50 @@ function sendJson(res: ServerResponse, status: number, body: unknown) {
   const payload = JSON.stringify(body, null, 2);
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(payload);
+}
+
+function readJsonBody(req: IncomingMessage): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", (chunk) => {
+      data += chunk;
+    });
+    req.on("end", () => {
+      try {
+        resolve(data ? JSON.parse(data) : {});
+      } catch {
+        reject(new Error("Request body is not valid JSON."));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+// STORY-011 / REQ-015: the only two task types this process actually knows how to
+// evaluate for rollback. start_monitoring is the one genuinely real, already-
+// idempotent reversible action in this codebase (STORY-008's stop()); notify_operators
+// is registered as honestly non-reversible — a delivered push notification really
+// cannot be unsent — rather than left unregistered (which would deny it as "unknown"
+// instead of "not reversible", the wrong reason for the wrong criterion).
+function buildRollbackRegistry(): Record<string, TaskRegistration> {
+  return {
+    start_monitoring: {
+      reversible: true,
+      revert: async (taskId) => {
+        if (!monitoringHandle || taskId !== currentMonitoringTaskId) {
+          throw new Error(`No active monitoring session matches task "${taskId}".`);
+        }
+        monitoringHandle.stop();
+        monitoringHandle = null;
+        currentMonitoringTaskId = null;
+        logEvent({ level: "info", event: "monitoring_control", context: { action: "stop", via: "rollback" } });
+      },
+    },
+    notify_operators: {
+      reversible: false,
+      reason: "A delivered push notification cannot be unsent.",
+    },
+  };
 }
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse) {
@@ -195,6 +248,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       sendJson(res, 200, { running: true, message: "Monitoring is already running." });
       return;
     }
+    currentMonitoringTaskId = crypto.randomUUID();
     monitoringHandle = startMonitoring({
       onCycle: (result) => {
         lastMonitoringCycle = result;
@@ -203,8 +257,10 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         }
       },
     });
-    logEvent({ level: "info", event: "monitoring_control", context: { action: "start" } });
-    sendJson(res, 200, { running: true });
+    logEvent({ level: "info", event: "monitoring_control", context: { action: "start", taskId: currentMonitoringTaskId } });
+    // STORY-011: taskId is what a later POST /api/rollback call names to revert
+    // this specific monitoring session.
+    sendJson(res, 200, { running: true, taskId: currentMonitoringTaskId });
     return;
   }
 
@@ -215,6 +271,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     }
     monitoringHandle.stop();
     monitoringHandle = null;
+    currentMonitoringTaskId = null;
     logEvent({ level: "info", event: "monitoring_control", context: { action: "stop" } });
     sendJson(res, 200, { running: false });
     return;
@@ -223,9 +280,70 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   if (req.method === "GET" && url.pathname === "/api/monitoring/status") {
     sendJson(res, 200, {
       running: monitoringHandle !== null,
+      taskId: currentMonitoringTaskId,
       lastCycle: lastMonitoringCycle,
       recentAlerts,
     });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/rollback") {
+    // STORY-011 / REQ-015: rollback for the two task types this process actually
+    // knows about — see buildRollbackRegistry()'s header comment for why only these
+    // two, and why notify_operators is registered rather than left unrecognized.
+    let body: { taskId?: unknown; taskType?: unknown; actor?: unknown; role?: unknown };
+    try {
+      body = (await readJsonBody(req)) as typeof body;
+    } catch (error) {
+      sendJson(res, 400, {
+        error: "INVALID_JSON_BODY",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+
+    const { taskId, taskType, actor, role } = body;
+    if (
+      typeof taskId !== "string" || !taskId ||
+      typeof taskType !== "string" || !taskType ||
+      typeof actor !== "string" || !actor ||
+      typeof role !== "string" || !role
+    ) {
+      sendJson(res, 400, {
+        error: "MISSING_FIELDS",
+        message: "taskId, taskType, actor, and role are all required strings.",
+      });
+      return;
+    }
+
+    try {
+      const result = await requestRollback(
+        { taskId, taskType, requestedBy: { actor, role } },
+        buildRollbackRegistry()
+      );
+      sendJson(res, 200, result);
+    } catch (error) {
+      if (error instanceof InsufficientPermissionsError) {
+        sendJson(res, 403, { error: "INSUFFICIENT_PERMISSIONS", message: error.message });
+        return;
+      }
+      if (error instanceof UnknownTaskTypeError) {
+        sendJson(res, 404, { error: "UNKNOWN_TASK_TYPE", message: error.message });
+        return;
+      }
+      if (error instanceof TaskNotReversibleError) {
+        sendJson(res, 409, { error: "TASK_NOT_REVERSIBLE", message: error.message });
+        return;
+      }
+      if (error instanceof RollbackDependencyError) {
+        sendJson(res, 409, { error: "ROLLBACK_DEPENDENCY_BLOCKED", message: error.message });
+        return;
+      }
+      sendJson(res, 500, {
+        error: "ROLLBACK_FAILED",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
     return;
   }
 
