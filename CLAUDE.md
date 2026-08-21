@@ -55,10 +55,23 @@ unverified, and it will tell you which half is missing.
 
 https://github.com/qninying/ai-operations-center
 
-## What not to edit
+## The `.colaberry/` files
 
-`.colaberry/plan.json` and `.colaberry/manifest.json` are platform bookkeeping and are
-overwritten on every sync. `.colaberry/progress.json` is shared: the platform owns the
-story and criterion list in it, you own the `passed` flags and the notes, and a sync
-keeps your side. Everything else — including the docs above — is yours to change.
+These three files are what your Command Center reads, so they have to be in your repo.
+
+- `.colaberry/plan.json` — your requirements, stories and releases.
+- `.colaberry/progress.json` — the criteria and which of them you have confirmed.
+- `.colaberry/manifest.json` — when the data above was last refreshed.
+
+Where the platform has push access to this repo it writes all three for you on every
+sync, and it will overwrite `plan.json` and `manifest.json` when it does — so edit those
+two only if you are maintaining them yourself. **Where it does not have push access it
+cannot put them there at all**, and they are yours to add: download them from the
+workspace panel in the portal and commit them like any other file. Either way, a
+criterion that names one of these files is not satisfied until the file is really in
+your repo.
+
+`.colaberry/progress.json` is shared in both cases: the platform owns the story and
+criterion list in it, you own the `passed` flags and the notes, and a sync keeps your
+side. Everything else — including the docs above — is yours to change.
 <!-- COLABERRY:END -->

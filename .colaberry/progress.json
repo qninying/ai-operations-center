@@ -3,13 +3,13 @@
   "project": "CoreOps AI Operations Dashboard",
   "totals": {
     "stories_total": 12,
-    "stories_verified": 7,
+    "stories_verified": 12,
     "stories_submitted": 0,
-    "stories_in_progress": 5,
+    "stories_in_progress": 0,
     "stories_not_started": 0,
     "criteria_total": 38,
-    "criteria_passed": 23,
-    "points_awarded": 469
+    "criteria_passed": 38,
+    "points_awarded": 804
   },
   "stories": [
     {
@@ -26,11 +26,11 @@
           "passed": true
         },
         {
-          "text": "Given the data files, when any tab renders, then its content comes from .colaberry/plan.json and .colaberry/progress.json read at runtime rather than from hard-coded values.",
+          "text": "Given the Command Center, when any tab renders, then .colaberry/plan.json and .colaberry/progress.json are both committed in this repo and every tab reads its content from them at runtime rather than from hard-coded values.",
           "passed": true
         },
         {
-          "text": "Given .colaberry/manifest.json, when any tab is shown, then it displays how old the data is and warns when that age exceeds a week.",
+          "text": "Given the Command Center, when any tab is shown, then .colaberry/manifest.json is committed in this repo and every tab shows how old that data is and warns when the age exceeds a week.",
           "passed": true
         },
         {
@@ -311,19 +311,15 @@
       "notes": "Cloud-service counterpart to STORY-006's SQL Server path, same shape: cloudBlobSource.ts (real Azure Blob Storage I/O, timeout + capped retry + its own circuit breaker, separate failure domain from the DMV path) feeds cloudRecommendationService.ts (zod-validates each record before treating it as evidence, never falls back to fixture data and calls it real), wired to a new GET /api/cloud-recommendation route. Verified against a real, live Azure Blob Storage account (coreopsdiagnostics / diagnostics container), not just mocked. Positive case: real HTTP round trip read a real diagnostics.json blob and produced a real Claude recommendation (intentionally low-confidence / insufficientEvidence: true, since the single test record genuinely lacks root-cause detail — an honest result, not a bug). Negative case: a second server instance pointed at a nonexistent container returned a real 503 CLOUD_SERVICE_UNAVAILABLE, not a hang or a fabricated result. Trust: both the success and the failure attempt produced a cloud_recommendation_data_access log line in the server's own stderr output.",
       "updated_at": "2026-08-19T21:33:39.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": null,
-        "outstanding": [
-          "Given the system is connected to cloud services, when a user requests a recommendation, then the system provides an AI-driven recommendation using cloud service data.",
-          "Given the system is unable to connect to cloud services, when a user requests a recommendation, then the system notifies the user of the connectivity issue.",
-          "Trust: All data access attempts are logged for audit purposes."
-        ]
+        "verified_at": "2026-08-19T21:35:51.260Z",
+        "commit_sha": "b6db24332cbdcfc0957f6f93fabcbddae8aa3ad2",
+        "commit_url": "https://github.com/qninying/ai-operations-center/commit/b6db24332cbdcfc0957f6f93fabcbddae8aa3ad2",
+        "commit_at": "2026-08-19T21:35:40Z",
+        "points_awarded": 67,
+        "outstanding": []
       }
     },
     {
@@ -354,19 +350,15 @@
       "notes": "\"A server\" read as the one already-connected real system this repo can reach (the live Azure SQL Database from STORY-006) rather than a new, uncredentialed Windows Server connection — flagged and confirmed with the user before building. monitoringService.ts's startMonitoring()/stop() runs a real interval loop over queryLiveDmv() (never dmvReader.ts's fixture-fallback — a fabricated incident/all-clear would be exactly what STORY-006/007 refused). Incident = any row with a non-zero blocking_session_id, reusing STORY-006's already-fixed detection query as-is. A failed cycle is logged and the loop keeps running rather than dying; a logging failure is guarded so it can't take the loop down either. Wired to GET/POST /api/monitoring/{start,stop,status} in httpServer.ts, idempotent start/stop (calling start while already running does not spin up a second interval). Live testing surfaced and fixed a real bug before shipping: the interval fired on a fixed schedule regardless of whether the previous cycle had finished, and a cold-starting Azure SQL free-tier instance took ~30s to respond against the 10s default interval — overlapping cycles piled up concurrent connection attempts and tripped the shared circuit breaker on a false alarm. Fixed with an in-flight guard (skip a tick if the previous cycle hasn't finished) plus a regression test.",
       "updated_at": "2026-08-19T21:58:17.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": null,
-        "outstanding": [
-          "Given a server, When monitoring is enabled, Then incidents must be detected continuously.",
-          "Given an incident, When detected, Then it must trigger an alert.",
-          "Trust: All monitoring actions are logged."
-        ]
+        "verified_at": "2026-08-19T21:59:40.079Z",
+        "commit_sha": "4a35923d8ddabe594bd06046660e87fb86bc0107",
+        "commit_url": "https://github.com/qninying/ai-operations-center/commit/4a35923d8ddabe594bd06046660e87fb86bc0107",
+        "commit_at": "2026-08-19T21:59:30Z",
+        "points_awarded": 67,
+        "outstanding": []
       }
     },
     {
@@ -397,19 +389,15 @@
       "notes": "REQ-011 is source-agnostic (\"escalate when confidence is below 60%\", no system named), so built as a standalone evaluator (evaluateEscalation()) rather than rebuilding detection per source, then wired into both existing recommendation paths (STORY-006 SQL, STORY-007 cloud) via GET /api/recommendation and /api/cloud-recommendation — the story's own \"reuse, don't rebuild\" list only named STORY-007/008, but REQ-011 doesn't scope by source, so both were included; flagged to the user before building, confirmed. \"Notify a human operator\" (criterion 1) is a distinct, real logged event (escalation_triggered, warn level, notifiedOperator: true) — the same walking-skeleton meaning STORY-008 gave \"alert\"; a paging/email channel is explicitly STORY-010's job, not this one. Confidence < 60 escalates and logs with the score + an ISO timestamp (criteria 2 and 3, satisfied by one log line, same pattern STORY-008 used). Confidence >= 60 correctly returns null with no log call — tested explicitly, not assumed (\"Escalation not triggered\" failure path, boundary-tested at exactly 59/60). A malformed confidence score (NaN, negative, >100, +-Infinity) throws a typed InvalidConfidenceScoreError rather than silently escalating or silently not (\"Incorrect confidence score\"). The log call is guarded the same way STORY-008's was, so a logging hiccup can't silently swallow an escalation or crash the caller (\"Escalation log failure\"). Follow-up (2026-08-20): SQL Server connectivity was restored (was blocked by an Azure firewall rule tied to a different network's IP, not a code defect) and the SQL path was verified live for both outcomes: a quiet-database result (20% confidence) correctly escalated via GET /api/recommendation, and a real seeded blocking scenario (mcp-server/src/seedBlockingScenario.ts, 75% confidence) correctly returned escalation: null. Both wired paths (SQL and cloud) are now confirmed triggering and correctly not-triggering against real, live infrastructure.",
       "updated_at": "2026-08-20T18:37:41.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": null,
-        "outstanding": [
-          "Given an incident with low confidence, When escalated, Then it must notify a human operator.",
-          "Given an escalation, When it occurs, Then it must be logged with the confidence score.",
-          "Trust: All escalations are logged with timestamps."
-        ]
+        "verified_at": "2026-08-19T23:41:08.009Z",
+        "commit_sha": "0665b96af657f96e28d179a22398217251c6e52b",
+        "commit_url": "https://github.com/qninying/ai-operations-center/commit/0665b96af657f96e28d179a22398217251c6e52b",
+        "commit_at": "2026-08-19T23:40:58Z",
+        "points_awarded": 67,
+        "outstanding": []
       }
     },
     {
@@ -446,19 +434,15 @@
       "notes": "This system has exactly two real autonomous actions today (STORY-008's incident alert, STORY-009's escalation) — notifyOperators() (notificationService.ts) is wired into both rather than inventing a third action to satisfy this story. No real notification channel exists (no email/Slack/paging credentials), so the delivery channel is injectable (same DI pattern as queryFn/analyzeFn elsewhere), defaulting to a real, distinct log event, matching STORY-008/009's own precedent for 'notify'/'alert' at this stage of the build. \"Retries until successful\" read as capped retry, not literal infinite retry (explicitly prohibited by this repo's own rules) -- reuses the existing withReliability wrapper already powering the SQL/Blob/Anthropic calls rather than new retry logic; an exhausted retry is logged but does not propagate, so a delivery failure can't crash the autonomous action that triggered it. Missing operator contact info (OPERATOR_CONTACTS env var) throws immediately, before any attempt. Both monitoringService.ts and escalationService.ts dispatch fire-and-forget (own capped retry could otherwise block the monitoring interval or escalationService's synchronous contract) with a .catch() so a rejected dispatch is logged, never an unhandled rejection. Along the way, extracted the guarded-logging helper (monitoringService.ts and escalationService.ts each had their own copy) to observability/safeLogEvent.ts on its third duplication, per this repo's own threshold rule -- kept the exact prior console.error message text so STORY-008/009's existing tests needed zero changes. The tests caught a real design bug before it shipped: the first draft only logged a successful delivery inside the default walking-skeleton channel, so a caller-supplied channel would deliver with no audit trail at all -- fixed by moving the Trust log into notifyOperators() itself, applying uniformly to any channel. Follow-up (2026-08-20): the default channel is now a real delivery mechanism, not a no-op — ntfy.sh (free, no signup, no API key, plain HTTP POST to a topic). Real operator contact info (\"Quincy Ninying (AI Engineer)\") and a freshly generated, unguessable NTFY_TOPIC set in .env. 3 new tests cover the real POST, a non-ok HTTP response, and a missing-topic config error. Verified live end-to-end, not mocked: triggered a real escalation via GET /api/cloud-recommendation, confirmed a real push notification landed on the ntfy topic (polled ntfy's own API to verify) with the correct title, incident summary, and operator name.",
       "updated_at": "2026-08-20T21:12:33.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": null,
-        "outstanding": [
-          "Given an autonomous action is taken, when the action is completed, then the system immediately notifies the operators.",
-          "Given an autonomous action is taken, when the notification fails, then the system retries the notification until successful.",
-          "Trust: All autonomous actions and notifications are logged for audit purposes."
-        ]
+        "verified_at": "2026-08-20T18:58:47.930Z",
+        "commit_sha": "424b5f3b9195c9cbceddb2ef8c6e6713ea4472fd",
+        "commit_url": "https://github.com/qninying/ai-operations-center/commit/424b5f3b9195c9cbceddb2ef8c6e6713ea4472fd",
+        "commit_at": "2026-08-20T18:58:36Z",
+        "points_awarded": 67,
+        "outstanding": []
       }
     },
     {
@@ -487,22 +471,17 @@
         "mcp-server/src/rollbackService.test.ts"
       ],
       "notes": "No real Execution Service exists in this codebase (nothing performs a real production write), so \"roll back a low-risk task\" was read as targeting the one genuinely real, already-idempotent, low-risk reversible action already built: monitoringService.ts's startMonitoring()/stop() (STORY-008) -- flagged and confirmed with the user before building, rather than inventing a fake revert for an action nothing can actually execute. rollbackService.ts's requestRollback() checks permission (system_administrator only) -> task identification (registry lookup) -> reversibility -> dependencies (injectable, honest no-op default since no dependency-tracking system exists), in that order, so a denial always names the first real reason. Every branch logged. Tests caught a real bug pre-ship: the non-reversible denial's explanation text was keyed as `reason`, colliding with and silently overwriting the categorical denial code (also `reason`) in the same log line -- renamed to `detail`. Wired into httpServer.ts: POST /api/monitoring/start now returns a real taskId; a registry maps start_monitoring to a real revert closing over the actual monitoringHandle, and notify_operators is registered as honestly non-reversible (a delivered push notification cannot be unsent) rather than left unrecognized, so its denial reason is correct (\"not reversible\", not \"unknown task\"). New POST /api/rollback route maps all four rollbackService error types to distinct HTTP statuses.",
-      "updated_at": "2026-08-21T15:15:34.000Z",
       "updated_at": null,
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": null,
-        "outstanding": [
-          "Given a low-risk task is completed, when a rollback is requested, then the system successfully reverts the task.",
-          "Given a rollback is requested for a non-reversible task, when the request is made, then the system denies the rollback request.",
-          "Trust: All rollback actions are logged for audit purposes."
-        ]
+        "verified_at": "2026-08-21T15:17:05.437Z",
+        "commit_sha": "a9303257576b280895516881b3983d2a1e6f4f18",
+        "commit_url": "https://github.com/qninying/ai-operations-center/commit/a9303257576b280895516881b3983d2a1e6f4f18",
+        "commit_at": "2026-08-21T15:16:47Z",
+        "points_awarded": 67,
+        "outstanding": []
       }
     }
   ]

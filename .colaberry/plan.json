@@ -623,8 +623,7 @@
     "systems": [
       "SQL Server",
       "SSIS",
-      "SSRS",
-      "Windows"
+      "SSRS"
     ],
     "roles": [
       "IT Operations Manager",
