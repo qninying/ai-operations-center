@@ -6,6 +6,7 @@ import {
 } from "./cloudRecommendationService.js";
 import { CloudSourceUnavailableError } from "./cloudBlobSource.js";
 import type { RootCauseResult } from "./rootCauseAgent.js";
+import { AuditLog } from "../../guardrails/auditLog.js";
 
 const validRecord = {
   timestamp: "2026-08-19T00:00:00Z",
@@ -110,5 +111,35 @@ describe("generateCloudRecommendation", () => {
         context: expect.objectContaining({ outcome: "success", recordCount: 1 }),
       })
     );
+  });
+
+  it("ADR-002: incidentId doubles as the correlation ID for a real audit entry, on both success and failure", async () => {
+    const auditLog = new AuditLog();
+
+    await generateCloudRecommendation("incident-7", "desc", {
+      queryFn: vi.fn().mockResolvedValue([validRecord]),
+      analyzeFn: vi.fn().mockResolvedValue(fakeRootCause()),
+      auditLog,
+    });
+
+    const successEntries = auditLog.forCorrelationId("incident-7");
+    expect(successEntries).toHaveLength(1);
+    expect(successEntries[0]).toMatchObject({
+      entryType: "system_event",
+      event: "cloud_recommendation_data_access",
+      outcome: "success",
+      actor: "cloudRecommendationService",
+      correlationId: "incident-7",
+    });
+
+    await generateCloudRecommendation("incident-8", "desc", {
+      queryFn: vi.fn().mockRejectedValue(new Error("boom")),
+      analyzeFn: vi.fn(),
+      auditLog,
+    }).catch(() => {});
+
+    const failureEntries = auditLog.forCorrelationId("incident-8");
+    expect(failureEntries).toHaveLength(1);
+    expect(failureEntries[0]).toMatchObject({ outcome: "failure", correlationId: "incident-8" });
   });
 });

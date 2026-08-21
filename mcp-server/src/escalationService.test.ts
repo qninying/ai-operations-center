@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { evaluateEscalation, InvalidConfidenceScoreError } from "./escalationService.js";
+import { notifyOperators } from "./notificationService.js";
 import * as logger from "./observability/logger.js";
+import { AuditLog } from "../../guardrails/auditLog.js";
 
 describe("evaluateEscalation", () => {
   afterEach(() => {
@@ -73,11 +75,14 @@ describe("evaluateEscalation", () => {
     const record = evaluateEscalation("incident-9", 30, "Session 90 blocked", { notifyFn });
 
     expect(record).not.toBeNull();
-    expect(notifyFn).toHaveBeenCalledWith({
-      actionType: "escalation",
-      incidentId: "incident-9",
-      summary: "Session 90 blocked",
-    });
+    expect(notifyFn).toHaveBeenCalledWith(
+      {
+        actionType: "escalation",
+        incidentId: "incident-9",
+        summary: "Session 90 blocked",
+      },
+      expect.anything()
+    );
     await notifyFn.mock.results[0].value;
   });
 
@@ -119,5 +124,48 @@ describe("evaluateEscalation", () => {
       "escalationService: logEvent failed",
       expect.any(Error)
     );
+  });
+
+  it("ADR-002: records a system_event audit entry keyed on incidentId as the correlation ID", () => {
+    const auditLog = new AuditLog();
+
+    evaluateEscalation("incident-12", 15, "Session 12 blocked", { auditLog });
+
+    const entries = auditLog.forCorrelationId("incident-12");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      entryType: "system_event",
+      event: "escalation_triggered",
+      outcome: "success",
+      actor: "escalationService",
+      correlationId: "incident-12",
+    });
+  });
+
+  it("does not record an audit entry when confidence does not escalate", () => {
+    const auditLog = new AuditLog();
+
+    evaluateEscalation("incident-13", 75, "fine", { auditLog });
+
+    expect(auditLog.all()).toHaveLength(0);
+  });
+
+  it("ADR-002 (the actual point): escalation and the notification it triggers share one correlation ID end to end", async () => {
+    const originalEnv = process.env.OPERATOR_CONTACTS;
+    process.env.OPERATOR_CONTACTS = "ops-oncall@example.com";
+    const auditLog = new AuditLog();
+    const channel = vi.fn().mockResolvedValue(undefined);
+
+    evaluateEscalation("incident-14", 25, "Session 14 blocked", {
+      auditLog,
+      notifyFn: (action, options) => notifyOperators(action, { ...options, channel }),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const entries = auditLog.forCorrelationId("incident-14");
+    const eventNames = entries.map((e) => (e.entryType === "system_event" ? e.event : e.entryType));
+    expect(eventNames.sort()).toEqual(["escalation_triggered", "operator_notification_delivered"]);
+
+    process.env.OPERATOR_CONTACTS = originalEnv;
   });
 });

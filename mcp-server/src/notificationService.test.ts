@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { notifyOperators, OperatorContactMissingError } from "./notificationService.js";
 import * as logger from "./observability/logger.js";
+import { AuditLog } from "../../guardrails/auditLog.js";
 
 const action = {
   actionType: "incident_alert",
@@ -127,6 +128,50 @@ describe("notifyOperators", () => {
     );
     expect(failureCall).toBeDefined();
     expect(failureCall![0].context?.errorClass).toBe("UpstreamCallFailedError");
+  });
+
+  it("ADR-002: records a real audit entry on delivery, falling back to incidentId when no correlationId is given", async () => {
+    setOperators();
+    const auditLog = new AuditLog();
+    const channel = vi.fn().mockResolvedValue(undefined);
+
+    await notifyOperators(action, { channel, auditLog });
+
+    const entries = auditLog.forCorrelationId("incident-1");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      entryType: "system_event",
+      event: "operator_notification_delivered",
+      outcome: "success",
+      actor: "notificationService",
+      correlationId: "incident-1",
+    });
+  });
+
+  it("ADR-002: uses the explicit correlationId over incidentId when both are given", async () => {
+    setOperators();
+    const auditLog = new AuditLog();
+    const channel = vi.fn().mockResolvedValue(undefined);
+    const actionWithCorrelation = { ...action, correlationId: "corr-xyz" };
+
+    await notifyOperators(actionWithCorrelation, { channel, auditLog });
+
+    expect(auditLog.forCorrelationId("corr-xyz")).toHaveLength(1);
+    expect(auditLog.forCorrelationId("incident-1")).toHaveLength(0);
+  });
+
+  it("ADR-002: a delivery failure still records an audit entry, never dropping the correlation ID", async () => {
+    setOperators();
+    const auditLog = new AuditLog();
+    const channel = vi.fn().mockRejectedValue(new Error("down"));
+
+    const resultPromise = notifyOperators(action, { channel, auditLog });
+    await vi.advanceTimersByTimeAsync(10_000);
+    await resultPromise;
+
+    const entries = auditLog.forCorrelationId("incident-1");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ outcome: "failure", event: "operator_notification_failed" });
   });
 });
 

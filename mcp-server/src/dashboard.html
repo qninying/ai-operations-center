@@ -604,6 +604,10 @@
                 <div class="banner-title">Escalated to a human operator</div>
                 <div id="escalation-detail"></div>
               </div>
+              <div class="btn-row" id="audit-trail-row" style="display:none; margin-top:12px;">
+                <button class="btn btn-secondary" id="view-audit-btn">View audit trail</button>
+              </div>
+              <div id="audit-trail-result"></div>
             </div>
           </section>
 
@@ -894,7 +898,7 @@ async function getAiRecommendation() {
   escalationBanner.className = 'banner escalation';
 
   try {
-    const incidentId = 'demo-' + Date.now();
+    const incidentId = 'inc-' + Date.now();
     const path = source === 'cloud' ? '/api/cloud-recommendation' : '/api/recommendation';
     const res = await fetch(path + '?incidentId=' + encodeURIComponent(incidentId));
     const body = await res.json();
@@ -913,6 +917,10 @@ async function getAiRecommendation() {
     confNumber.className = 'confidence-number ' + (body.confidence < 60 ? 'low' : 'high');
     rootCauseEl.style.display = 'block';
     rootCauseEl.textContent = body.rootCause;
+
+    lastCorrelationId = incidentId;
+    $('audit-trail-row').style.display = 'inline-flex';
+    $('audit-trail-result').innerHTML = '';
 
     kpiConfidence.textContent = body.confidence + '%';
     kpiConfidence.className = 'kpi-value ' + (body.confidence < 60 ? 'danger' : 'success');
@@ -937,6 +945,35 @@ async function getAiRecommendation() {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Get AI recommendation';
+  }
+}
+
+/* ---------- audit trail ---------- */
+let lastCorrelationId = null;
+
+async function viewAuditTrail() {
+  if (!lastCorrelationId) return;
+  const btn = $('view-audit-btn');
+  const resultEl = $('audit-trail-result');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  try {
+    const res = await fetch('/api/audit?correlationId=' + encodeURIComponent(lastCorrelationId));
+    const body = await res.json();
+    if (!body.entries || body.entries.length === 0) {
+      resultEl.innerHTML = '<div class="empty-state">No audit entries for this correlation ID.</div>';
+      return;
+    }
+    resultEl.innerHTML = '<div class="activity-list">' + body.entries.map((e) => {
+      const failed = e.outcome === 'failure';
+      const label = e.event || e.hitlEventType || e.actionType || e.entryType;
+      return '<div class="activity-item"><span class="activity-dot ' + (failed ? 'danger' : 'success') + '"></span>' +
+        '<span class="activity-text"><strong>' + e.entryType + '</strong> — ' + label + ' (' + e.actor + ')' +
+        '<br><span style="color:var(--text-tertiary);font-size:11px;">' + new Date(e.loggedAt).toLocaleTimeString() + '</span></span></div>';
+    }).join('') + '</div>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'View audit trail';
   }
 }
 
@@ -1031,6 +1068,7 @@ const commands = [
   { label: 'Start monitoring', hint: 'POST /api/monitoring/start', run: startMonitoring },
   { label: 'Stop monitoring', hint: 'POST /api/monitoring/stop', run: stopMonitoring },
   { label: 'Get AI recommendation', hint: 'GET /api/recommendation', run: getAiRecommendation },
+  { label: 'View audit trail', hint: 'GET /api/audit', run: viewAuditTrail },
   { label: 'Propose remediation', hint: 'POST /api/guardrail/propose', run: proposeRemediation },
   { label: 'Approve remediation', hint: 'POST /api/guardrail/decide', run: () => decideRemediation('approve') },
   { label: 'Reject remediation', hint: 'POST /api/guardrail/decide', run: () => decideRemediation('reject') },
@@ -1095,6 +1133,7 @@ $('monitor-start-btn').addEventListener('click', startMonitoring);
 $('monitor-stop-btn').addEventListener('click', stopMonitoring);
 $('monitor-rollback-btn').addEventListener('click', rollbackMonitoring);
 $('recommend-ai-btn').addEventListener('click', getAiRecommendation);
+$('view-audit-btn').addEventListener('click', viewAuditTrail);
 $('propose-btn').addEventListener('click', proposeRemediation);
 $('approve-btn').addEventListener('click', () => decideRemediation('approve'));
 $('reject-btn').addEventListener('click', () => decideRemediation('reject'));

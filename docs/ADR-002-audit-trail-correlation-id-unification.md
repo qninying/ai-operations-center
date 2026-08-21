@@ -1,7 +1,6 @@
 # ADR-002: Unify Correlation IDs Between `mcp-server/` and `guardrails/auditLog.ts`
 
-**Status:** Proposed — step 1 (the audit log entry type) is implemented; steps 2-4
-below are not yet built.
+**Status:** Implemented — all four steps are built, live-verified, and unit-tested.
 **Owner:** Quincy Nkwain Ninying
 **Date:** 2026-08-20
 **Component:** `guardrails/auditLog.ts`, `mcp-server/src/`
@@ -92,7 +91,7 @@ whole ADR — a `system_event` entry is retrievable via `forCorrelationId()` alo
 `tsc --noEmit` clean.
 
 ### Step 2 — one correlation ID per incident, generated once, at the true entry point
-(not yet built)
+(implemented)
 
 - HTTP-triggered incidents: `httpServer.ts` already generates one ID at the right
   place (`crypto.randomUUID()` if the caller didn't supply one) — rename/treat it as
@@ -106,22 +105,41 @@ whole ADR — a `system_event` entry is retrievable via `forCorrelationId()` alo
   `notifyOperators()` already applies to `incidentId` today, extended to cover the
   whole chain, not one hop of it.
 
-### Step 3 — write into `AuditLog`, not just stderr (not yet built)
+### Step 3 — write into `AuditLog`, not just stderr (implemented)
 
 Each `mcp-server/` service takes an injectable `AuditLog` instance, the same DI pattern
 as `queryFn`/`analyzeFn`/`notifyFn`, and records a `SystemEventAuditEntry` alongside
 (not instead of) its existing `logEvent()` call — `logEvent()` stays the live
-operational view; `AuditLog` becomes the durable, queryable one.
+operational view; `AuditLog` becomes the durable, queryable one. Extracted to a shared
+`mcp-server/src/observability/auditWrite.ts` helper (`recordSystemEvent()`) since the
+same call shape was always going to appear in all five services, rather than five
+near-identical copies.
 
-### Step 4 — never drop the correlation ID on a failure path (not yet built)
+### Step 4 — never drop the correlation ID on a failure path (implemented)
 
 Every failure branch already logs an outcome — the correlation ID needs to be present
 on every one of those audit writes too, not just the happy path, matching what's
-already true of every `logEvent()` failure call today.
+already true of every `logEvent()` failure call today. A monitoring cycle failure
+(no detected incident to key off of) generates its own fresh correlation ID rather than
+skipping the audit write, since a cycle failure is itself a real, audit-worthy event.
+
+### Result: `GET /api/audit?correlationId=` — the demonstration route (implemented)
+
+`httpServer.ts` now exposes `GET /api/audit`, returning every entry sharing one
+correlation ID via the existing `AuditLog.forCorrelationId()`. Live-verified end to
+end: a real `/api/recommendation` call at 55% confidence correctly produced three
+entries under one correlation ID — `recommendationService`'s `recommendation_data_access`,
+`escalationService`'s `escalation_triggered`, and `notificationService`'s
+`operator_notification_delivered` (a real ntfy dispatch) — in that order, each with
+its own actor and timestamp. The guardrail's HITL approval flow (built earlier this
+session) shares the same `AuditLog` instance, so its `hitl_event` entries are
+retrievable through this same route with no additional code. The dashboard's AI
+Recommendation panel has a "View audit trail" button that calls this route directly,
+so the reconstruction is demoable live, not just assertable in a test.
 
 ## Consequences
 
-**What this requires, if the remaining steps are approved:**
+**What this required (all delivered):**
 - `httpServer.ts` and `monitoringService.ts` become the two places a correlation ID is
   ever minted; every other function receives it as a parameter.
 - Each `mcp-server/` service's function signature grows one more optional injectable

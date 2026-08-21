@@ -6,6 +6,7 @@ import {
 } from "./recommendationService.js";
 import { LiveSourceUnavailableError } from "./dmvLiveSource.js";
 import type { RootCauseResult } from "./rootCauseAgent.js";
+import { AuditLog } from "../../guardrails/auditLog.js";
 
 const validRow = {
   session_id: 61,
@@ -92,5 +93,35 @@ describe("generateRecommendation", () => {
         context: expect.objectContaining({ outcome: "failure", errorClass: "InvalidDataFormatError" }),
       })
     );
+  });
+
+  it("ADR-002: incidentId doubles as the correlation ID for a real audit entry, on both success and failure", async () => {
+    const auditLog = new AuditLog();
+
+    await generateRecommendation("incident-6", "desc", {
+      queryFn: vi.fn().mockResolvedValue([validRow]),
+      analyzeFn: vi.fn().mockResolvedValue(fakeRootCause()),
+      auditLog,
+    });
+
+    const successEntries = auditLog.forCorrelationId("incident-6");
+    expect(successEntries).toHaveLength(1);
+    expect(successEntries[0]).toMatchObject({
+      entryType: "system_event",
+      event: "recommendation_data_access",
+      outcome: "success",
+      actor: "recommendationService",
+      correlationId: "incident-6",
+    });
+
+    await generateRecommendation("incident-7", "desc", {
+      queryFn: vi.fn().mockRejectedValue(new Error("boom")),
+      analyzeFn: vi.fn(),
+      auditLog,
+    }).catch(() => {});
+
+    const failureEntries = auditLog.forCorrelationId("incident-7");
+    expect(failureEntries).toHaveLength(1);
+    expect(failureEntries[0]).toMatchObject({ outcome: "failure", correlationId: "incident-7" });
   });
 });

@@ -63,6 +63,7 @@ function startMonitoringInternal(): string {
         recentAlerts = [result, ...recentAlerts].slice(0, RECENT_ALERTS_LIMIT);
       }
     },
+    auditLog,
   });
   logEvent({ level: "info", event: "monitoring_control", context: { action: "start", taskId: currentMonitoringTaskId } });
   return currentMonitoringTaskId;
@@ -219,14 +220,17 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     // falls back to fixture data on a SQL Server failure — see
     // recommendationService.ts's header comment for why. Every attempt is logged
     // regardless of outcome ("Trust: all data access attempts are logged").
+    // ADR-002 step 2: incidentId is generated once, right here, at the true entry
+    // point for this chain — and is the correlation ID every downstream write below
+    // (generateRecommendation, evaluateEscalation, notifyOperators) shares.
     const incidentId = url.searchParams.get("incidentId") ?? crypto.randomUUID();
     const description = url.searchParams.get("description") ?? "";
     try {
-      const result = await generateRecommendation(incidentId, description);
+      const result = await generateRecommendation(incidentId, description, { auditLog });
       // STORY-009 / REQ-011: escalate to a human operator when the agent's own
       // confidence in this recommendation is below 60% — evaluateEscalation() logs
       // the escalation itself; this just surfaces it in the response for a demo.
-      const escalation = evaluateEscalation(incidentId, result.confidence, result.rootCause);
+      const escalation = evaluateEscalation(incidentId, result.confidence, result.rootCause, { auditLog });
       sendJson(res, 200, { incidentId, ...result, escalation });
     } catch (error) {
       if (error instanceof SqlServerUnavailableError) {
@@ -256,11 +260,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     const incidentId = url.searchParams.get("incidentId") ?? crypto.randomUUID();
     const description = url.searchParams.get("description") ?? "";
     try {
-      const result = await generateCloudRecommendation(incidentId, description);
+      const result = await generateCloudRecommendation(incidentId, description, { auditLog });
       // STORY-009 / REQ-011: same escalation check as /api/recommendation — REQ-011
       // is source-agnostic, so a low-confidence cloud-service recommendation escalates
       // exactly the same way a low-confidence SQL Server one does.
-      const escalation = evaluateEscalation(incidentId, result.confidence, result.rootCause);
+      const escalation = evaluateEscalation(incidentId, result.confidence, result.rootCause, { auditLog });
       sendJson(res, 200, { incidentId, ...result, escalation });
     } catch (error) {
       if (error instanceof CloudServiceUnavailableError) {
@@ -489,6 +493,25 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       }
       throw error;
     }
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/audit") {
+    // ADR-002 "Consequences": the audit log's actual value is forCorrelationId()
+    // reconstruction — this route is what makes that demoable live, not just
+    // asserted in a test. Real data only: whatever correlationId a real
+    // /api/recommendation, /api/cloud-recommendation, monitoring cycle, or guardrail
+    // decision actually used.
+    const correlationId = url.searchParams.get("correlationId");
+    if (!correlationId) {
+      sendJson(res, 400, {
+        error: "MISSING_CORRELATION_ID",
+        message: "Query param 'correlationId' is required.",
+      });
+      return;
+    }
+    const entries = auditLog.forCorrelationId(correlationId);
+    sendJson(res, 200, { correlationId, count: entries.length, entries });
+    return;
   }
 
   sendJson(res, 404, { error: "NOT_FOUND", path: url.pathname });

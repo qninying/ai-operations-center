@@ -3,6 +3,8 @@ import { queryLiveCloudBlob } from "./cloudBlobSource.js";
 import { analyzeIncidentRootCause } from "./rootCauseAgent.js";
 import type { EvidenceItem, Incident, RootCauseResult } from "./rootCauseAgent.js";
 import { logEvent } from "./observability/logger.js";
+import { recordSystemEvent } from "./observability/auditWrite.js";
+import type { AuditLog } from "../../guardrails/auditLog.js";
 
 // STORY-007 / REQ-008 + REQ-013: wires real Azure Blob Storage cloud-service data
 // into a real AI recommendation — the cloud-service counterpart to
@@ -72,6 +74,9 @@ export interface GenerateCloudRecommendationOptions {
   // recommendationService.ts / rootCauseAgent.ts.
   queryFn?: typeof queryLiveCloudBlob;
   analyzeFn?: typeof analyzeIncidentRootCause;
+  // ADR-002 step 3 — see recommendationService.ts's identical field for the full
+  // rationale.
+  auditLog?: AuditLog;
 }
 
 // Throws CloudServiceUnavailableError for ANY live-source failure (unreachable,
@@ -92,15 +97,13 @@ export async function generateCloudRecommendation(
   try {
     rawRecords = await queryFn();
   } catch (error) {
+    const errorClass = error instanceof Error ? error.name : "Error";
     logEvent({
       level: "error",
       event: "cloud_recommendation_data_access",
-      context: {
-        incidentId,
-        outcome: "failure",
-        errorClass: error instanceof Error ? error.name : "Error",
-      },
+      context: { incidentId, outcome: "failure", errorClass },
     });
+    recordSystemEvent(options.auditLog, "cloudRecommendationService", "cloud_recommendation_data_access", "failure", { errorClass }, incidentId);
     throw new CloudServiceUnavailableError(error);
   }
 
@@ -108,15 +111,13 @@ export async function generateCloudRecommendation(
   try {
     evidence = recordsToEvidence(rawRecords);
   } catch (error) {
+    const errorClass = error instanceof Error ? error.name : "Error";
     logEvent({
       level: "error",
       event: "cloud_recommendation_data_access",
-      context: {
-        incidentId,
-        outcome: "failure",
-        errorClass: error instanceof Error ? error.name : "Error",
-      },
+      context: { incidentId, outcome: "failure", errorClass },
     });
+    recordSystemEvent(options.auditLog, "cloudRecommendationService", "cloud_recommendation_data_access", "failure", { errorClass }, incidentId);
     throw error;
   }
 
@@ -125,6 +126,7 @@ export async function generateCloudRecommendation(
     event: "cloud_recommendation_data_access",
     context: { incidentId, outcome: "success", recordCount: evidence.length },
   });
+  recordSystemEvent(options.auditLog, "cloudRecommendationService", "cloud_recommendation_data_access", "success", { recordCount: evidence.length }, incidentId);
 
   const incident: Incident = { id: incidentId, description: incidentDescription, evidence };
   return analyzeFn(incident);

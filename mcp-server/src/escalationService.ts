@@ -1,6 +1,8 @@
 import { notifyOperators } from "./notificationService.js";
 import { safeLogEvent as sharedSafeLogEvent } from "./observability/safeLogEvent.js";
+import { recordSystemEvent } from "./observability/auditWrite.js";
 import type { LogEventInput } from "./observability/logger.js";
+import type { AuditLog } from "../../guardrails/auditLog.js";
 
 // STORY-009 / REQ-011: escalate an incident to a human operator when the AI's
 // confidence in its own recommendation is below 60%. Source-agnostic by design —
@@ -51,6 +53,9 @@ function safeLogEvent(input: LogEventInput): void {
 export interface EvaluateEscalationOptions {
   // STORY-010: injection point for tests. Defaults to the real notifyOperators().
   notifyFn?: typeof notifyOperators;
+  // ADR-002 step 3: incidentId already IS the correlation ID for every call site
+  // this function has today (all HTTP-triggered, generated once in httpServer.ts).
+  auditLog?: AuditLog;
 }
 
 // Returns the EscalationRecord when confidence is below the threshold, or null when
@@ -89,17 +94,28 @@ export function evaluateEscalation(
       notifiedOperator: true,
     },
   });
+  recordSystemEvent(
+    options.auditLog,
+    "escalationService",
+    "escalation_triggered",
+    "success",
+    { confidence, rootCause, escalatedAt: record.escalatedAt },
+    incidentId
+  );
 
   // STORY-010 / REQ-012: an escalation is this system's other real autonomous action.
   // Fire-and-forget, same reasoning as monitoringService.ts — evaluateEscalation()
   // stays synchronous (its established contract from STORY-009), and
   // notifyOperators()'s own capped retry shouldn't block this function's return.
   const notifyFn = options.notifyFn ?? notifyOperators;
-  notifyFn({
-    actionType: "escalation",
-    incidentId,
-    summary: rootCause,
-  }).catch((error) => {
+  notifyFn(
+    {
+      actionType: "escalation",
+      incidentId,
+      summary: rootCause,
+    },
+    { auditLog: options.auditLog }
+  ).catch((error) => {
     safeLogEvent({
       level: "error",
       event: "operator_notification_dispatch_failed",

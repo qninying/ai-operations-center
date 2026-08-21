@@ -2,7 +2,9 @@ import { queryLiveDmv } from "./dmvLiveSource.js";
 import type { DmvExecRequestRow } from "./dmvFixtures.js";
 import { notifyOperators } from "./notificationService.js";
 import { safeLogEvent as sharedSafeLogEvent } from "./observability/safeLogEvent.js";
+import { recordSystemEvent } from "./observability/auditWrite.js";
 import type { LogEventInput } from "./observability/logger.js";
+import type { AuditLog } from "../../guardrails/auditLog.js";
 
 // STORY-008 / REQ-016: continuous monitoring for incident management. Calls
 // queryLiveDmv() directly, the same as recommendationService.ts and
@@ -45,6 +47,8 @@ export interface MonitoringOptions {
   onCycle?: (result: MonitoringCycleResult) => void;
   // STORY-010: injection point for tests. Defaults to the real notifyOperators().
   notifyFn?: typeof notifyOperators;
+  // ADR-002 step 3.
+  auditLog?: AuditLog;
 }
 
 export interface MonitoringHandle {
@@ -67,7 +71,8 @@ function safeLogEvent(input: LogEventInput): void {
 async function runMonitoringCycle(
   queryFn: typeof queryLiveDmv,
   notifyFn: typeof notifyOperators,
-  onCycle?: (result: MonitoringCycleResult) => void
+  onCycle?: (result: MonitoringCycleResult) => void,
+  auditLog?: AuditLog
 ): Promise<void> {
   let rows: DmvExecRequestRow[];
   try {
@@ -79,6 +84,11 @@ async function runMonitoringCycle(
       event: "monitoring_cycle",
       context: { outcome: "failure", errorClass },
     });
+    // ADR-002 step 4: a cycle failure has no detected-incident identity of its own,
+    // but it's still a real, audit-worthy operational event — a fresh correlation ID
+    // here (not dropped, not reused from an unrelated prior cycle) is what makes it
+    // independently reconstructable later.
+    recordSystemEvent(auditLog, "monitoringService", "monitoring_cycle", "failure", { errorClass }, crypto.randomUUID());
     onCycle?.({
       timestamp: new Date().toISOString(),
       outcome: "failure",
@@ -94,8 +104,15 @@ async function runMonitoringCycle(
     event: "monitoring_cycle",
     context: { outcome: "success", incidentDetected: incident !== undefined, rowCount: rows.length },
   });
+  // No audit entry for a routine no-incident cycle — nothing to correlate a story
+  // about. ADR-002 step 2's correlation ID exists for actual incidents.
 
   if (incident) {
+    // ADR-002 step 2: generated once, here, at the true detection point — shared by
+    // the incident_alert log/audit entry and the notifyOperators() call below, never
+    // regenerated partway through this chain. Distinct from the human-readable
+    // incidentId string below, which stays in the notification body text.
+    const correlationId = crypto.randomUUID();
     safeLogEvent({
       level: "warn",
       event: "incident_alert",
@@ -104,8 +121,22 @@ async function runMonitoringCycle(
         sessionId: incident.session_id,
         blockingSessionId: incident.blocking_session_id,
         databaseName: incident.database_name,
+        correlationId,
       },
     });
+    recordSystemEvent(
+      auditLog,
+      "monitoringService",
+      "incident_alert",
+      "success",
+      {
+        source: "sys.dm_exec_requests",
+        sessionId: incident.session_id,
+        blockingSessionId: incident.blocking_session_id,
+        databaseName: incident.database_name,
+      },
+      correlationId
+    );
 
     // STORY-010 / REQ-012: incident_alert is one of this system's two real
     // autonomous actions. Fire-and-forget deliberately — notifyOperators() has its
@@ -115,11 +146,15 @@ async function runMonitoringCycle(
     // notifyOperators() itself never throws except for missing operator config
     // (thrown before any attempt), which is caught here so it can't produce an
     // unhandled rejection.
-    notifyFn({
-      actionType: "incident_alert",
-      incidentId: `sql:sys.dm_exec_requests:${incident.session_id}`,
-      summary: `Session ${incident.session_id} is blocked by session ${incident.blocking_session_id} on ${incident.database_name}.`,
-    }).catch((error) => {
+    notifyFn(
+      {
+        actionType: "incident_alert",
+        incidentId: `sql:sys.dm_exec_requests:${incident.session_id}`,
+        correlationId,
+        summary: `Session ${incident.session_id} is blocked by session ${incident.blocking_session_id} on ${incident.database_name}.`,
+      },
+      { auditLog }
+    ).catch((error) => {
       safeLogEvent({
         level: "error",
         event: "operator_notification_dispatch_failed",
@@ -167,7 +202,7 @@ export function startMonitoring(options: MonitoringOptions = {}): MonitoringHand
     }
     cycleInFlight = true;
     try {
-      await runMonitoringCycle(queryFn, notifyFn, options.onCycle);
+      await runMonitoringCycle(queryFn, notifyFn, options.onCycle, options.auditLog);
     } finally {
       cycleInFlight = false;
     }

@@ -3,6 +3,8 @@ import { queryLiveDmv } from "./dmvLiveSource.js";
 import { analyzeIncidentRootCause } from "./rootCauseAgent.js";
 import type { EvidenceItem, Incident, RootCauseResult } from "./rootCauseAgent.js";
 import { logEvent } from "./observability/logger.js";
+import { recordSystemEvent } from "./observability/auditWrite.js";
+import type { AuditLog } from "../../guardrails/auditLog.js";
 
 // STORY-006 / REQ-007 + REQ-013: wires real SQL Server data into a real AI
 // recommendation. Deliberately calls queryLiveDmv() directly rather than going
@@ -74,6 +76,11 @@ export interface GenerateRecommendationOptions {
   // rootCauseAgent.ts/diagnosticsGatherer.ts.
   queryFn?: typeof queryLiveDmv;
   analyzeFn?: typeof analyzeIncidentRootCause;
+  // ADR-002 step 3: optional durable, correlation-ID-queryable record alongside the
+  // existing logEvent() calls below. incidentId doubles as the correlation ID here —
+  // it's already generated once, at the true entry point (httpServer.ts), per ADR-002
+  // step 2.
+  auditLog?: AuditLog;
 }
 
 // Throws SqlServerUnavailableError for ANY live-source failure (unreachable,
@@ -94,15 +101,13 @@ export async function generateRecommendation(
   try {
     rawRows = await queryFn({ dmvName: "sys.dm_exec_requests" });
   } catch (error) {
+    const errorClass = error instanceof Error ? error.name : "Error";
     logEvent({
       level: "error",
       event: "recommendation_data_access",
-      context: {
-        incidentId,
-        outcome: "failure",
-        errorClass: error instanceof Error ? error.name : "Error",
-      },
+      context: { incidentId, outcome: "failure", errorClass },
     });
+    recordSystemEvent(options.auditLog, "recommendationService", "recommendation_data_access", "failure", { errorClass }, incidentId);
     throw new SqlServerUnavailableError(error);
   }
 
@@ -110,15 +115,13 @@ export async function generateRecommendation(
   try {
     evidence = rowsToEvidence(rawRows);
   } catch (error) {
+    const errorClass = error instanceof Error ? error.name : "Error";
     logEvent({
       level: "error",
       event: "recommendation_data_access",
-      context: {
-        incidentId,
-        outcome: "failure",
-        errorClass: error instanceof Error ? error.name : "Error",
-      },
+      context: { incidentId, outcome: "failure", errorClass },
     });
+    recordSystemEvent(options.auditLog, "recommendationService", "recommendation_data_access", "failure", { errorClass }, incidentId);
     throw error;
   }
 
@@ -127,6 +130,7 @@ export async function generateRecommendation(
     event: "recommendation_data_access",
     context: { incidentId, outcome: "success", rowCount: evidence.length },
   });
+  recordSystemEvent(options.auditLog, "recommendationService", "recommendation_data_access", "success", { rowCount: evidence.length }, incidentId);
 
   const incident: Incident = { id: incidentId, description: incidentDescription, evidence };
   return analyzeFn(incident);

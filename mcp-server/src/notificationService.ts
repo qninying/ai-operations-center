@@ -1,5 +1,7 @@
 import { withReliability } from "./reliability/withReliability.js";
 import { safeLogEvent } from "./observability/safeLogEvent.js";
+import { recordSystemEvent } from "./observability/auditWrite.js";
+import type { AuditLog } from "../../guardrails/auditLog.js";
 
 // STORY-010 / REQ-012: notify operators of autonomous actions the system takes on its
 // own initiative. This system currently takes exactly two kinds of autonomous action —
@@ -29,6 +31,13 @@ const MAX_DELAY_MS = 4_000;
 export interface AutonomousAction {
   actionType: string;
   incidentId: string;
+  // ADR-002 step 2: optional — most callers' incidentId already IS the correlation
+  // ID (generated once, at the true entry point). monitoringService.ts is the one
+  // caller where incidentId stays a human-readable identifier for the notification
+  // body text while a separate real correlation ID is threaded here for audit
+  // purposes. Falls back to incidentId below when unset, so existing callers need
+  // no change.
+  correlationId?: string;
   summary: string;
 }
 
@@ -56,6 +65,8 @@ export class NotificationChannelUnconfiguredError extends Error {
 
 export interface NotifyOperatorsOptions {
   channel?: NotificationChannel;
+  // ADR-002 step 3.
+  auditLog?: AuditLog;
 }
 
 function readOperators(): string[] {
@@ -117,6 +128,7 @@ export async function notifyOperators(
 ): Promise<void> {
   const operators = readOperators();
   const channel = options.channel ?? defaultChannel;
+  const correlationId = action.correlationId ?? action.incidentId;
 
   try {
     await withReliability(() => channel(action, operators), {
@@ -135,15 +147,32 @@ export async function notifyOperators(
         operators,
       },
     });
+    recordSystemEvent(
+      options.auditLog,
+      "notificationService",
+      "operator_notification_delivered",
+      "success",
+      { actionType: action.actionType, incidentId: action.incidentId, summary: action.summary, operators },
+      correlationId
+    );
   } catch (error) {
+    const errorClass = error instanceof Error ? error.name : "Error";
     safeLogEvent("notificationService", {
       level: "error",
       event: "operator_notification_failed",
       context: {
         actionType: action.actionType,
         incidentId: action.incidentId,
-        errorClass: error instanceof Error ? error.name : "Error",
+        errorClass,
       },
     });
+    recordSystemEvent(
+      options.auditLog,
+      "notificationService",
+      "operator_notification_failed",
+      "failure",
+      { actionType: action.actionType, incidentId: action.incidentId, errorClass },
+      correlationId
+    );
   }
 }

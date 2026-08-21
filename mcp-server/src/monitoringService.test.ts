@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { startMonitoring } from "./monitoringService.js";
 import * as logger from "./observability/logger.js";
+import { AuditLog } from "../../guardrails/auditLog.js";
 
 const quietRow = {
   session_id: 52,
@@ -173,9 +174,54 @@ describe("startMonitoring", () => {
       expect.objectContaining({
         actionType: "incident_alert",
         incidentId: "sql:sys.dm_exec_requests:61",
+        correlationId: expect.any(String),
         summary: expect.stringContaining("Session 61"),
-      })
+      }),
+      expect.anything()
     );
+  });
+
+  it("ADR-002: records a system_event audit entry for a detected incident, retrievable by its correlation ID", async () => {
+    const notifyFn = vi.fn().mockResolvedValue(undefined);
+    const queryFn = vi.fn().mockResolvedValue([quietRow, blockedRow]);
+    const auditLog = new AuditLog();
+
+    const handle = startMonitoring({ queryFn, notifyFn, auditLog });
+    await vi.advanceTimersByTimeAsync(0);
+    handle.stop();
+
+    const [, options] = notifyFn.mock.calls[0];
+    expect(options.auditLog).toBe(auditLog);
+
+    const [action] = notifyFn.mock.calls[0];
+    const entries = auditLog.forCorrelationId(action.correlationId);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      entryType: "system_event",
+      event: "incident_alert",
+      outcome: "success",
+      actor: "monitoringService",
+      correlationId: action.correlationId,
+    });
+  });
+
+  it("ADR-002: a monitoring cycle failure still gets its own auditable correlation ID", async () => {
+    const queryFn = vi.fn().mockRejectedValue(new Error("connection refused"));
+    const auditLog = new AuditLog();
+
+    const handle = startMonitoring({ queryFn, auditLog });
+    await vi.advanceTimersByTimeAsync(0);
+    handle.stop();
+
+    const entries = auditLog.all();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      entryType: "system_event",
+      event: "monitoring_cycle",
+      outcome: "failure",
+      actor: "monitoringService",
+    });
+    expect(entries[0].correlationId).toBeTruthy();
   });
 
   it("does not notify operators on a quiet cycle with no incident", async () => {
