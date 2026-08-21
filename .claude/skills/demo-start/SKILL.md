@@ -37,13 +37,47 @@ the blocking scenario, not waiting on a cold start.
    ```
    Confirm the response shows `"running": true` and a real `taskId`.
 
-5. **Report readiness, don't open a browser tab yourself.** Tell the user the
+5. **Schedule a real fault injection in the background**, so the demo starts clean
+   and healthy and a real incident appears on its own partway through — the
+   presenter never has to trigger anything on camera. Write a small wrapper script
+   rather than backgrounding `sleep && seedBlockingScenario` directly — `$!` capture
+   is unreliable when the command runs through a wrapped/sandboxed shell, confirmed
+   by testing it directly: it captured the wrapper's own PID, not the real
+   background job's. A named script file gives `pgrep -f`/`pkill -f` an unambiguous,
+   collision-free target instead.
+   ```
+   cat > /tmp/coreops-fault-injector.sh <<'EOF'
+   #!/bin/sh
+   cd "<absolute path to mcp-server>"
+   sleep "${1:-90}"
+   npx tsx src/seedBlockingScenario.ts "${2:-60}"
+   EOF
+   chmod +x /tmp/coreops-fault-injector.sh
+   nohup /tmp/coreops-fault-injector.sh 90 60 > /tmp/coreops-fault.log 2>&1 &
+   disown
+   ```
+   Substitute the real absolute path to this repo's `mcp-server/` directory for
+   `<absolute path to mcp-server>`. Defaults: the fault lands 90s after this step
+   runs, then holds a real SQL Server lock for 60s before releasing it on its own.
+   Those are the only two numbers (the two arguments to the script) — adjust them if
+   the user asks for different timing (e.g. "2 minutes in" or "give me more time to
+   explain it"). This runs the same real blocking scenario `seedBlockingScenario.ts`
+   always creates (one session locks a row, a second blocks on it) — it's genuinely
+   scheduled, not faked, and it resolves itself once the hold time elapses, which is
+   the one honest "fix" this system can currently show: there is no real
+   kill-session/restart-service execution path built yet (the guardrail correctly
+   blocks that), so don't imply on camera that a button fixed it — the truthful
+   narration is "the lock cleared" or "the system's own guardrail is why we can't
+   just auto-fix this yet."
+
+6. **Report readiness, don't open a browser tab yourself.** Tell the user the
    dashboard is ready at `http://localhost:8787/` and that they should open it in
    their own browser (the one they'll actually be screen-sharing) — the Claude Code
    Browser pane isn't what an audience sees. Mention that SQL Server may still take
    a little longer to fully warm on its very first real query even after step 2's
    direct check succeeds, since the app's own connection pool is separate from the
-   warmup script's.
+   warmup script's. Also state plainly when the scheduled fault will land and how
+   long it holds, so the presenter can pace their narration against it.
 
 ## If something fails
 
@@ -53,8 +87,10 @@ or a server that never returns healthy means the demo isn't ready yet; say so pl
 
 ## Related
 
-- `demo-stop` — the matching teardown skill, for after the demo.
+- `demo-stop` — the matching teardown skill. It also cancels any fault injection
+  step 5 scheduled but hasn't fired yet, and kills it if it has — don't leave a
+  scheduled or running blocking scenario behind after the demo ends.
 - `mcp-server/src/warmup.ts` — the actual warmup script this drives.
-- `mcp-server/src/seedBlockingScenario.ts` — run this separately, live, during the
-  actual demo to trigger the blocking scenario. Not part of this skill — the
-  presenter triggers it on camera, that's the point.
+- `mcp-server/src/seedBlockingScenario.ts` — the real blocking-scenario script step 5
+  schedules. Can still be run by hand instead, with different timing, if the
+  presenter wants to trigger it live on camera rather than have it appear on its own.

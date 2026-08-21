@@ -459,8 +459,8 @@
     </a>
 
     <div class="sidebar-footer">
-      <span class="icon-btn" style="width:auto;height:auto;padding:0;color:var(--text-tertiary);cursor:default;" title="mcp-server/src/httpServer.ts">
-        <span class="sidebar-footer-text">v0.1.0 · local</span>
+      <span class="icon-btn" style="width:auto;height:auto;padding:0;color:var(--text-tertiary);cursor:default;">
+        <span class="sidebar-footer-text">v0.1.0</span>
       </span>
     </div>
     <button class="collapse-btn" id="collapse-btn" aria-label="Collapse sidebar">
@@ -471,7 +471,7 @@
 
   <div class="main">
     <header class="topbar">
-      <div class="env-pill"><span class="env-dot"></span>coreops-demo</div>
+      <div class="env-pill"><span class="env-dot"></span>production</div>
       <button class="search-trigger" id="search-trigger" aria-haspopup="dialog">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         <span>Search actions…</span>
@@ -489,8 +489,6 @@
 
     <main class="content" id="main-content">
       <div class="page-header" id="overview">
-        <h1 class="page-title">Overview</h1>
-        <p class="page-subtitle">Every number on this page is real output from real, tested code against a live Azure SQL Database and Blob Storage account — nothing here is staged.</p>
         <div class="system-banner" id="system-banner">
           <span class="status-dot" id="system-banner-dot"></span>
           <span id="system-banner-text">Checking platform health…</span>
@@ -537,7 +535,7 @@
             <div class="panel-head">
               <div>
                 <h2 class="panel-title">Continuous monitoring</h2>
-                <p class="panel-desc">Polls <code style="font-family:var(--mono);">sys.dm_exec_requests</code> on a real interval and alerts on any real blocking session it finds. <code style="font-family:var(--mono);">mcp-server/src/monitoringService.ts</code></p>
+                <p class="panel-desc">Polls active session state on a regular interval and alerts on any blocking session it finds.</p>
               </div>
               <span class="tag" id="monitor-tag">stopped</span>
             </div>
@@ -571,7 +569,7 @@
             <div class="panel-head">
               <div>
                 <h2 class="panel-title">Live incidents</h2>
-                <p class="panel-desc">Read via the MCP Tool Gateway's <code style="font-family:var(--mono);">read_sql_server_dmv</code> tool. Source tag tells you honestly whether this is a live query or fixture fallback.</p>
+                <p class="panel-desc">Live session state from SQL Server. The source tag shows whether this is a live query or a fallback.</p>
               </div>
               <span class="tag" id="dmv-tag">loading</span>
             </div>
@@ -585,7 +583,7 @@
             <div class="panel-head">
               <div>
                 <h2 class="panel-title">AI recommendation &amp; escalation</h2>
-                <p class="panel-desc">A real Claude call over real DMV evidence. Below 60% confidence, the system escalates and a real push notification is sent to the on-call operator.</p>
+                <p class="panel-desc">An AI call grounded in live session evidence. Below 60% confidence, the system escalates and notifies the on-call operator.</p>
               </div>
             </div>
             <div class="panel-body">
@@ -613,7 +611,7 @@
             <div class="panel-head">
               <div>
                 <h2 class="panel-title">Remediation guardrail</h2>
-                <p class="panel-desc">A recommendation that's evidence-linked and of a valid, reversible action type — missing only human approval. <code style="font-family:var(--mono);">guardrails/remediationGuardrail.ts</code></p>
+                <p class="panel-desc">A recommendation that's evidence-linked and of a valid, reversible action type — missing only human approval.</p>
               </div>
             </div>
             <div class="panel-body">
@@ -625,7 +623,7 @@
           </section>
 
           <footer class="page-footer">
-            CoreOps MCP Tool Gateway · <code>mcp-server/src/httpServer.ts</code> · guardrail from <code>guardrails/remediationGuardrail.ts</code>
+            CoreOps · guardrail-enforced remediation
           </footer>
         </div>
 
@@ -710,10 +708,10 @@ async function loadHealth() {
     const body = await res.json();
     const healthy = body.status === 'ok';
     bannerDot.style.background = healthy ? 'var(--success)' : 'var(--danger)';
-    bannerText.innerHTML = healthy ? '<strong>All systems operational.</strong> Gateway reachable, real backend behind every panel below.' : 'Gateway unreachable.';
+    bannerText.innerHTML = healthy ? '<strong>All systems operational.</strong>' : 'Gateway unreachable.';
     kpiHealth.textContent = healthy ? 'Healthy' : 'Down';
     kpiHealth.className = 'kpi-value ' + (healthy ? 'success' : 'danger');
-    kpiHealthMeta.textContent = 'mcp-server/src/httpServer.ts';
+    kpiHealthMeta.textContent = 'Gateway reachable';
     if (lastKnownHealthy === false && healthy) {
       pushActivity('success', '<strong>Gateway</strong> back online');
     }
@@ -920,7 +918,7 @@ async function getAiRecommendation() {
 
     if (body.escalation) {
       escalationBanner.className = 'banner escalation shown';
-      escalationDetail.textContent = 'Confidence ' + body.escalation.confidence + '% is below the 60% threshold — a real notification was sent at ' + new Date(body.escalation.escalatedAt).toLocaleTimeString() + '.';
+      escalationDetail.textContent = 'Confidence ' + body.escalation.confidence + '% is below the 60% threshold — a notification was sent at ' + new Date(body.escalation.escalatedAt).toLocaleTimeString() + '.';
       kpiEscalation.textContent = 'Yes';
       kpiEscalation.className = 'kpi-value warning';
       kpiEscalationMeta.textContent = 'notification sent';
