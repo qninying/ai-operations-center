@@ -101,6 +101,62 @@
   }
   footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
   footer code { color: var(--text); }
+
+  .btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  button.action.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  button.action.danger { background: var(--danger); }
+
+  .status-block {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .cycle-block { margin-top: 14px; font-size: 13px; }
+  .cycle-block .k { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+  .cycle-block .v { font-family: ui-monospace, SFMono-Regular, monospace; }
+  .alert-item {
+    border: 1px solid var(--danger);
+    background: #1c1013;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 8px;
+    font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+  }
+
+  .confidence-block {
+    margin-top: 16px;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .confidence-number { font-size: 44px; font-weight: 700; font-family: ui-monospace, SFMono-Regular, monospace; }
+  .confidence-number.low { color: var(--danger); }
+  .confidence-number.high { color: var(--ok); }
+  .confidence-label { color: var(--muted); font-size: 13px; }
+  .root-cause {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #0f1420;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .escalation-banner {
+    display: none;
+    margin-top: 16px;
+    padding: 14px;
+    border-radius: 8px;
+    border: 1px solid var(--warn);
+    background: #241c0d;
+    font-size: 13px;
+  }
+  .escalation-banner.shown { display: block; }
+  .escalation-banner .title { font-weight: 700; color: var(--warn); font-size: 14px; margin-bottom: 6px; }
 </style>
 </head>
 <body>
@@ -115,6 +171,36 @@
     <div class="desc">Read via the MCP Tool Gateway's <code>read_sql_server_dmv</code> tool (R2/R3). Source tag tells you honestly whether this is a live query or fixture fallback.</div>
     <div id="dmv-status">Loading…</div>
     <div class="row" id="dmv-rows"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Continuous monitoring — <code>monitoringService.ts</code></h2>
+    <div class="desc">Polls <code>sys.dm_exec_requests</code> on a real interval and alerts on any real blocking session it finds. Start this before triggering a blocking scenario.</div>
+    <div class="btn-row">
+      <button class="action" id="monitor-start-btn">Start monitoring</button>
+      <button class="action secondary" id="monitor-stop-btn">Stop monitoring</button>
+    </div>
+    <div class="status-block"><span class="dot" id="monitor-dot"></span><span id="monitor-status-text">Checking…</span></div>
+    <div class="cycle-block" id="monitor-cycle"></div>
+    <div id="monitor-alerts"></div>
+  </section>
+
+  <section class="panel">
+    <h2>AI recommendation &amp; escalation</h2>
+    <div class="desc">A real Claude call over real DMV evidence. The confidence score is the AI's own — not a guess dressed up as one. Below 60%, the system escalates and a real push notification is sent.</div>
+    <div class="btn-row">
+      <button class="action" id="recommend-ai-btn">Get AI recommendation (SQL Server)</button>
+    </div>
+    <div id="recommend-ai-error"></div>
+    <div class="confidence-block" id="confidence-block" style="display:none;">
+      <div class="confidence-number" id="confidence-number">—</div>
+      <div class="confidence-label">confidence</div>
+    </div>
+    <div class="root-cause" id="root-cause-text" style="display:none;"></div>
+    <div class="escalation-banner" id="escalation-banner">
+      <div class="title">Escalated to a human operator</div>
+      <div id="escalation-detail"></div>
+    </div>
   </section>
 
   <section class="panel">
@@ -197,8 +283,115 @@ async function recommendRemediation() {
 }
 
 document.getElementById('recommend-btn').addEventListener('click', recommendRemediation);
+
+let monitorPollTimer = null;
+
+function renderMonitorStatus(body) {
+  const dot = document.getElementById('monitor-dot');
+  const text = document.getElementById('monitor-status-text');
+  const cycleEl = document.getElementById('monitor-cycle');
+  const alertsEl = document.getElementById('monitor-alerts');
+
+  dot.className = 'dot ' + (body.running ? 'ok' : '');
+  text.textContent = body.running
+    ? 'Running (task ' + body.taskId + ')'
+    : 'Stopped';
+
+  if (body.lastCycle) {
+    const c = body.lastCycle;
+    cycleEl.innerHTML =
+      '<div class="k">last cycle</div><div class="v">' + c.timestamp + ' — ' + c.outcome
+      + (c.outcome === 'success' ? (c.incidentDetected ? ' — incident detected' : ' — no incident') : ' — ' + c.errorClass) + '</div>';
+  } else {
+    cycleEl.innerHTML = '';
+  }
+
+  alertsEl.innerHTML = '';
+  for (const alert of body.recentAlerts || []) {
+    const div = document.createElement('div');
+    div.className = 'alert-item';
+    div.textContent = alert.timestamp + ' — session ' + alert.alert.sessionId + ' blocked by session '
+      + alert.alert.blockingSessionId + ' on ' + alert.alert.databaseName;
+    alertsEl.appendChild(div);
+  }
+}
+
+async function loadMonitorStatus() {
+  try {
+    const res = await fetch('/api/monitoring/status');
+    const body = await res.json();
+    renderMonitorStatus(body);
+  } catch (e) {
+    document.getElementById('monitor-status-text').textContent = 'Unreachable: ' + e.message;
+  }
+}
+
+async function startMonitoring() {
+  await fetch('/api/monitoring/start', { method: 'POST' });
+  await loadMonitorStatus();
+}
+
+async function stopMonitoring() {
+  await fetch('/api/monitoring/stop', { method: 'POST' });
+  await loadMonitorStatus();
+}
+
+async function getAiRecommendation() {
+  const btn = document.getElementById('recommend-ai-btn');
+  const errorEl = document.getElementById('recommend-ai-error');
+  const confBlock = document.getElementById('confidence-block');
+  const confNumber = document.getElementById('confidence-number');
+  const rootCauseEl = document.getElementById('root-cause-text');
+  const escalationBanner = document.getElementById('escalation-banner');
+  const escalationDetail = document.getElementById('escalation-detail');
+
+  btn.disabled = true;
+  btn.textContent = 'Asking the AI…';
+  errorEl.textContent = '';
+
+  try {
+    const incidentId = 'demo-' + Date.now();
+    const res = await fetch('/api/recommendation?incidentId=' + encodeURIComponent(incidentId));
+    const body = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = body.error + ': ' + body.message;
+      confBlock.style.display = 'none';
+      rootCauseEl.style.display = 'none';
+      escalationBanner.className = 'escalation-banner';
+      return;
+    }
+
+    confBlock.style.display = 'flex';
+    confNumber.textContent = body.confidence + '%';
+    confNumber.className = 'confidence-number ' + (body.confidence < 60 ? 'low' : 'high');
+
+    rootCauseEl.style.display = 'block';
+    rootCauseEl.textContent = body.rootCause;
+
+    if (body.escalation) {
+      escalationBanner.className = 'escalation-banner shown';
+      escalationDetail.textContent = 'Confidence ' + body.escalation.confidence
+        + '% is below the 60% threshold — a real notification was sent at ' + body.escalation.escalatedAt + '.';
+    } else {
+      escalationBanner.className = 'escalation-banner';
+    }
+  } catch (e) {
+    errorEl.textContent = 'Request failed: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Get AI recommendation (SQL Server)';
+  }
+}
+
+document.getElementById('monitor-start-btn').addEventListener('click', startMonitoring);
+document.getElementById('monitor-stop-btn').addEventListener('click', stopMonitoring);
+document.getElementById('recommend-ai-btn').addEventListener('click', getAiRecommendation);
+
 loadHealth();
 loadIncidents();
+loadMonitorStatus();
+monitorPollTimer = setInterval(loadMonitorStatus, 5000);
 </script>
 </body>
 </html>
