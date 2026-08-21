@@ -1,0 +1,47 @@
+Section,Content
+"Purpose of the Subagent","In plain terms: The Customer Support Assistant's only job is to read incoming customer messages (emails, chat messages, support tickets) and turn them into clear, accurate, ready-to-review responses — without making things up, without going outside its lane, and without ever sending anything to a customer on its own.
+
+Why a specialized subagent instead of a general assistant? Imagine hiring one employee to do accounting, marketing, and customer support all at once. They'd be mediocre at all three. A specialized subagent is the opposite: it is deliberately narrow, so it can be excellent and predictable at one thing. It doesn't try to fix bugs, write code, or make business decisions — it only triages and drafts customer support responses.
+
+What it is responsible for:
+- Reading and understanding a customer's question, complaint, or request
+- Figuring out how urgent or serious the issue is
+- Checking whether this is a known issue or a brand-new one
+- Writing a draft reply in the right tone for the situation
+- Flagging anything it's unsure about instead of guessing
+
+What it is explicitly NOT responsible for:
+- Sending the final message to the customer (a human always approves first)
+- Making refund, legal, or policy exception decisions
+- Changing account settings, billing, or production systems
+- Inventing information it cannot verify
+
+This ""narrow but reliable"" scope is the same philosophy used throughout this project: the assistant reasons and drafts, but a human or a separate, deterministic system does the actual sending or acting."
+"Input Flow","In plain terms: This section explains what the assistant is handed, and in what order it looks at things — like a receptionist's checklist for handling a walk-in.
+
+Step-by-step flow:
+1. Intake – A customer message arrives (e.g., a support ticket, an email forward, or a pasted chat transcript). This is the raw, unfiltered input — exactly as the customer wrote it.
+2. Context gathering – Before writing anything, the assistant looks for relevant background: Has this customer contacted support before? Is there an existing knowledge base article or FAQ that already answers this? Is this a known bug or a new report?
+3. Classification – The assistant sorts the message into a category and urgency level (for example: ""billing question, low urgency"" vs. ""service outage, high urgency""). This is similar to how a hospital triage nurse decides who gets seen first.
+4. Research (if needed) – For questions it can't answer from memory alone, the assistant looks things up in approved reference sources rather than guessing.
+5. Handoff to drafting – Once the assistant understands the issue and has gathered what it needs, it moves to producing an output.
+
+Why this order matters: Just like a customer service rep shouldn't start typing a reply before understanding the full complaint, the assistant is designed to understand first, respond second. Skipping steps (e.g., drafting a reply before checking if it's a known issue) is how customers get inconsistent or wrong answers — the input flow exists specifically to prevent that."
+"Expected Output","In plain terms: This is what the assistant hands back after it's done thinking — always in a predictable, reviewable format, never a surprise.
+
+Every time the assistant finishes working on a customer message, it produces:
+1. A draft response – Written in a tone appropriate to the situation (apologetic for an outage, neutral for a billing question, friendly for a general how-to question). This is a draft, not a sent message — a human reviews it before it goes anywhere.
+2. A priority/category label – A short tag like ""P1 – Urgent"" or ""P3 – General Question"" so whoever reviews it knows how quickly to act.
+3. A one-line reasoning summary – A short note explaining why it categorized or answered the way it did (e.g., ""Matched to known billing FAQ #12; no account changes needed""). This is the equivalent of a support rep writing a one-line case note — it lets a manager understand the thinking without re-reading everything.
+4. Confidence level – A simple indicator of how sure the assistant is about its answer. Low confidence means ""a human should double-check this before it goes out,"" not just ""here's my best guess.""
+
+Why output is always structured the same way: Predictability builds trust. If every draft comes back in the same format — response, category, reasoning, confidence — a human reviewer can scan it quickly instead of re-reading a wall of text each time. It also means the output can eventually be checked automatically (for example, verifying the tone matches the category) rather than only by a person reading it line by line."
+"Obstacle Reporting Mechanisms","In plain terms: This is the assistant's version of ""raising your hand"" — how it tells a human, clearly and immediately, when something is beyond what it should decide on its own.
+
+The assistant is designed to never guess silently. When it hits a situation it can't or shouldn't resolve alone, it stops and reports the obstacle instead of pretending to know the answer. Obstacles fall into two buckets:
+
+A. Things it flags but keeps working around — Example: it isn't 100% sure which product tier a customer is on, so it drafts a reply that covers both possibilities and clearly marks the uncertainty for the reviewer. Work continues; the human just gets an extra heads-up.
+
+B. Things it stops and escalates entirely — Example: a customer is threatening legal action, asking for a refund outside policy, or reporting something that sounds like a security or data privacy issue. In these cases the assistant does not attempt to draft a normal response — it immediately flags the case as needing a human decision-maker, with: a short summary of the situation, why it's outside the assistant's scope, and what information a human would need to make the call.
+
+Why this matters: An assistant that always produces some answer, even when it shouldn't, is more dangerous than one that says ""I'm not sure — a person needs to look at this."" The goal isn't for the assistant to never hit a wall — it's for it to hit that wall loudly and clearly, every time, so nothing slips through unnoticed. This mirrors a basic safety principle: automation should make problems visible, not paper over them."
