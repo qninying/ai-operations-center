@@ -2,318 +2,828 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>CoreOps — Live Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CoreOps — AI Operations Center</title>
 <style>
   :root {
     color-scheme: dark;
-    --bg: #0b0e14;
-    --panel: #131826;
-    --border: #232a3d;
-    --text: #e6e9f0;
-    --muted: #8a92a6;
-    --accent: #4f8cff;
-    --ok: #3ddc97;
-    --warn: #f2b84b;
-    --danger: #ff5c6c;
+    --bg: #0a0b0d;
+    --bg-elevated: #131418;
+    --bg-elevated-2: #1a1c22;
+    --border: #23252b;
+    --border-strong: #2f323a;
+    --text: #eef0f3;
+    --text-secondary: #9198a6;
+    --text-tertiary: #656b78;
+    --accent: #5b8cff;
+    --accent-dim: #2a3a63;
+    --success: #34d399;
+    --success-dim: #163629;
+    --warning: #f0b556;
+    --warning-dim: #3a2f16;
+    --danger: #f0576b;
+    --danger-dim: #3a1a20;
+    --radius-lg: 14px;
+    --radius-md: 10px;
+    --radius-sm: 7px;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.24);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   }
+
   * { box-sizing: border-box; }
-  body {
+  ::selection { background: var(--accent-dim); }
+
+  html, body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    padding: 32px;
-  }
-  header { margin-bottom: 24px; }
-  h1 { margin: 0 0 4px; font-size: 22px; }
-  .subtitle { color: var(--muted); font-size: 14px; }
-  .status-line { margin-top: 8px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
-  .dot.ok { background: var(--ok); }
-  .dot.bad { background: var(--danger); }
-  .panel {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 20px;
-  }
-  .panel h2 { margin: 0 0 4px; font-size: 15px; }
-  .panel .desc { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
-  .tag {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 2px 8px;
-    border-radius: 100px;
-    border: 1px solid var(--border);
-    color: var(--muted);
-  }
-  .tag.fallback { color: var(--warn); border-color: var(--warn); }
-  .tag.live { color: var(--ok); border-color: var(--ok); }
-  .row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-top: 14px;
-  }
-  .card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px;
-    font-size: 13px;
-    background: #0f1420;
-  }
-  .card.blocked { border-color: var(--danger); background: #1c1013; }
-  .card .k { color: var(--muted); font-size: 11px; text-transform: uppercase; }
-  .card .v { font-family: ui-monospace, SFMono-Regular, monospace; margin-bottom: 6px; }
-  button.action {
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 10px 16px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  button.action:disabled { opacity: 0.6; cursor: default; }
-  .guardrail-result {
-    margin-top: 16px;
-    padding: 14px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    font-size: 13px;
-    display: none;
-  }
-  .guardrail-result.blocked { display: block; border-color: var(--danger); background: #1c1013; }
-  .guardrail-result.allowed { display: block; border-color: var(--ok); background: #0f1c17; }
-  .verdict { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
-  .verdict.blocked-text { color: var(--danger); }
-  .verdict.allowed-text { color: var(--ok); }
-  .violation {
-    font-family: ui-monospace, SFMono-Regular, monospace;
-    font-size: 12px;
-    color: var(--danger);
-    margin: 2px 0;
-  }
-  footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
-  footer code { color: var(--text); }
-
-  .btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  button.action.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
-  button.action.danger { background: var(--danger); }
-
-  .status-block {
-    margin-top: 14px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 13px;
-    color: var(--muted);
-  }
-  .cycle-block { margin-top: 14px; font-size: 13px; }
-  .cycle-block .k { color: var(--muted); font-size: 11px; text-transform: uppercase; }
-  .cycle-block .v { font-family: ui-monospace, SFMono-Regular, monospace; }
-  .alert-item {
-    border: 1px solid var(--danger);
-    background: #1c1013;
-    border-radius: 8px;
-    padding: 10px 12px;
-    margin-top: 8px;
-    font-size: 12px;
-    font-family: ui-monospace, SFMono-Regular, monospace;
-  }
-
-  .confidence-block {
-    margin-top: 16px;
-    display: flex;
-    align-items: baseline;
-    gap: 14px;
-  }
-  .confidence-number { font-size: 44px; font-weight: 700; font-family: ui-monospace, SFMono-Regular, monospace; }
-  .confidence-number.low { color: var(--danger); }
-  .confidence-number.high { color: var(--ok); }
-  .confidence-label { color: var(--muted); font-size: 13px; }
-  .root-cause {
-    margin-top: 12px;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: #0f1420;
-    font-size: 13px;
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    font-size: 14px;
     line-height: 1.5;
   }
-  .escalation-banner {
-    display: none;
-    margin-top: 16px;
-    padding: 14px;
-    border-radius: 8px;
-    border: 1px solid var(--warn);
-    background: #241c0d;
-    font-size: 13px;
+
+  a { color: inherit; }
+  button { font-family: inherit; }
+
+  /* ---------- focus / accessibility ---------- */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
-  .escalation-banner.shown { display: block; }
-  .escalation-banner .title { font-weight: 700; color: var(--warn); font-size: 14px; margin-bottom: 6px; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+  .skip-link {
+    position: absolute; left: 12px; top: -48px; z-index: 200;
+    background: var(--accent); color: #06122b; padding: 10px 16px;
+    border-radius: var(--radius-sm); font-weight: 600; transition: top 150ms var(--ease);
+  }
+  .skip-link:focus { top: 12px; }
+
+  /* ---------- layout shell ---------- */
+  .app { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 232px;
+    flex-shrink: 0;
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--border);
+    padding: 20px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: width 180ms var(--ease), padding 180ms var(--ease);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .sidebar.collapsed { width: 68px; padding: 20px 10px; }
+  .sidebar.collapsed .nav-label,
+  .sidebar.collapsed .brand-text,
+  .sidebar.collapsed .sidebar-footer-text { display: none; }
+
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 10px 22px;
+    color: var(--text);
+  }
+  .brand-mark {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px; color: #06122b;
+    flex-shrink: 0;
+  }
+  .brand-text { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; white-space: nowrap; }
+
+  .nav-section-label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-tertiary); padding: 14px 10px 6px;
+  }
+  .sidebar.collapsed .nav-section-label { visibility: hidden; height: 8px; padding: 6px 0 0; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13.5px; font-weight: 500;
+    cursor: pointer;
+    border: none; background: none; width: 100%; text-align: left;
+    transition: background 120ms var(--ease), color 120ms var(--ease);
+    white-space: nowrap;
+  }
+  .nav-item:hover { background: var(--bg-elevated-2); color: var(--text); }
+  .nav-item.active { background: var(--accent-dim); color: #cddbff; }
+  .nav-item svg { flex-shrink: 0; width: 17px; height: 17px; opacity: 0.9; }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    color: var(--text-tertiary); font-size: 12px;
+  }
+
+  .collapse-btn {
+    margin-top: 8px;
+    display: flex; align-items: center; gap: 11px;
+    padding: 8px 10px; border-radius: var(--radius-sm);
+    color: var(--text-tertiary); background: none; border: none;
+    cursor: pointer; font-size: 13px; width: 100%;
+  }
+  .collapse-btn:hover { background: var(--bg-elevated-2); color: var(--text-secondary); }
+  .collapse-btn svg { transition: transform 180ms var(--ease); }
+  .sidebar.collapsed .collapse-btn svg { transform: rotate(180deg); }
+
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    height: 56px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .env-pill {
+    display: flex; align-items: center; gap: 7px;
+    padding: 5px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 100px;
+    font-size: 12.5px; font-weight: 500; color: var(--text-secondary);
+    background: var(--bg-elevated-2);
+  }
+  .env-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+
+  .search-trigger {
+    flex: 1; max-width: 420px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+    color: var(--text-tertiary); font-size: 13px;
+    cursor: pointer;
+  }
+  .search-trigger:hover { border-color: var(--border-strong); }
+  .search-trigger kbd {
+    margin-left: auto; font-family: var(--mono); font-size: 11px;
+    background: var(--bg-elevated-2); border: 1px solid var(--border-strong);
+    border-radius: 4px; padding: 1px 5px; color: var(--text-tertiary);
+  }
+
+  .topbar-spacer { flex: 1; }
+
+  .icon-btn {
+    position: relative;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-sm);
+    background: none; border: none; color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--bg-elevated-2); color: var(--text); }
+  .icon-btn .badge {
+    position: absolute; top: 4px; right: 4px;
+    width: 7px; height: 7px; border-radius: 50%; background: var(--danger);
+    border: 1.5px solid var(--bg);
+  }
+
+  .user-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 8px 4px 4px; border-radius: 100px;
+    background: none; border: none; cursor: pointer; color: var(--text);
+  }
+  .user-chip:hover { background: var(--bg-elevated-2); }
+  .avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #8b6bff);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; color: #06122b;
+  }
+
+  /* ---------- content ---------- */
+  .content { padding: 28px 32px 64px; max-width: 1180px; }
+
+  .page-header { margin-bottom: 24px; }
+  .page-title { font-size: 20px; font-weight: 650; letter-spacing: -0.015em; margin: 0 0 4px; }
+  .page-subtitle { color: var(--text-secondary); font-size: 13.5px; margin: 0; max-width: 620px; }
+
+  .system-banner {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 14px; padding: 10px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    font-size: 13px; color: var(--text-secondary);
+  }
+  .system-banner .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .system-banner strong { color: var(--text); font-weight: 600; }
+
+  /* ---------- KPI grid ---------- */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin: 24px 0 32px;
+  }
+  .kpi-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    transition: border-color 150ms var(--ease), transform 150ms var(--ease);
+  }
+  .kpi-card:hover { border-color: var(--border-strong); }
+  .kpi-label {
+    font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-tertiary); margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .kpi-value { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .kpi-value.success { color: var(--success); }
+  .kpi-value.warning { color: var(--warning); }
+  .kpi-value.danger { color: var(--danger); }
+  .kpi-meta { margin-top: 6px; font-size: 12px; color: var(--text-tertiary); }
+  .kpi-skeleton {
+    height: 26px; width: 60%; border-radius: 6px;
+    background: linear-gradient(90deg, var(--bg-elevated-2) 25%, var(--border-strong) 37%, var(--bg-elevated-2) 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+  @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+
+  /* ---------- panels ---------- */
+  .layout-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .layout-grid { grid-template-columns: 1fr; }
+  }
+
+  .panel-stack { display: flex; flex-direction: column; gap: 20px; }
+
+  .panel {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px 22px;
+    scroll-margin-top: 76px;
+  }
+  .panel-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px; margin-bottom: 4px;
+  }
+  .panel-title { font-size: 14.5px; font-weight: 600; letter-spacing: -0.005em; margin: 0; }
+  .panel-desc { color: var(--text-secondary); font-size: 12.5px; margin: 4px 0 0; max-width: 480px; }
+  .panel-body { margin-top: 16px; }
+
+  .tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+    padding: 3px 8px; border-radius: 100px;
+    border: 1px solid var(--border-strong); color: var(--text-tertiary);
+  }
+  .tag.live { color: var(--success); border-color: var(--success-dim); background: var(--success-dim); }
+  .tag.fallback { color: var(--warning); border-color: var(--warning-dim); background: var(--warning-dim); }
+  .tag.danger { color: var(--danger); border-color: var(--danger-dim); background: var(--danger-dim); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 600;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 120ms var(--ease), border-color 120ms var(--ease), transform 120ms var(--ease);
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+  .btn-primary { background: var(--accent); color: #061024; }
+  .btn-primary:hover:not(:disabled) { background: #6f9aff; }
+  .btn-secondary { background: var(--bg-elevated-2); color: var(--text); border-color: var(--border-strong); }
+  .btn-secondary:hover:not(:disabled) { background: #21242b; }
+  .btn-danger { background: var(--danger-dim); color: #ffb3bd; border-color: #4d2129; }
+  .btn-danger:hover:not(:disabled) { background: #4d1e26; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  .status-line { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-tertiary); flex-shrink: 0; }
+  .dot.ok { background: var(--success); box-shadow: 0 0 0 3px var(--success-dim); }
+  .dot.bad { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-dim); }
+  .dot.pending { background: var(--warning); box-shadow: 0 0 0 3px var(--warning-dim); }
+
+  .data-row {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    margin-top: 14px;
+  }
+  .data-cell {
+    border: 1px solid var(--border); border-radius: var(--radius-md);
+    padding: 11px 13px; background: var(--bg);
+  }
+  .data-cell.blocked { border-color: #4d2129; background: var(--danger-dim); }
+  .data-cell .k { font-size: 10.5px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
+  .data-cell .v { font-family: var(--mono); font-size: 13px; margin-top: 3px; }
+
+  .confidence-row { display: flex; align-items: baseline; gap: 12px; margin-top: 4px; }
+  .confidence-number { font-size: 40px; font-weight: 700; font-family: var(--mono); letter-spacing: -0.02em; }
+  .confidence-number.low { color: var(--danger); }
+  .confidence-number.high { color: var(--success); }
+  .confidence-caption { color: var(--text-tertiary); font-size: 12.5px; }
+
+  .root-cause {
+    margin-top: 12px; padding: 13px 15px;
+    border: 1px solid var(--border); border-radius: var(--radius-md);
+    background: var(--bg); font-size: 13px; line-height: 1.6; color: var(--text-secondary);
+  }
+
+  .banner { margin-top: 14px; padding: 12px 15px; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 13px; display: none; }
+  .banner.shown { display: block; }
+  .banner.escalation { border-color: var(--warning-dim); background: var(--warning-dim); }
+  .banner.escalation .banner-title { color: var(--warning); font-weight: 600; margin-bottom: 4px; }
+  .banner.error { border-color: #4d2129; background: var(--danger-dim); color: #ffb3bd; }
+  .banner.allowed { border-color: var(--success-dim); background: var(--success-dim); }
+  .banner.allowed .banner-title { color: var(--success); font-weight: 600; margin-bottom: 4px; }
+  .banner.blocked { border-color: #4d2129; background: var(--danger-dim); }
+  .banner.blocked .banner-title { color: var(--danger); font-weight: 600; margin-bottom: 4px; }
+  .violation { font-family: var(--mono); font-size: 12px; color: #ffb3bd; margin: 2px 0; }
+
+  .field-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .field-group select {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius-sm); padding: 7px 10px; font-size: 12.5px; font-family: inherit;
+  }
+
+  /* ---------- activity feed ---------- */
+  .activity-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+  .activity-item {
+    display: flex; gap: 10px; padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+  }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .activity-dot.success { background: var(--success); }
+  .activity-dot.warning { background: var(--warning); }
+  .activity-dot.danger { background: var(--danger); }
+  .activity-dot.neutral { background: var(--text-tertiary); }
+  .activity-text { color: var(--text-secondary); }
+  .activity-text strong { color: var(--text); font-weight: 500; }
+  .activity-time { color: var(--text-tertiary); font-size: 11px; margin-top: 2px; }
+  .empty-state { color: var(--text-tertiary); font-size: 13px; padding: 8px 0; }
+
+  footer.page-footer {
+    color: var(--text-tertiary); font-size: 12px; margin-top: 8px;
+    padding-top: 20px; border-top: 1px solid var(--border);
+  }
+  footer.page-footer code { color: var(--text-secondary); font-family: var(--mono); }
+
+  /* ---------- command palette ---------- */
+  .cmdk-overlay {
+    position: fixed; inset: 0; background: rgba(6, 7, 9, 0.6);
+    display: none; align-items: flex-start; justify-content: center;
+    padding-top: 12vh; z-index: 100;
+    backdrop-filter: blur(2px);
+  }
+  .cmdk-overlay.open { display: flex; }
+  .cmdk-box {
+    width: 100%; max-width: 560px;
+    background: var(--bg-elevated-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .cmdk-input-row { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .cmdk-input-row input {
+    flex: 1; background: none; border: none; color: var(--text); font-size: 14.5px; font-family: inherit;
+  }
+  .cmdk-input-row input:focus { outline: none; }
+  .cmdk-list { max-height: 320px; overflow-y: auto; padding: 8px; }
+  .cmdk-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 12px; border-radius: var(--radius-sm);
+    font-size: 13.5px; cursor: pointer; color: var(--text);
+  }
+  .cmdk-item.active-option { background: var(--accent-dim); }
+  .cmdk-item .cmdk-hint { color: var(--text-tertiary); font-size: 11.5px; }
+  .cmdk-empty { padding: 24px 16px; text-align: center; color: var(--text-tertiary); font-size: 13px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
 </style>
 </head>
 <body>
-  <header>
-    <h1>CoreOps — Live Demo</h1>
-    <div class="subtitle">Walking skeleton. Every number on this page is real output from real, tested code — nothing here is staged.</div>
-    <div class="status-line"><span class="dot" id="health-dot"></span><span id="health-text">Checking service health…</span></div>
-  </header>
+<a href="#main-content" class="skip-link">Skip to content</a>
 
-  <section class="panel">
-    <h2>Live incidents — <code>sys.dm_exec_requests</code></h2>
-    <div class="desc">Read via the MCP Tool Gateway's <code>read_sql_server_dmv</code> tool (R2/R3). Source tag tells you honestly whether this is a live query or fixture fallback.</div>
-    <div id="dmv-status">Loading…</div>
-    <div class="row" id="dmv-rows"></div>
-  </section>
-
-  <section class="panel">
-    <h2>Continuous monitoring — <code>monitoringService.ts</code></h2>
-    <div class="desc">Polls <code>sys.dm_exec_requests</code> on a real interval and alerts on any real blocking session it finds. Start this before triggering a blocking scenario.</div>
-    <div class="btn-row">
-      <button class="action" id="monitor-start-btn">Start monitoring</button>
-      <button class="action secondary" id="monitor-stop-btn">Stop monitoring</button>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">C</div>
+      <div class="brand-text">CoreOps</div>
     </div>
-    <div class="status-block"><span class="dot" id="monitor-dot"></span><span id="monitor-status-text">Checking…</span></div>
-    <div class="cycle-block" id="monitor-cycle"></div>
-    <div id="monitor-alerts"></div>
-  </section>
 
-  <section class="panel">
-    <h2>AI recommendation &amp; escalation</h2>
-    <div class="desc">A real Claude call over real DMV evidence. The confidence score is the AI's own — not a guess dressed up as one. Below 60%, the system escalates and a real push notification is sent.</div>
-    <div class="btn-row">
-      <button class="action" id="recommend-ai-btn">Get AI recommendation (SQL Server)</button>
-    </div>
-    <div id="recommend-ai-error"></div>
-    <div class="confidence-block" id="confidence-block" style="display:none;">
-      <div class="confidence-number" id="confidence-number">—</div>
-      <div class="confidence-label">confidence</div>
-    </div>
-    <div class="root-cause" id="root-cause-text" style="display:none;"></div>
-    <div class="escalation-banner" id="escalation-banner">
-      <div class="title">Escalated to a human operator</div>
-      <div id="escalation-detail"></div>
-    </div>
-  </section>
+    <div class="nav-section-label">Platform</div>
+    <a class="nav-item active" href="#overview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      <span class="nav-label">Overview</span>
+    </a>
+    <a class="nav-item" href="#monitoring">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+      <span class="nav-label">Monitoring</span>
+    </a>
+    <a class="nav-item" href="#incidents">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01M10.3 3.9 2.7 17.5a1.8 1.8 0 0 0 1.6 2.7h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0Z"/></svg>
+      <span class="nav-label">Incidents</span>
+    </a>
+    <a class="nav-item" href="#recommendation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v2M12 19v2M5 5l1.4 1.4M17.6 17.6 19 19M3 12h2M19 12h2M5 19l1.4-1.4M17.6 6.4 19 5"/><circle cx="12" cy="12" r="4"/></svg>
+      <span class="nav-label">AI Recommendation</span>
+    </a>
+    <a class="nav-item" href="#guardrail">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 4 6v6c0 4.4 3.4 8.4 8 9 4.6-.6 8-4.6 8-9V6l-8-3Z"/></svg>
+      <span class="nav-label">Guardrail</span>
+    </a>
 
-  <section class="panel">
-    <h2>Proposed remediation</h2>
-    <div class="desc">A recommendation that's evidence-linked and of a valid, reversible action type — missing only human approval. Watch it get blocked anyway.</div>
-    <button class="action" id="recommend-btn">Recommend: restart_service on prod-app-server-03</button>
-    <div class="guardrail-result" id="guardrail-result"></div>
-  </section>
+    <div class="sidebar-footer">
+      <span class="icon-btn" style="width:auto;height:auto;padding:0;color:var(--text-tertiary);cursor:default;" title="mcp-server/src/httpServer.ts">
+        <span class="sidebar-footer-text">v0.1.0 · local</span>
+      </span>
+    </div>
+    <button class="collapse-btn" id="collapse-btn" aria-label="Collapse sidebar">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      <span class="nav-label">Collapse</span>
+    </button>
+  </aside>
 
-  <footer>
-    CoreOps MCP Tool Gateway · <code>mcp-server/src/httpServer.ts</code> · guardrail from <code>guardrails/remediationGuardrail.ts</code>
-  </footer>
+  <div class="main">
+    <header class="topbar">
+      <div class="env-pill"><span class="env-dot"></span>coreops-demo</div>
+      <button class="search-trigger" id="search-trigger" aria-haspopup="dialog">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>Search actions…</span>
+        <kbd>⌘K</kbd>
+      </button>
+      <div class="topbar-spacer"></div>
+      <button class="icon-btn" id="notif-btn" aria-label="Notifications — jump to recent activity">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="badge" id="notif-badge" style="display:none;"></span>
+      </button>
+      <span class="user-chip" style="cursor:default;" title="Quincy Ninying">
+        <div class="avatar">QN</div>
+      </span>
+    </header>
+
+    <main class="content" id="main-content">
+      <div class="page-header" id="overview">
+        <h1 class="page-title">Overview</h1>
+        <p class="page-subtitle">Every number on this page is real output from real, tested code against a live Azure SQL Database and Blob Storage account — nothing here is staged.</p>
+        <div class="system-banner" id="system-banner">
+          <span class="status-dot" id="system-banner-dot"></span>
+          <span id="system-banner-text">Checking platform health…</span>
+        </div>
+      </div>
+
+      <section class="kpi-grid" aria-label="Key metrics">
+        <div class="kpi-card">
+          <div class="kpi-label">System health</div>
+          <div class="kpi-value" id="kpi-health"><div class="kpi-skeleton"></div></div>
+          <div class="kpi-meta" id="kpi-health-meta">&nbsp;</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Monitoring</div>
+          <div class="kpi-value" id="kpi-monitoring"><div class="kpi-skeleton"></div></div>
+          <div class="kpi-meta" id="kpi-monitoring-meta">&nbsp;</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Active sessions</div>
+          <div class="kpi-value" id="kpi-sessions"><div class="kpi-skeleton"></div></div>
+          <div class="kpi-meta" id="kpi-sessions-meta">&nbsp;</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Recent alerts</div>
+          <div class="kpi-value" id="kpi-alerts"><div class="kpi-skeleton"></div></div>
+          <div class="kpi-meta" id="kpi-alerts-meta">&nbsp;</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Last confidence</div>
+          <div class="kpi-value" id="kpi-confidence">—</div>
+          <div class="kpi-meta" id="kpi-confidence-meta">No recommendation requested yet</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Escalations</div>
+          <div class="kpi-value" id="kpi-escalation">—</div>
+          <div class="kpi-meta" id="kpi-escalation-meta">No recommendation requested yet</div>
+        </div>
+      </section>
+
+      <div class="layout-grid">
+        <div class="panel-stack">
+
+          <section class="panel" id="monitoring">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Continuous monitoring</h2>
+                <p class="panel-desc">Polls <code style="font-family:var(--mono);">sys.dm_exec_requests</code> on a real interval and alerts on any real blocking session it finds. <code style="font-family:var(--mono);">mcp-server/src/monitoringService.ts</code></p>
+              </div>
+              <span class="tag" id="monitor-tag">stopped</span>
+            </div>
+            <div class="panel-body">
+              <div class="btn-row">
+                <button class="btn btn-primary" id="monitor-start-btn">Start monitoring</button>
+                <button class="btn btn-secondary" id="monitor-stop-btn">Stop monitoring</button>
+                <button class="btn btn-danger" id="monitor-rollback-btn" disabled>Roll back this session</button>
+              </div>
+              <div class="status-line" style="margin-top:14px;"><span class="dot" id="monitor-dot"></span><span id="monitor-status-text">Checking…</span></div>
+              <div class="data-row" id="monitor-cycle-row" style="display:none;">
+                <div class="data-cell">
+                  <div class="k">Last cycle</div>
+                  <div class="v" id="monitor-cycle-time">—</div>
+                </div>
+                <div class="data-cell">
+                  <div class="k">Outcome</div>
+                  <div class="v" id="monitor-cycle-outcome">—</div>
+                </div>
+                <div class="data-cell">
+                  <div class="k">Rows observed</div>
+                  <div class="v" id="monitor-cycle-rows">—</div>
+                </div>
+              </div>
+              <div id="monitor-alerts" style="margin-top:10px;"></div>
+              <div class="banner" id="rollback-banner"></div>
+            </div>
+          </section>
+
+          <section class="panel" id="incidents">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Live incidents</h2>
+                <p class="panel-desc">Read via the MCP Tool Gateway's <code style="font-family:var(--mono);">read_sql_server_dmv</code> tool. Source tag tells you honestly whether this is a live query or fixture fallback.</p>
+              </div>
+              <span class="tag" id="dmv-tag">loading</span>
+            </div>
+            <div class="panel-body">
+              <div id="dmv-status" class="status-line">Loading…</div>
+              <div class="data-row" id="dmv-rows"></div>
+            </div>
+          </section>
+
+          <section class="panel" id="recommendation">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">AI recommendation &amp; escalation</h2>
+                <p class="panel-desc">A real Claude call over real DMV evidence. Below 60% confidence, the system escalates and a real push notification is sent to the on-call operator.</p>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="field-group">
+                <select id="source-select" aria-label="Data source">
+                  <option value="sql">SQL Server</option>
+                  <option value="cloud">Cloud service (Blob Storage)</option>
+                </select>
+                <button class="btn btn-primary" id="recommend-ai-btn">Get AI recommendation</button>
+              </div>
+              <div class="banner error" id="recommend-ai-error-banner"></div>
+              <div class="confidence-row" id="confidence-block" style="display:none;">
+                <div class="confidence-number" id="confidence-number">—</div>
+                <div class="confidence-caption">confidence</div>
+              </div>
+              <div class="root-cause" id="root-cause-text" style="display:none;"></div>
+              <div class="banner escalation" id="escalation-banner">
+                <div class="banner-title">Escalated to a human operator</div>
+                <div id="escalation-detail"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" id="guardrail">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Remediation guardrail</h2>
+                <p class="panel-desc">A recommendation that's evidence-linked and of a valid, reversible action type — missing only human approval. <code style="font-family:var(--mono);">guardrails/remediationGuardrail.ts</code></p>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="btn-row">
+                <button class="btn btn-secondary" id="recommend-btn">Propose: restart_service on prod-app-server-03</button>
+              </div>
+              <div class="banner" id="guardrail-result"></div>
+            </div>
+          </section>
+
+          <footer class="page-footer">
+            CoreOps MCP Tool Gateway · <code>mcp-server/src/httpServer.ts</code> · guardrail from <code>guardrails/remediationGuardrail.ts</code>
+          </footer>
+        </div>
+
+        <aside class="panel-stack">
+          <section class="panel" id="activity-panel" tabindex="-1">
+            <div class="panel-head">
+              <h2 class="panel-title">Recent activity</h2>
+            </div>
+            <div class="panel-body">
+              <div class="activity-list" id="activity-list">
+                <div class="empty-state">No activity yet this session.</div>
+              </div>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="cmdk-overlay" id="cmdk-overlay" role="dialog" aria-modal="true" aria-label="Command palette">
+  <div class="cmdk-box">
+    <div class="cmdk-input-row">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-tertiary);flex-shrink:0;"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="cmdk-input" placeholder="Run a command or jump to a section…" autocomplete="off" />
+    </div>
+    <div class="cmdk-list" id="cmdk-list"></div>
+  </div>
+</div>
 
 <script>
+const $ = (id) => document.getElementById(id);
+const activityLog = [];
+
+function pushActivity(kind, html) {
+  activityLog.unshift({ kind, html, at: new Date() });
+  if (activityLog.length > 12) activityLog.pop();
+  renderActivity();
+}
+
+function renderActivity() {
+  const el = $('activity-list');
+  if (activityLog.length === 0) {
+    el.innerHTML = '<div class="empty-state">No activity yet this session.</div>';
+    return;
+  }
+  el.innerHTML = activityLog.map(item => `
+    <div class="activity-item">
+      <div class="activity-dot ${item.kind}"></div>
+      <div>
+        <div class="activity-text">${item.html}</div>
+        <div class="activity-time">${item.at.toLocaleTimeString()}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ---------- sidebar collapse ---------- */
+$('collapse-btn').addEventListener('click', () => {
+  $('sidebar').classList.toggle('collapsed');
+});
+
+/* ---------- nav active state on scroll ---------- */
+const navItems = Array.from(document.querySelectorAll('.nav-item'));
+navItems.forEach(item => {
+  item.addEventListener('click', (e) => {
+    navItems.forEach(n => n.classList.remove('active'));
+    item.classList.add('active');
+  });
+});
+
+/* ---------- system health ---------- */
+let lastKnownHealthy = null;
+
 async function loadHealth() {
-  const dot = document.getElementById('health-dot');
-  const text = document.getElementById('health-text');
+  const bannerDot = $('system-banner-dot');
+  const bannerText = $('system-banner-text');
+  const kpiHealth = $('kpi-health');
+  const kpiHealthMeta = $('kpi-health-meta');
   try {
     const res = await fetch('/health');
     const body = await res.json();
-    dot.className = 'dot ok';
-    text.textContent = 'Service: ' + body.status;
+    const healthy = body.status === 'ok';
+    bannerDot.style.background = healthy ? 'var(--success)' : 'var(--danger)';
+    bannerText.innerHTML = healthy ? '<strong>All systems operational.</strong> Gateway reachable, real backend behind every panel below.' : 'Gateway unreachable.';
+    kpiHealth.textContent = healthy ? 'Healthy' : 'Down';
+    kpiHealth.className = 'kpi-value ' + (healthy ? 'success' : 'danger');
+    kpiHealthMeta.textContent = 'mcp-server/src/httpServer.ts';
+    if (lastKnownHealthy === false && healthy) {
+      pushActivity('success', '<strong>Gateway</strong> back online');
+    }
+    lastKnownHealthy = healthy;
   } catch (e) {
-    dot.className = 'dot bad';
-    text.textContent = 'Service unreachable';
+    bannerDot.style.background = 'var(--danger)';
+    bannerText.textContent = 'Gateway unreachable: ' + e.message;
+    kpiHealth.textContent = 'Down';
+    kpiHealth.className = 'kpi-value danger';
+    kpiHealthMeta.textContent = 'Connection failed';
   }
 }
 
+/* ---------- DMV incidents ---------- */
 async function loadIncidents() {
-  const statusEl = document.getElementById('dmv-status');
-  const rowsEl = document.getElementById('dmv-rows');
+  const statusEl = $('dmv-status');
+  const rowsEl = $('dmv-rows');
+  const tagEl = $('dmv-tag');
+  const kpiSessions = $('kpi-sessions');
+  const kpiSessionsMeta = $('kpi-sessions-meta');
   try {
     const res = await fetch('/dmv/exec-requests');
     const body = await res.json();
-    const tagClass = body.source === 'live' ? 'live' : 'fallback';
-    statusEl.innerHTML = 'Source: <span class="tag ' + tagClass + '">' + body.source + '</span>'
-      + (body.message ? ' — ' + body.message : '');
+    const isLive = body.source === 'live';
+    tagEl.textContent = body.source;
+    tagEl.className = 'tag ' + (isLive ? 'live' : 'fallback');
+    statusEl.innerHTML = (body.message ? body.message : (body.rows.length + ' session(s) observed'));
+
+    const blockedCount = body.rows.filter(r => r.blocking_session_id && r.blocking_session_id !== 0).length;
+    kpiSessions.textContent = String(body.rows.length);
+    kpiSessions.className = 'kpi-value' + (blockedCount > 0 ? ' danger' : '');
+    kpiSessionsMeta.textContent = blockedCount > 0 ? blockedCount + ' blocked' : 'none blocked';
 
     rowsEl.innerHTML = '';
     for (const row of body.rows) {
       const blocked = row.blocking_session_id && row.blocking_session_id !== 0;
-      const card = document.createElement('div');
-      card.className = 'card' + (blocked ? ' blocked' : '');
-      card.innerHTML =
-        '<div class="k">session</div><div class="v">' + row.session_id + '</div>' +
-        '<div class="k">status</div><div class="v">' + row.status + '</div>' +
-        '<div class="k">wait_type</div><div class="v">' + (row.wait_type ?? '—') + '</div>' +
-        '<div class="k">blocked_by</div><div class="v">' + (blocked ? row.blocking_session_id : '—') + '</div>';
-      rowsEl.appendChild(card);
+      const cell = document.createElement('div');
+      cell.className = 'data-cell' + (blocked ? ' blocked' : '');
+      cell.innerHTML =
+        '<div class="k">session ' + row.session_id + '</div>' +
+        '<div class="v">' + row.status + (row.wait_type ? ' · ' + row.wait_type : '') + '</div>' +
+        (blocked ? '<div class="v" style="color:var(--danger);margin-top:2px;">blocked by ' + row.blocking_session_id + '</div>' : '');
+      rowsEl.appendChild(cell);
     }
   } catch (e) {
     statusEl.textContent = 'Failed to load: ' + e.message;
+    tagEl.textContent = 'error';
+    tagEl.className = 'tag danger';
   }
 }
 
-async function recommendRemediation() {
-  const btn = document.getElementById('recommend-btn');
-  const resultEl = document.getElementById('guardrail-result');
-  btn.disabled = true;
-  btn.textContent = 'Checking guardrail…';
-
-  try {
-    const res = await fetch('/guardrail/check-demo', { method: 'POST' });
-    const body = await res.json();
-    const allowed = body.result.allowed;
-
-    resultEl.className = 'guardrail-result ' + (allowed ? 'allowed' : 'blocked');
-    let html = '<div class="verdict ' + (allowed ? 'allowed-text' : 'blocked-text') + '">'
-      + (allowed ? 'ALLOWED' : 'BLOCKED') + '</div>';
-    if (!allowed) {
-      for (const v of body.result.violations) {
-        html += '<div class="violation">' + v + '</div>';
-      }
-    }
-    resultEl.innerHTML = html;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Recommend: restart_service on prod-app-server-03';
-  }
-}
-
-document.getElementById('recommend-btn').addEventListener('click', recommendRemediation);
-
-let monitorPollTimer = null;
+/* ---------- monitoring ---------- */
+let lastMonitorRunning = null;
+let currentTaskId = null;
 
 function renderMonitorStatus(body) {
-  const dot = document.getElementById('monitor-dot');
-  const text = document.getElementById('monitor-status-text');
-  const cycleEl = document.getElementById('monitor-cycle');
-  const alertsEl = document.getElementById('monitor-alerts');
+  const dot = $('monitor-dot');
+  const text = $('monitor-status-text');
+  const tag = $('monitor-tag');
+  const cycleRow = $('monitor-cycle-row');
+  const cycleTime = $('monitor-cycle-time');
+  const cycleOutcome = $('monitor-cycle-outcome');
+  const cycleRows = $('monitor-cycle-rows');
+  const alertsEl = $('monitor-alerts');
+  const kpiMonitoring = $('kpi-monitoring');
+  const kpiMonitoringMeta = $('kpi-monitoring-meta');
+  const kpiAlerts = $('kpi-alerts');
+  const kpiAlertsMeta = $('kpi-alerts-meta');
+  const rollbackBtn = $('monitor-rollback-btn');
 
+  currentTaskId = body.taskId;
   dot.className = 'dot ' + (body.running ? 'ok' : '');
-  text.textContent = body.running
-    ? 'Running (task ' + body.taskId + ')'
-    : 'Stopped';
+  text.textContent = body.running ? 'Running · task ' + body.taskId.slice(0, 8) : 'Stopped';
+  tag.textContent = body.running ? 'running' : 'stopped';
+  tag.className = 'tag ' + (body.running ? 'live' : '');
+
+  kpiMonitoring.textContent = body.running ? 'Active' : 'Stopped';
+  kpiMonitoring.className = 'kpi-value' + (body.running ? ' success' : '');
+  kpiMonitoringMeta.textContent = body.running ? 'polling every 10s' : 'not polling';
+
+  rollbackBtn.disabled = !body.running;
 
   if (body.lastCycle) {
+    cycleRow.style.display = 'grid';
     const c = body.lastCycle;
-    cycleEl.innerHTML =
-      '<div class="k">last cycle</div><div class="v">' + c.timestamp + ' — ' + c.outcome
-      + (c.outcome === 'success' ? (c.incidentDetected ? ' — incident detected' : ' — no incident') : ' — ' + c.errorClass) + '</div>';
-  } else {
-    cycleEl.innerHTML = '';
+    cycleTime.textContent = new Date(c.timestamp).toLocaleTimeString();
+    cycleOutcome.textContent = c.outcome === 'success' ? (c.incidentDetected ? 'incident detected' : 'no incident') : c.errorClass;
+    cycleRows.textContent = c.rowCount != null ? String(c.rowCount) : '—';
   }
 
+  const alerts = body.recentAlerts || [];
+  kpiAlerts.textContent = String(alerts.length);
+  kpiAlerts.className = 'kpi-value' + (alerts.length > 0 ? ' warning' : '');
+  kpiAlertsMeta.textContent = alerts.length > 0 ? 'since monitoring started' : 'none yet';
+
   alertsEl.innerHTML = '';
-  for (const alert of body.recentAlerts || []) {
+  for (const item of alerts.slice(0, 3)) {
     const div = document.createElement('div');
-    div.className = 'alert-item';
-    div.textContent = alert.timestamp + ' — session ' + alert.alert.sessionId + ' blocked by session '
-      + alert.alert.blockingSessionId + ' on ' + alert.alert.databaseName;
+    div.className = 'data-cell';
+    div.style.marginTop = '8px';
+    div.style.borderColor = '#4d2129';
+    div.style.background = 'var(--danger-dim)';
+    div.innerHTML = '<div class="v">Session ' + item.alert.sessionId + ' blocked by session ' + item.alert.blockingSessionId + ' on ' + item.alert.databaseName + '</div>';
     alertsEl.appendChild(div);
   }
+
+  if (lastMonitorRunning !== null && lastMonitorRunning !== body.running) {
+    pushActivity(body.running ? 'success' : 'neutral', body.running ? '<strong>Monitoring</strong> started' : '<strong>Monitoring</strong> stopped');
+  }
+  lastMonitorRunning = body.running;
 }
 
 async function loadMonitorStatus() {
@@ -322,7 +832,7 @@ async function loadMonitorStatus() {
     const body = await res.json();
     renderMonitorStatus(body);
   } catch (e) {
-    document.getElementById('monitor-status-text').textContent = 'Unreachable: ' + e.message;
+    $('monitor-status-text').textContent = 'Unreachable: ' + e.message;
   }
 }
 
@@ -330,68 +840,218 @@ async function startMonitoring() {
   await fetch('/api/monitoring/start', { method: 'POST' });
   await loadMonitorStatus();
 }
-
 async function stopMonitoring() {
   await fetch('/api/monitoring/stop', { method: 'POST' });
   await loadMonitorStatus();
 }
 
+async function rollbackMonitoring() {
+  const banner = $('rollback-banner');
+  const btn = $('monitor-rollback-btn');
+  if (!currentTaskId) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/rollback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId: currentTaskId, taskType: 'start_monitoring', actor: 'quincy', role: 'system_administrator' }),
+    });
+    const body = await res.json();
+    if (res.ok) {
+      banner.className = 'banner allowed shown';
+      banner.innerHTML = '<div class="banner-title">Rolled back</div>Task ' + body.taskId.slice(0, 8) + ' reverted at ' + new Date(body.revertedAt).toLocaleTimeString() + '.';
+      pushActivity('warning', '<strong>Rollback</strong> reverted monitoring task');
+    } else {
+      banner.className = 'banner error shown';
+      banner.textContent = body.error + ': ' + body.message;
+    }
+  } catch (e) {
+    banner.className = 'banner error shown';
+    banner.textContent = 'Request failed: ' + e.message;
+  } finally {
+    await loadMonitorStatus();
+  }
+}
+
+/* ---------- AI recommendation ---------- */
 async function getAiRecommendation() {
-  const btn = document.getElementById('recommend-ai-btn');
-  const errorEl = document.getElementById('recommend-ai-error');
-  const confBlock = document.getElementById('confidence-block');
-  const confNumber = document.getElementById('confidence-number');
-  const rootCauseEl = document.getElementById('root-cause-text');
-  const escalationBanner = document.getElementById('escalation-banner');
-  const escalationDetail = document.getElementById('escalation-detail');
+  const btn = $('recommend-ai-btn');
+  const errorBanner = $('recommend-ai-error-banner');
+  const confBlock = $('confidence-block');
+  const confNumber = $('confidence-number');
+  const rootCauseEl = $('root-cause-text');
+  const escalationBanner = $('escalation-banner');
+  const escalationDetail = $('escalation-detail');
+  const source = $('source-select').value;
+  const kpiConfidence = $('kpi-confidence');
+  const kpiConfidenceMeta = $('kpi-confidence-meta');
+  const kpiEscalation = $('kpi-escalation');
+  const kpiEscalationMeta = $('kpi-escalation-meta');
 
   btn.disabled = true;
   btn.textContent = 'Asking the AI…';
-  errorEl.textContent = '';
+  errorBanner.className = 'banner error';
+  escalationBanner.className = 'banner escalation';
 
   try {
     const incidentId = 'demo-' + Date.now();
-    const res = await fetch('/api/recommendation?incidentId=' + encodeURIComponent(incidentId));
+    const path = source === 'cloud' ? '/api/cloud-recommendation' : '/api/recommendation';
+    const res = await fetch(path + '?incidentId=' + encodeURIComponent(incidentId));
     const body = await res.json();
 
     if (!res.ok) {
-      errorEl.textContent = body.error + ': ' + body.message;
+      errorBanner.className = 'banner error shown';
+      errorBanner.textContent = body.error + ': ' + body.message;
       confBlock.style.display = 'none';
       rootCauseEl.style.display = 'none';
-      escalationBanner.className = 'escalation-banner';
+      pushActivity('danger', '<strong>Recommendation</strong> failed — ' + body.error);
       return;
     }
 
     confBlock.style.display = 'flex';
     confNumber.textContent = body.confidence + '%';
     confNumber.className = 'confidence-number ' + (body.confidence < 60 ? 'low' : 'high');
-
     rootCauseEl.style.display = 'block';
     rootCauseEl.textContent = body.rootCause;
 
+    kpiConfidence.textContent = body.confidence + '%';
+    kpiConfidence.className = 'kpi-value ' + (body.confidence < 60 ? 'danger' : 'success');
+    kpiConfidenceMeta.textContent = 'incident ' + incidentId.slice(-6);
+
     if (body.escalation) {
-      escalationBanner.className = 'escalation-banner shown';
-      escalationDetail.textContent = 'Confidence ' + body.escalation.confidence
-        + '% is below the 60% threshold — a real notification was sent at ' + body.escalation.escalatedAt + '.';
+      escalationBanner.className = 'banner escalation shown';
+      escalationDetail.textContent = 'Confidence ' + body.escalation.confidence + '% is below the 60% threshold — a real notification was sent at ' + new Date(body.escalation.escalatedAt).toLocaleTimeString() + '.';
+      kpiEscalation.textContent = 'Yes';
+      kpiEscalation.className = 'kpi-value warning';
+      kpiEscalationMeta.textContent = 'notification sent';
+      pushActivity('warning', '<strong>Escalated</strong> — confidence ' + body.confidence + '%, operator notified');
     } else {
-      escalationBanner.className = 'escalation-banner';
+      kpiEscalation.textContent = 'No';
+      kpiEscalation.className = 'kpi-value success';
+      kpiEscalationMeta.textContent = 'confidence above threshold';
+      pushActivity('success', '<strong>Recommendation</strong> generated — ' + body.confidence + '% confidence');
     }
   } catch (e) {
-    errorEl.textContent = 'Request failed: ' + e.message;
+    errorBanner.className = 'banner error shown';
+    errorBanner.textContent = 'Request failed: ' + e.message;
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Get AI recommendation (SQL Server)';
+    btn.textContent = 'Get AI recommendation';
   }
 }
 
-document.getElementById('monitor-start-btn').addEventListener('click', startMonitoring);
-document.getElementById('monitor-stop-btn').addEventListener('click', stopMonitoring);
-document.getElementById('recommend-ai-btn').addEventListener('click', getAiRecommendation);
+/* ---------- guardrail demo ---------- */
+async function recommendRemediation() {
+  const btn = $('recommend-btn');
+  const resultEl = $('guardrail-result');
+  btn.disabled = true;
+  btn.textContent = 'Checking guardrail…';
+  try {
+    const res = await fetch('/guardrail/check-demo', { method: 'POST' });
+    const body = await res.json();
+    const allowed = body.result.allowed;
+    resultEl.className = 'banner shown ' + (allowed ? 'allowed' : 'blocked');
+    let html = '<div class="banner-title">' + (allowed ? 'Allowed' : 'Blocked') + '</div>';
+    if (!allowed) {
+      for (const v of body.result.violations) html += '<div class="violation">' + v + '</div>';
+    }
+    resultEl.innerHTML = html;
+    pushActivity(allowed ? 'success' : 'danger', '<strong>Guardrail</strong> ' + (allowed ? 'allowed' : 'blocked') + ' restart_service');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Propose: restart_service on prod-app-server-03';
+  }
+}
 
+/* ---------- notifications (real alerts, repurposed) ---------- */
+async function refreshNotifBadge() {
+  try {
+    const res = await fetch('/api/monitoring/status');
+    const body = await res.json();
+    $('notif-badge').style.display = (body.recentAlerts || []).length > 0 ? 'block' : 'none';
+  } catch (e) { /* silent — badge just stays hidden */ }
+}
+
+/* ---------- command palette ---------- */
+const commands = [
+  { label: 'Start monitoring', hint: 'POST /api/monitoring/start', run: startMonitoring },
+  { label: 'Stop monitoring', hint: 'POST /api/monitoring/stop', run: stopMonitoring },
+  { label: 'Get AI recommendation', hint: 'GET /api/recommendation', run: getAiRecommendation },
+  { label: 'Run guardrail check', hint: 'POST /guardrail/check-demo', run: recommendRemediation },
+  { label: 'Roll back this session', hint: 'POST /api/rollback', run: rollbackMonitoring },
+  { label: 'Jump to Overview', hint: '#overview', run: () => location.hash = '#overview' },
+  { label: 'Jump to Monitoring', hint: '#monitoring', run: () => location.hash = '#monitoring' },
+  { label: 'Jump to Incidents', hint: '#incidents', run: () => location.hash = '#incidents' },
+  { label: 'Jump to AI Recommendation', hint: '#recommendation', run: () => location.hash = '#recommendation' },
+  { label: 'Jump to Guardrail', hint: '#guardrail', run: () => location.hash = '#guardrail' },
+  { label: 'Refresh all data', hint: 'reload live data', run: () => { loadHealth(); loadIncidents(); loadMonitorStatus(); } },
+];
+let cmdkActiveIndex = 0;
+
+function openCmdk() {
+  $('cmdk-overlay').classList.add('open');
+  $('cmdk-input').value = '';
+  renderCmdkList('');
+  $('cmdk-input').focus();
+}
+function closeCmdk() {
+  $('cmdk-overlay').classList.remove('open');
+}
+function renderCmdkList(query) {
+  const list = $('cmdk-list');
+  const filtered = commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase()));
+  cmdkActiveIndex = 0;
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="cmdk-empty">No matching commands.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map((c, i) =>
+    `<div class="cmdk-item${i === 0 ? ' active-option' : ''}" data-index="${i}">
+       <span>${c.label}</span><span class="cmdk-hint">${c.hint}</span>
+     </div>`
+  ).join('');
+  list.querySelectorAll('.cmdk-item').forEach((el, i) => {
+    el.addEventListener('click', () => { filtered[i].run(); closeCmdk(); });
+  });
+  renderCmdkList._filtered = filtered;
+}
+
+$('search-trigger').addEventListener('click', openCmdk);
+$('cmdk-overlay').addEventListener('click', (e) => { if (e.target.id === 'cmdk-overlay') closeCmdk(); });
+$('cmdk-input').addEventListener('input', (e) => renderCmdkList(e.target.value));
+$('cmdk-input').addEventListener('keydown', (e) => {
+  const filtered = renderCmdkList._filtered || [];
+  if (e.key === 'Escape') { closeCmdk(); return; }
+  if (e.key === 'Enter' && filtered[cmdkActiveIndex]) { filtered[cmdkActiveIndex].run(); closeCmdk(); return; }
+  if (e.key === 'ArrowDown') { e.preventDefault(); cmdkActiveIndex = Math.min(cmdkActiveIndex + 1, filtered.length - 1); highlightCmdk(); }
+  if (e.key === 'ArrowUp') { e.preventDefault(); cmdkActiveIndex = Math.max(cmdkActiveIndex - 1, 0); highlightCmdk(); }
+});
+function highlightCmdk() {
+  const items = $('cmdk-list').querySelectorAll('.cmdk-item');
+  items.forEach((el, i) => el.classList.toggle('active-option', i === cmdkActiveIndex));
+}
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openCmdk(); }
+});
+
+/* ---------- wire up buttons ---------- */
+$('monitor-start-btn').addEventListener('click', startMonitoring);
+$('monitor-stop-btn').addEventListener('click', stopMonitoring);
+$('monitor-rollback-btn').addEventListener('click', rollbackMonitoring);
+$('recommend-ai-btn').addEventListener('click', getAiRecommendation);
+$('recommend-btn').addEventListener('click', recommendRemediation);
+$('notif-btn').addEventListener('click', () => {
+  const panel = $('activity-panel');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  panel.focus();
+});
+
+/* ---------- boot ---------- */
 loadHealth();
 loadIncidents();
 loadMonitorStatus();
-monitorPollTimer = setInterval(loadMonitorStatus, 5000);
+refreshNotifBadge();
+setInterval(() => { loadMonitorStatus(); refreshNotifBadge(); }, 5000);
 </script>
 </body>
 </html>
