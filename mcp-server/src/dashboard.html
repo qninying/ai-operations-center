@@ -663,6 +663,22 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+
+// Every value that reaches innerHTML and did not originate as a string literal in
+// this file (a DMV row field, an API response field, anything from a fetch()) goes
+// through this first — not because every field is exploitable today, but because
+// "this particular field happens to be safe right now" is exactly the judgment that
+// breaks quietly later. Values rendered via textContent (the AI's own root-cause
+// text, in particular) don't need this — the DOM never parses textContent as markup.
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const activityLog = [];
 
 function pushActivity(kind, html) {
@@ -755,7 +771,7 @@ async function loadIncidents() {
     const isLive = body.source === 'live';
     tagEl.textContent = body.source;
     tagEl.className = 'tag ' + (isLive ? 'live' : 'fallback');
-    statusEl.innerHTML = (body.message ? body.message : (body.rows.length + ' session(s) observed'));
+    statusEl.innerHTML = (body.message ? escapeHtml(body.message) : (body.rows.length + ' session(s) observed'));
 
     const blockedCount = body.rows.filter(r => r.blocking_session_id && r.blocking_session_id !== 0).length;
     kpiSessions.textContent = String(body.rows.length);
@@ -769,8 +785,8 @@ async function loadIncidents() {
       cell.className = 'data-cell' + (blocked ? ' blocked' : '');
       cell.innerHTML =
         '<div class="k">session ' + row.session_id + '</div>' +
-        '<div class="v">' + row.status + (row.wait_type ? ' · ' + row.wait_type : '') + '</div>' +
-        '<div class="v-secondary">' + row.command + ' on ' + row.database_name + '</div>' +
+        '<div class="v">' + escapeHtml(row.status) + (row.wait_type ? ' · ' + escapeHtml(row.wait_type) : '') + '</div>' +
+        '<div class="v-secondary">' + escapeHtml(row.command) + ' on ' + escapeHtml(row.database_name) + '</div>' +
         '<div class="v-secondary">' + formatDuration(row.total_elapsed_time_ms) + ' elapsed · ' + formatDuration(row.cpu_time_ms) + ' CPU</div>' +
         (blocked ? '<div class="v" style="color:var(--danger);margin-top:4px;">blocked by session ' + row.blocking_session_id + '</div>' : '');
       rowsEl.appendChild(cell);
@@ -833,7 +849,7 @@ function renderMonitorStatus(body) {
     div.style.marginTop = '8px';
     div.style.borderColor = '#4d2129';
     div.style.background = 'var(--danger-dim)';
-    div.innerHTML = '<div class="v">Session ' + item.alert.sessionId + ' blocked by session ' + item.alert.blockingSessionId + ' on ' + item.alert.databaseName + '</div>';
+    div.innerHTML = '<div class="v">Session ' + item.alert.sessionId + ' blocked by session ' + item.alert.blockingSessionId + ' on ' + escapeHtml(item.alert.databaseName) + '</div>';
     alertsEl.appendChild(div);
   }
 
@@ -876,7 +892,7 @@ async function rollbackMonitoring() {
     const body = await res.json();
     if (res.ok) {
       banner.className = 'banner allowed shown';
-      banner.innerHTML = '<div class="banner-title">Rolled back</div>Task ' + body.taskId.slice(0, 8) + ' reverted at ' + new Date(body.revertedAt).toLocaleTimeString() + '.';
+      banner.innerHTML = '<div class="banner-title">Rolled back</div>Task ' + escapeHtml(body.taskId.slice(0, 8)) + ' reverted at ' + new Date(body.revertedAt).toLocaleTimeString() + '.';
       pushActivity('warning', '<strong>Rollback</strong> reverted monitoring task');
     } else {
       banner.className = 'banner error shown';
@@ -921,7 +937,7 @@ async function getAiRecommendation() {
       errorBanner.textContent = body.error + ': ' + body.message;
       confBlock.style.display = 'none';
       rootCauseEl.style.display = 'none';
-      pushActivity('danger', '<strong>Recommendation</strong> failed — ' + body.error);
+      pushActivity('danger', '<strong>Recommendation</strong> failed — ' + escapeHtml(body.error));
       return;
     }
 
@@ -945,12 +961,12 @@ async function getAiRecommendation() {
       kpiEscalation.textContent = 'Yes';
       kpiEscalation.className = 'kpi-value warning';
       kpiEscalationMeta.textContent = 'notification sent';
-      pushActivity('warning', '<strong>Escalated</strong> — confidence ' + body.confidence + '%, operator notified');
+      pushActivity('warning', '<strong>Escalated</strong> — confidence ' + escapeHtml(body.confidence) + '%, operator notified');
     } else {
       kpiEscalation.textContent = 'No';
       kpiEscalation.className = 'kpi-value success';
       kpiEscalationMeta.textContent = 'confidence above threshold';
-      pushActivity('success', '<strong>Recommendation</strong> generated — ' + body.confidence + '% confidence');
+      pushActivity('success', '<strong>Recommendation</strong> generated — ' + escapeHtml(body.confidence) + '% confidence');
     }
   } catch (e) {
     errorBanner.className = 'banner error shown';
@@ -981,7 +997,7 @@ async function viewAuditTrail() {
       const failed = e.outcome === 'failure';
       const label = e.event || e.hitlEventType || e.actionType || e.entryType;
       return '<div class="activity-item"><span class="activity-dot ' + (failed ? 'danger' : 'success') + '"></span>' +
-        '<span class="activity-text"><strong>' + e.entryType + '</strong> — ' + label + ' (' + e.actor + ')' +
+        '<span class="activity-text"><strong>' + escapeHtml(e.entryType) + '</strong> — ' + escapeHtml(label) + ' (' + escapeHtml(e.actor) + ')' +
         '<br><span style="color:var(--text-tertiary);font-size:11px;">' + new Date(e.loggedAt).toLocaleTimeString() + '</span></span></div>';
     }).join('') + '</div>';
   } finally {
@@ -1006,12 +1022,12 @@ async function proposeRemediation() {
     resultEl.className = 'banner shown ' + (allowed ? 'allowed' : 'blocked');
     let html = '<div class="banner-title">' + (allowed ? 'Allowed' : 'Blocked') + '</div>';
     if (!allowed) {
-      for (const v of body.result.violations) html += '<div class="violation">' + v + '</div>';
+      for (const v of body.result.violations) html += '<div class="violation">' + escapeHtml(v) + '</div>';
     }
     resultEl.innerHTML = html;
     pushActivity(
       allowed ? 'success' : 'danger',
-      '<strong>Guardrail</strong> ' + (allowed ? 'allowed' : 'blocked') + ' a monitoring collector restart — awaiting ' + body.approver
+      '<strong>Guardrail</strong> ' + (allowed ? 'allowed' : 'blocked') + ' a monitoring collector restart — awaiting ' + escapeHtml(body.approver)
     );
     $('approve-btn').style.display = allowed ? 'none' : 'inline-flex';
     $('reject-btn').style.display = allowed ? 'none' : 'inline-flex';
@@ -1037,7 +1053,7 @@ async function decideRemediation(decision) {
     const body = await res.json();
     if (!res.ok) {
       resultEl.className = 'banner shown blocked';
-      resultEl.innerHTML = '<div class="banner-title">' + body.error + '</div>' + body.message;
+      resultEl.innerHTML = '<div class="banner-title">' + escapeHtml(body.error) + '</div>' + escapeHtml(body.message);
       return;
     }
     if (decision === 'reject') {
@@ -1049,13 +1065,13 @@ async function decideRemediation(decision) {
       resultEl.innerHTML =
         '<div class="banner-title">Allowed — executed</div>Monitoring collector restarted at ' +
         new Date(body.executedAt).toLocaleTimeString() +
-        ' (task ' + body.taskId.slice(0, 8) + ').';
+        ' (task ' + escapeHtml(body.taskId.slice(0, 8)) + ').';
       pushActivity('success', '<strong>Guardrail</strong> approved — monitoring collector restarted');
       loadMonitorStatus();
     } else {
       resultEl.className = 'banner shown blocked';
       let html = '<div class="banner-title">Approved but not executed</div>';
-      for (const v of body.result.violations) html += '<div class="violation">' + v + '</div>';
+      for (const v of body.result.violations) html += '<div class="violation">' + escapeHtml(v) + '</div>';
       resultEl.innerHTML = html;
     }
     $('approve-btn').style.display = 'none';
