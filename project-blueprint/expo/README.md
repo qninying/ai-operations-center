@@ -22,6 +22,11 @@ correlation-ID audit trail).
   points where trust actually changes (identity, external services, rendering, the
   action gate) marked and explained.
   Published live at <https://claude.ai/code/artifact/f39fd0ed-49b5-466a-90d8-0edda0975ec8>
+- **`7-layer-architecture-mapping.md`** — the full written version of the layer-table
+  section in `architecture-summary.html`: each of the 7 layers with its components,
+  interactions, responsibilities, and significance spelled out in prose, not just a
+  table row. Not published as an Artifact — plain Markdown, meant to be read or
+  submitted directly (e.g. as coursework).
 
 ## Updating
 
