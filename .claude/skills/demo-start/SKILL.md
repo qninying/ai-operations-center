@@ -92,14 +92,41 @@ the blocking scenario, not waiting on a cold start.
    narration is "the lock cleared" or "the system's own guardrail is why we can't
    just auto-fix this yet."
 
-7. **Report readiness, don't open a browser tab yourself.** Tell the user the
+7. **Schedule a fresh cloud-diagnostics scenario in parallel**, same 90s default and
+   same wrapper-script pattern as step 6 (a distinct wrapper path, so `demo-stop` can
+   cancel this independently of the SQL fault injector) — this is what makes
+   `/api/cloud-recommendation` (and the real "CoreOps: escalation" push notification
+   it can trigger) show a genuinely different issue each demo instead of whatever
+   static scenario was last uploaded to blob storage by hand:
+   ```
+   cat > /tmp/coreops-cloud-fault-injector.sh <<'EOF'
+   #!/bin/sh
+   cd "<absolute path to mcp-server>"
+   sleep "${1:-90}"
+   npx tsx src/seedCloudDiagnostics.ts
+   EOF
+   chmod +x /tmp/coreops-cloud-fault-injector.sh
+   nohup /tmp/coreops-cloud-fault-injector.sh 90 > /tmp/coreops-cloud-fault.log 2>&1 &
+   disown
+   ```
+   No scenario name is passed, so `seedCloudDiagnostics.ts` picks one at random from
+   its five (SSIS slow load, SSRS render timeout, SQL Agent job failure, Windows disk
+   critical, cloud storage latency) — deliberate, so consecutive demos don't line up
+   on the same one. If the presenter wants a specific scenario instead (e.g. to match
+   a specific narration beat), pass its name as the script's argument in place of
+   nothing. This only refreshes the evidence in blob storage; nothing calls
+   `/api/cloud-recommendation` on its own — the presenter (or a curl in the demo
+   script) still triggers that live, same as any other route.
+
+8. **Report readiness, don't open a browser tab yourself.** Tell the user the
    dashboard is ready at `http://localhost:8787/` and that they should open it in
    their own browser (the one they'll actually be screen-sharing) — the Claude Code
    Browser pane isn't what an audience sees. Mention that SQL Server may still take
    a little longer to fully warm on its very first real query even after step 2's
    direct check succeeds, since the app's own connection pool is separate from the
-   warmup script's. Also state plainly when the scheduled fault will land and how
-   long it holds, so the presenter can pace their narration against it.
+   warmup script's. Also state plainly when the scheduled faults (SQL blocking scenario
+   and cloud-diagnostics scenario, step 6 and step 7) will land and how long the SQL
+   one holds, so the presenter can pace their narration against both.
 
 ## If something fails
 
@@ -110,11 +137,15 @@ or a server that never returns healthy means the demo isn't ready yet; say so pl
 ## Related
 
 - `demo-stop` — the matching teardown skill. It also cancels any fault injection
-  step 6 scheduled but hasn't fired yet, and kills it if it has — don't leave a
-  scheduled or running blocking scenario behind after the demo ends.
+  step 6 or step 7 scheduled but hasn't fired yet, and kills it if it has — don't
+  leave a scheduled or running blocking scenario, or a pending cloud-diagnostics
+  seed, behind after the demo ends.
 - `mcp-server/src/warmup.ts` — the actual warmup script this drives.
 - `mcp-server/src/seedBlockingScenario.ts` — the real blocking-scenario script step 6
   schedules. Can still be run by hand instead, with different timing, if the
   presenter wants to trigger it live on camera rather than have it appear on its own.
+- `mcp-server/src/seedCloudDiagnostics.ts` — the real cloud-diagnostics scenario
+  script step 7 schedules. Can also be run by hand with a specific scenario name
+  instead of a random one, same reasoning as `seedBlockingScenario.ts` above.
 - `mcp-server/src/auth/` — session auth. `demo-stop` re-logs in rather than assuming
   step 4's cookie jar is still valid (a demo can run past the 60-minute session TTL).

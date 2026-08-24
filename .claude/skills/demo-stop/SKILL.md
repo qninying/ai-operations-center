@@ -11,17 +11,20 @@ running — every step here is idempotent, matching this repo's own idempotency 
 ## Steps
 
 1. **Cancel any scheduled or running fault injection first**, before it can fire
-   after the demo has already ended:
+   after the demo has already ended — both the SQL blocking scenario (`demo-start`
+   step 6) and the cloud-diagnostics scenario (`demo-start` step 7):
    ```
    pkill -f "coreops-fault-injector.sh" 2>/dev/null
    pkill -f "seedBlockingScenario.ts" 2>/dev/null
+   pkill -f "coreops-cloud-fault-injector.sh" 2>/dev/null
+   pkill -f "seedCloudDiagnostics.ts" 2>/dev/null
    ```
-   Matches on the wrapper script's distinctive path, not a captured PID — `demo-start`
+   Matches on each wrapper script's distinctive path, not a captured PID — `demo-start`
    deliberately doesn't rely on `$!` for this (confirmed unreliable in this
-   environment: it captured the wrong process when tested directly). Both `pkill`s
+   environment: it captured the wrong process when tested directly). All four `pkill`s
    are safe to run even if nothing was scheduled — a no-op `pkill` just exits
    non-zero silently, which is the correct outcome here, not an error. This matters
-   even if `demo-start`'s step 5 already fired and resolved on its own: killing an
+   even if `demo-start`'s step 6 or 7 already fired and resolved on its own: killing an
    already-finished process's name match is harmless.
 
 2. **Log in fresh**, from `mcp-server/` — don't assume `demo-start`'s cookie jar is
