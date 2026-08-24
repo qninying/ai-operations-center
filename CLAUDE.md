@@ -59,13 +59,25 @@ https://github.com/qninying/ai-operations-center
 
 These three files are what your Command Center reads, so they have to be in your repo.
 
-- `.colaberry/plan.json` — your requirements, stories and releases.
-- `.colaberry/progress.json` — the criteria and which of them you have confirmed.
+- `.colaberry/plan.json` — your requirements, stories and releases. **The plan only.**
+  It carries no completion state: there is no `built` on a requirement and no
+  `status` on a story, in any version.
+- `.colaberry/progress.json` — the criteria, which of them you have confirmed, and
+  the story state. **Completion comes from here**, via `stories[].verification.state`.
 - `.colaberry/manifest.json` — when the data above was last refreshed.
 
+See `docs/DATA_CONTRACT.md` for the field-by-field spec of all three, the
+join on story id, and a worked example. Read it before you write anything that
+renders them — guessing at these shapes is the single most common way a Command
+Center ends up showing numbers that are not true.
+
 Where the platform has push access to this repo it writes all three for you on every
-sync, and it will overwrite `plan.json` and `manifest.json` when it does — so edit those
-two only if you are maintaining them yourself. **Where it does not have push access it
+sync. It always refreshes `manifest.json`. It refreshes `plan.json` only while that file
+is still exactly as the platform last wrote it: **edit `plan.json` by hand and the
+platform will notice and stop overwriting it** — your version stays, and later plan
+changes stop arriving in it, so from then on it is yours to maintain. (It compares your
+copy against the hash in `manifest.json`, and it leaves the file alone whenever it cannot
+prove the copy is one it wrote.) **Where it does not have push access it
 cannot put them there at all**, and they are yours to add: download them from the
 workspace panel in the portal and commit them like any other file. Either way, a
 criterion that names one of these files is not satisfied until the file is really in
