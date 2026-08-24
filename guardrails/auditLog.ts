@@ -23,8 +23,8 @@
 // rather than a new rigid schema — unlike a decision or an ABAC check, an operational
 // event's shape genuinely varies per event type, so this type doesn't pretend it's fixed.
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync } from "node:fs";
+import { basename, dirname, extname, join } from "node:path";
 import { ApprovalDecision, GuardrailResult, RemediationAction } from "./remediationGuardrail.js";
 import { AbacDecision } from "./abacEvaluator.js";
 import { AbacRequest } from "./abacPolicy.js";
@@ -250,6 +250,51 @@ export interface AuditLogOptions {
   // process restart no longer loses the governance record of what was approved and
   // by whom. See ADR-005.
   persistTo?: string;
+  // ADR-005 addendum: once the active persistTo file reaches this many lines, it is
+  // rotated into a numbered archive segment (e.g. audit-log.1.jsonl) and a fresh
+  // active file is started — bounding any single file's size without ever deleting
+  // history, since this is a governance record, not a disposable debug log. Only
+  // meaningful when persistTo is set. Defaults to DEFAULT_MAX_LINES_PER_SEGMENT.
+  maxLinesPerSegment?: number;
+}
+
+// Chosen as a round number comfortably larger than this system's actual current
+// volume (dozens of entries total across the whole project as of ADR-005) while
+// still keeping each archived file small enough to open and read directly — the
+// same "human-inspectable" property ADR-005 already valued in choosing JSONL over
+// a database in the first place.
+const DEFAULT_MAX_LINES_PER_SEGMENT = 5_000;
+
+// Archived segments sit next to the active file, named `<base>.<n><ext>` (e.g.
+// audit-log.jsonl -> audit-log.1.jsonl, audit-log.2.jsonl, ...). No separate index
+// file or persisted counter is needed — the next index is always derivable by
+// scanning the directory, and that scan is cheap at this system's volume.
+function archiveSegmentPattern(activePath: string): RegExp {
+  const ext = extname(activePath);
+  const base = basename(activePath, ext);
+  const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${escape(base)}\\.(\\d+)${escape(ext)}$`);
+}
+
+function scanArchivedSegments(activePath: string): Array<{ path: string; index: number }> {
+  const dir = dirname(activePath);
+  if (!existsSync(dir)) return [];
+  const pattern = archiveSegmentPattern(activePath);
+  return readdirSync(dir)
+    .map((name) => {
+      const match = name.match(pattern);
+      return match ? { path: join(dir, name), index: Number(match[1]) } : null;
+    })
+    .filter((entry): entry is { path: string; index: number } => entry !== null)
+    .sort((a, b) => a.index - b.index);
+}
+
+function nextArchiveSegmentPath(activePath: string): string {
+  const segments = scanArchivedSegments(activePath);
+  const nextIndex = segments.length > 0 ? segments[segments.length - 1].index + 1 : 1;
+  const ext = extname(activePath);
+  const base = basename(activePath, ext);
+  return join(dirname(activePath), `${base}.${nextIndex}${ext}`);
 }
 
 // Append-only, immutable, idempotent-by-id. Per CLAUDE.md's Idempotency &
@@ -261,12 +306,21 @@ export interface AuditLogOptions {
 export class AuditLog {
   private entries = new Map<string, AuditEntry>();
   private readonly persistTo?: string;
+  private readonly maxLinesPerSegment: number;
+  private currentSegmentLines = 0;
 
   constructor(options: AuditLogOptions = {}) {
     this.persistTo = options.persistTo;
+    this.maxLinesPerSegment = options.maxLinesPerSegment ?? DEFAULT_MAX_LINES_PER_SEGMENT;
     if (this.persistTo) {
       mkdirSync(dirname(this.persistTo), { recursive: true });
-      this.rehydrate(this.persistTo);
+      // Oldest archived segments first, active file last — same order the entries
+      // were originally written in, so this.entries (a Map) preserves chronological
+      // insertion order across a restart, matching pre-rotation behavior exactly.
+      for (const segment of scanArchivedSegments(this.persistTo)) {
+        this.rehydrateFile(segment.path);
+      }
+      this.currentSegmentLines = this.rehydrateFile(this.persistTo);
     }
   }
 
@@ -275,8 +329,11 @@ export class AuditLog {
   // truncated final line from a crash mid-append, not a corrupted history, and a
   // governance system that refuses to start because of one bad tail line is a
   // worse failure mode than losing that one entry. See ADR-005's accepted-risk note.
-  private rehydrate(path: string): void {
-    if (!existsSync(path)) return;
+  // Returns the number of non-blank raw lines in the file (whether they parsed or
+  // not) — rotation counts physical lines, not valid entries, since a corrupted
+  // tail line still takes up space in the file.
+  private rehydrateFile(path: string): number {
+    if (!existsSync(path)) return 0;
     const lines = readFileSync(path, "utf-8").split("\n").filter((line) => line.trim().length > 0);
     lines.forEach((line, index) => {
       try {
@@ -290,6 +347,23 @@ export class AuditLog {
         );
       }
     });
+    return lines.length;
+  }
+
+  // Called immediately before an append, never after — so an archived segment
+  // always ends up with exactly maxLinesPerSegment lines, and the active file
+  // never exceeds it. If the active file is already gone (e.g. a rotation happened
+  // but the process crashed before the next append landed), there's nothing to
+  // rotate; just reset the counter rather than renaming a file that doesn't exist.
+  private rotateIfNeeded(): void {
+    if (!this.persistTo) return;
+    if (this.currentSegmentLines < this.maxLinesPerSegment) return;
+    if (!existsSync(this.persistTo)) {
+      this.currentSegmentLines = 0;
+      return;
+    }
+    renameSync(this.persistTo, nextArchiveSegmentPath(this.persistTo));
+    this.currentSegmentLines = 0;
   }
 
   record(entry: AuditEntry): void {
@@ -305,7 +379,9 @@ export class AuditLog {
     }
     this.entries.set(entry.id, freezeEntry(entry));
     if (this.persistTo) {
+      this.rotateIfNeeded();
       appendFileSync(this.persistTo, JSON.stringify(entry) + "\n", "utf-8");
+      this.currentSegmentLines += 1;
     }
   }
 

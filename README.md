@@ -50,8 +50,8 @@ Then open `http://localhost:8787/console?role=it-manager`.
 ## What's real
 
 Every claim below has a test behind it and was verified against a real running
-server, not just unit-tested. Current counts: **277 tests passing** — 214 in
-`mcp-server/`, 57 in `guardrails/`, 6 in `frontend/`.
+server, not just unit-tested. Current counts: **284 tests passing** — 214 in
+`mcp-server/`, 64 in `guardrails/`, 6 in `frontend/`.
 
 **Governance & security**
 - Session-based authentication (`mcp-server/src/auth/`) gates every route —
@@ -87,6 +87,11 @@ server, not just unit-tested. Current counts: **277 tests passing** — 214 in
 - Persisted to disk, not just in-memory — proven by killing the running server
   mid-session and confirming a prior approval decision was still retrievable
   afterward. See [ADR-005](docs/ADR-005-audit-trail-persistence.md).
+- Bounded by size-based rotation, never deletion — every entry ever recorded
+  stays queryable forever, split across numbered archive segments instead of
+  one unbounded file. Live-verified against a copy of the real, running
+  audit log's actual data, not synthetic data. See ADR-005's implementation
+  addendum.
 
 **Reasoning & reliability**
 - The Root Cause Analysis Agent (`mcp-server/src/rootCauseAgent.ts`) makes real
@@ -123,7 +128,7 @@ choice made:
 | [ADR-002](docs/ADR-002-audit-trail-correlation-id-unification.md) | Unifying correlation IDs between the audit log and `mcp-server`'s operational logging |
 | [ADR-003](docs/ADR-003-session-based-authentication.md) | Session-based auth over JWT — no distributed system for JWT's statelessness to help with, and a JWT in `localStorage` sits in the same XSS exposure class an audit had just closed |
 | [ADR-004](docs/ADR-004-console-serving-topology.md) | Serving the built console from `mcp-server` itself, not a reverse proxy that doesn't exist yet |
-| [ADR-005](docs/ADR-005-audit-trail-persistence.md) | Append-only JSONL persistence for the audit trail, chosen over SQLite to avoid a first-ever database dependency |
+| [ADR-005](docs/ADR-005-audit-trail-persistence.md) | Append-only JSONL persistence for the audit trail, chosen over SQLite to avoid a first-ever database dependency; size-based rotation into numbered archives over time-based or deletion, added in a later addendum |
 | [ADR-006](docs/ADR-006-totp-mfa.md) | Real TOTP-based MFA over an ntfy-delivered OTP or WebAuthn — hand-rolled with `node:crypto`, and login itself requiring TOTP makes every session inherently MFA-verified, closing a hardcoded placeholder |
 | [ADR-007](docs/ADR-007-second-approver-identity.md) | A real second approver identity over a general N-user credential store — mirrors the existing single-user pattern for exactly the two roles the escalation model actually has |
 

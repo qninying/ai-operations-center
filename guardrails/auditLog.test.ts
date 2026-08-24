@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { appendFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -11,6 +11,7 @@ import {
   buildHitlAuditEntry,
   buildPolicyEvaluationAuditEntry,
   buildSystemEventAuditEntry,
+  type SystemEventAuditEntry,
 } from "./auditLog.js";
 import { checkRemediationGuardrail, RemediationAction } from "./remediationGuardrail.js";
 import { evaluateAbacPolicy } from "./abacEvaluator.js";
@@ -522,5 +523,121 @@ describe("AuditLog — persistence (ADR-005)", () => {
     const path = join(dir, "nested", "audit-log.jsonl");
 
     expect(() => new AuditLog({ persistTo: path })).not.toThrow();
+  });
+});
+
+describe("AuditLog — log rotation (ADR-005 addendum)", () => {
+  const tempDirs: string[] = [];
+
+  afterEach(() => {
+    while (tempDirs.length > 0) {
+      const dir = tempDirs.pop();
+      if (dir) rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  function tempLogPath(): string {
+    const dir = mkdtempSync(join(tmpdir(), "audit-log-rotation-test-"));
+    tempDirs.push(dir);
+    return join(dir, "audit-log.jsonl");
+  }
+
+  function event(id: string, correlationId = "corr-rot"): SystemEventAuditEntry {
+    return buildSystemEventAuditEntry("test_event", "success", {}, "test", id, correlationId);
+  }
+
+  it("rotates the active file into a numbered archive once it reaches maxLinesPerSegment", () => {
+    const path = tempLogPath();
+    const log = new AuditLog({ persistTo: path, maxLinesPerSegment: 3 });
+
+    log.record(event("r1"));
+    log.record(event("r2"));
+    log.record(event("r3"));
+    log.record(event("r4")); // crosses the threshold -- rotates before this line lands
+
+    const archivePath = path.replace(/\.jsonl$/, ".1.jsonl");
+    expect(existsSync(archivePath)).toBe(true);
+    expect(readFileSync(archivePath, "utf-8").trim().split("\n")).toHaveLength(3);
+    expect(readFileSync(path, "utf-8").trim().split("\n")).toHaveLength(1);
+  });
+
+  it("does not rotate before the threshold is reached", () => {
+    const path = tempLogPath();
+    const log = new AuditLog({ persistTo: path, maxLinesPerSegment: 3 });
+
+    log.record(event("nr1"));
+    log.record(event("nr2"));
+
+    expect(existsSync(path.replace(/\.jsonl$/, ".1.jsonl"))).toBe(false);
+    expect(readFileSync(path, "utf-8").trim().split("\n")).toHaveLength(2);
+  });
+
+  it("rehydrates entries from both archived segments and the active file", () => {
+    const path = tempLogPath();
+    const first = new AuditLog({ persistTo: path, maxLinesPerSegment: 3 });
+    ["h1", "h2", "h3", "h4"].forEach((id) => first.record(event(id)));
+
+    const second = new AuditLog({ persistTo: path, maxLinesPerSegment: 3 });
+
+    expect(second.all()).toHaveLength(4);
+    expect(second.retrieve("h1").found).toBe(true); // archived segment
+    expect(second.retrieve("h4").found).toBe(true); // active file
+    expect(second.forCorrelationId("corr-rot")).toHaveLength(4);
+  });
+
+  it("continues rotating correctly after rehydration, producing sequentially numbered archives", () => {
+    const path = tempLogPath();
+    const first = new AuditLog({ persistTo: path, maxLinesPerSegment: 2 });
+    first.record(event("m1"));
+    first.record(event("m2")); // rotates -> .1.jsonl
+
+    const second = new AuditLog({ persistTo: path, maxLinesPerSegment: 2 });
+    second.record(event("m3"));
+    second.record(event("m4")); // rotates -> .2.jsonl
+    second.record(event("m5")); // stays in the active file
+
+    expect(readFileSync(path.replace(/\.jsonl$/, ".1.jsonl"), "utf-8").trim().split("\n")).toHaveLength(2);
+    expect(readFileSync(path.replace(/\.jsonl$/, ".2.jsonl"), "utf-8").trim().split("\n")).toHaveLength(2);
+    expect(readFileSync(path, "utf-8").trim().split("\n")).toHaveLength(1);
+
+    const third = new AuditLog({ persistTo: path, maxLinesPerSegment: 2 });
+    expect(third.all()).toHaveLength(5);
+  });
+
+  it("keeps every entry queryable in memory across a rotation within the same running instance", () => {
+    const path = tempLogPath();
+    const log = new AuditLog({ persistTo: path, maxLinesPerSegment: 2 });
+
+    log.record(event("q1"));
+    log.record(event("q2"));
+    log.record(event("q3")); // rotates, but nothing in-memory should be lost
+
+    expect(log.all()).toHaveLength(3);
+    expect(log.retrieve("q1").found).toBe(true);
+  });
+
+  it("an idempotent duplicate right at a rotation boundary does not rotate or append again", () => {
+    const path = tempLogPath();
+    const log = new AuditLog({ persistTo: path, maxLinesPerSegment: 2 });
+    const entry = event("dup1");
+
+    log.record(entry);
+    log.record(entry); // same id, same content -- returns early, before rotation logic ever runs
+    log.record(entry);
+
+    expect(existsSync(path.replace(/\.jsonl$/, ".1.jsonl"))).toBe(false);
+    expect(readFileSync(path, "utf-8").trim().split("\n")).toHaveLength(1);
+  });
+
+  it("defaults to a threshold high enough that ordinary use never rotates", () => {
+    const path = tempLogPath();
+    const log = new AuditLog({ persistTo: path }); // no maxLinesPerSegment override
+
+    for (let i = 0; i < 10; i++) {
+      log.record(event(`d${i}`));
+    }
+
+    expect(existsSync(path.replace(/\.jsonl$/, ".1.jsonl"))).toBe(false);
+    expect(readFileSync(path, "utf-8").trim().split("\n")).toHaveLength(10);
   });
 });

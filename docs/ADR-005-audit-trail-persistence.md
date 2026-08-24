@@ -96,9 +96,6 @@ before this ADR.
   parent-directory creation.
 
 **What this explicitly does not cover (flagged, not silently skipped):**
-- **No log rotation or compaction.** The file grows without bound. Acceptable
-  for this system's current, low volume; a real operational concern once this
-  runs continuously for months. Flagged as future work, not solved here.
 - **No corruption recovery beyond skip-and-warn.** A crash mid-write can lose at
   most the one entry that was mid-write, never any entry before it — the file is
   append-only and prior lines are untouched — but there's no checksum or repair
@@ -107,6 +104,54 @@ before this ADR.
   scaled, this file-per-process approach breaks the same way the in-memory
   `SessionStore` would (see ADR-003's own "what would change this decision") —
   a shared store becomes necessary at that point, not before.
+
+## Implementation addendum (2026-08-24): log rotation
+
+The "no log rotation" gap above was closed the same day it was flagged, as part of
+an INPACT trust-posture audit that named it as Non-repudiation's one remaining
+named gap (Band 3, not yet Hardened).
+
+**Decision:** size-based rotation into numbered archive segments, never deletion.
+This is a governance record, not a disposable debug log — every entry ever
+recorded must remain queryable indefinitely, so "rotation" here means bounding any
+*single* file's size, not expiring old data. `AuditLog` gained an optional
+`maxLinesPerSegment` constructor option (default 5,000 — comfortably above this
+system's actual volume, small enough that any one archived file stays easy to
+open and read directly, matching JSONL's original "human-inspectable" rationale
+from the Decision section above). Once the active `persistTo` file reaches that
+line count, the next `record()` call renames it to `<base>.<n>.jsonl` (e.g.
+`audit-log.1.jsonl`, `audit-log.2.jsonl`, ...) before appending — no separate
+index file or persisted counter; the next `n` is always derived by scanning the
+directory for existing `<base>.<n>.jsonl` files, cheap at this volume.
+
+**Rehydration** now reads every archived segment (oldest first, by `n`) and then
+the active file, replaying all of them into the same in-memory `Map` exactly as
+before — `retrieve()`, `all()`, and `forCorrelationId()` are completely unchanged
+and don't know or care how many files the history is split across. Chronological
+insertion order is preserved across a restart, matching pre-rotation behavior.
+
+**Options considered:** time-based rotation (daily/monthly files) was rejected —
+size-based directly bounds what actually matters (file size, rehydration cost),
+where time-based would let a burst of activity produce one huge daily file just
+the same. Deleting old segments after N days was rejected outright — this is the
+audit trail the whole system's governance claim rests on; silently expiring old
+entries would quietly break "every production change has a verifiable human
+approval" for anything old enough to be dropped, the same category of regression
+ADR-005 itself was written to close.
+
+**Verification:** 7 new unit tests (rotation at threshold, no premature rotation,
+rehydration across archived + active segments, multiple sequential rotations,
+in-memory continuity across a rotation within one running instance, idempotent
+duplicates near a rotation boundary don't rotate twice, default threshold high
+enough that ordinary use never rotates). Live-verified against a copy of the
+real, running system's actual `audit-log.jsonl` (48 real entries at the time) —
+not synthetic data: rehydrated all 48 real entries through the new code, recorded
+one more with a deliberately small threshold to force an immediate rotation,
+confirmed the archived segment held all 48 original lines byte-for-byte, the new
+entry landed in a fresh active file, and a second rehydration correctly saw all
+49. The real, live `mcp-server/data/audit-log.jsonl` itself was never touched by
+this test (48 lines, well under the real 5,000-line default) — only a scratch
+copy was.
 
 ## What would change this decision
 
