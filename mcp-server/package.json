@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "http": "tsx src/httpServer.ts",
+    "http-mcp": "tsx src/httpMcpServer.ts",
     "build": "tsc",
     "start": "node dist/mcp-server/src/index.js",
     "test": "vitest run",

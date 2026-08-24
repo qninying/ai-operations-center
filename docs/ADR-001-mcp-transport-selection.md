@@ -1,6 +1,6 @@
 # ADR-001: Transport Selection for the MCP Tool Gateway
 
-**Status:** Proposed — needs DRI sign-off before the target-state column below is implemented.
+**Status:** Implemented (2026-08-24) — see the Implementation addendum at the end of this document.
 **Owner:** Quincy Nkwain Ninying
 **Date:** 2026-08-12
 **Component:** `mcp-server/` (the MCP Tool Gateway, per `architecture.md`)
@@ -121,3 +121,65 @@ MCP endpoint is a separate, smaller decision, not part of this ADR.
 - If a future requirement needs true server-to-client push independent of a request
   (not just responses to calls), that's a signal to re-examine SSE or a future
   transport, not StreamableHTTP.
+
+## Implementation addendum (2026-08-24)
+
+Built and live-verified in response to an INPACT trust-posture assessment that
+flagged this ADR's own "Proposed, needs DRI sign-off before implementation"
+status as a real Control-dimension gap — the network-reachable transport
+described above didn't exist yet, so the "agents reach monitored platforms"
+boundary had no network-level control at all.
+
+**Correction to this ADR's original text:** the Decision drivers and Options
+tables above reference `auth_server_provider`/`token_verifier`/`AuthSettings` —
+that naming is from the **Python** MCP SDK. This repo uses the **TypeScript**
+SDK (`@modelcontextprotocol/sdk`, confirmed at v1.30.0), whose equivalent
+(`requireBearerAuth` in `server/auth/middleware/bearerAuth.js`) is an **Express**
+`RequestHandler` built around an OAuth-shaped `OAuthTokenVerifier` provider —
+this repo has no Express dependency, and a single static machine credential
+needs none of OAuth's client-registration/token-exchange machinery. Confirmed
+directly against the installed package before building against it, rather than
+trusting this ADR's own three-week-old text.
+
+**What was actually built**, reusing raw `node:http` (no new dependency, same
+choice `httpServer.ts` already made) and implementing one hand-rolled
+bearer-token check instead:
+
+- `mcp-server/src/mcpServerFactory.ts` — the tool/resource registrations
+  extracted out of `index.ts` so both transports share identical logic, per this
+  ADR's own "additive at the transport layer only" consequence.
+- `mcp-server/src/index.ts` — unchanged in behavior, now calling the shared
+  factory. Still the local, dev-only, zero-config stdio entry point this ADR
+  always intended it to remain.
+- `mcp-server/src/auth/apiToken.ts` — `verifyBearerToken()`, a constant-time
+  (`timingSafeEqual`) comparison against a static `MCP_API_TOKEN`, deliberately
+  separate from `credentials.ts`'s human-password verification (ADR-003) since
+  MCP callers are services/agents, not a browser with a login UI.
+- `mcp-server/src/httpMcpServer.ts` — the new network-facing entry point.
+  `POST /mcp` is bearer-gated before `StreamableHTTPServerTransport` is ever
+  touched; `GET`/`DELETE /mcp` return `405`, matching the SDK's own stateless
+  example. Runs in **stateless mode** (`sessionIdGenerator: undefined`) — a
+  fresh `McpServer` + transport pair per request, directly satisfying this
+  ADR's own "any replica can answer any request" driver. Fails fast at startup
+  if `MCP_API_TOKEN` is unset, the same deliberate exception to "degrade
+  gracefully" already established for `AUTH_USERNAME`/`AUTH_PASSWORD_HASH`.
+
+**Live-verified**, not just unit-tested: started `npm run http-mcp` for real;
+confirmed startup fails fast with no `MCP_API_TOKEN` set; generated a real
+random token, confirmed a request with no `Authorization` header and a request
+with a wrong token both get a real `401`; performed a genuine MCP protocol
+handshake (`initialize`) and `tools/list` call with the correct bearer token
+and got back both real tools (`read_sql_server_dmv`, `run_diagnostic_query`)
+with their full schemas — proving the transport, the shared factory, and the
+auth gate all work together, not just in isolation. `mcp-server`'s full test
+suite (167 tests, including 7 new `apiToken.test.ts` cases) and `tsc --noEmit`
+both stayed clean throughout.
+
+**Deliberately not built:** OAuth/dynamic client registration (not needed for
+a single known machine caller today — see this ADR's own "what would change
+this decision" for when that would matter); TLS termination or any change to
+this repo's zero-deploy-pipeline reality (`npm run http-mcp` runs the same way
+every other service in this repo does, with no container or reverse proxy
+assumed); multiple distinct API tokens for multiple distinct callers (one
+static token today, matching the single-caller reality, the same way
+`AUTH_USERNAME` matches the single-operator reality in ADR-003).

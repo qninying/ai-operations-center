@@ -23,6 +23,8 @@
 // rather than a new rigid schema — unlike a decision or an ABAC check, an operational
 // event's shape genuinely varies per event type, so this type doesn't pretend it's fixed.
 
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { ApprovalDecision, GuardrailResult, RemediationAction } from "./remediationGuardrail.js";
 import { AbacDecision } from "./abacEvaluator.js";
 import { AbacRequest } from "./abacPolicy.js";
@@ -239,6 +241,17 @@ function freezeEntry(entry: AuditEntry): AuditEntry {
   return Object.freeze(entry);
 }
 
+export interface AuditLogOptions {
+  // Absolute path to an append-only JSONL file. Omitted (the default, and every
+  // existing test/demo call site) means purely in-memory, exactly as before this
+  // option existed — persistence is opt-in, not automatic, so unit tests stay fast
+  // and never touch disk. When set, every record() call also appends one JSON line
+  // here, and the constructor replays the file to rehydrate the in-memory Map, so a
+  // process restart no longer loses the governance record of what was approved and
+  // by whom. See ADR-005.
+  persistTo?: string;
+}
+
 // Append-only, immutable, idempotent-by-id. Per CLAUDE.md's Idempotency &
 // Replayability section, `id` is the idempotency key checked before the write
 // "fires": recording the same id with identical content twice (a retried write) is
@@ -247,6 +260,37 @@ function freezeEntry(entry: AuditEntry): AuditEntry {
 // by design and a mismatched id collision usually means a caller bug.
 export class AuditLog {
   private entries = new Map<string, AuditEntry>();
+  private readonly persistTo?: string;
+
+  constructor(options: AuditLogOptions = {}) {
+    this.persistTo = options.persistTo;
+    if (this.persistTo) {
+      mkdirSync(dirname(this.persistTo), { recursive: true });
+      this.rehydrate(this.persistTo);
+    }
+  }
+
+  // A line that fails to parse or validate is skipped with a loud warning rather
+  // than crashing the whole audit log — the most likely cause is a single
+  // truncated final line from a crash mid-append, not a corrupted history, and a
+  // governance system that refuses to start because of one bad tail line is a
+  // worse failure mode than losing that one entry. See ADR-005's accepted-risk note.
+  private rehydrate(path: string): void {
+    if (!existsSync(path)) return;
+    const lines = readFileSync(path, "utf-8").split("\n").filter((line) => line.trim().length > 0);
+    lines.forEach((line, index) => {
+      try {
+        const entry = JSON.parse(line) as AuditEntry;
+        assertValid(entry);
+        this.entries.set(entry.id, freezeEntry(entry));
+      } catch (error) {
+        console.error(
+          `AuditLog: skipping unreadable line ${index + 1} in ${path} during rehydration: ` +
+            (error instanceof Error ? error.message : String(error))
+        );
+      }
+    });
+  }
 
   record(entry: AuditEntry): void {
     assertValid(entry);
@@ -260,6 +304,9 @@ export class AuditLog {
       );
     }
     this.entries.set(entry.id, freezeEntry(entry));
+    if (this.persistTo) {
+      appendFileSync(this.persistTo, JSON.stringify(entry) + "\n", "utf-8");
+    }
   }
 
   retrieve(id: string): { found: true; entry: AuditEntry } | { found: false } {

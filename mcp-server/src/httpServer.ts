@@ -35,6 +35,7 @@ import { verifyPassword } from "./auth/credentials.js";
 import { SessionStore } from "./auth/sessionStore.js";
 import { serializeSessionCookie, clearSessionCookie, parseSessionCookie } from "./auth/cookies.js";
 import { resolveStaticFilePath, mimeTypeFor } from "./staticFiles.js";
+import { RateLimiter } from "./rateLimiter.js";
 
 // Thin HTTP transport for R2's DMV read path, alongside the existing stdio MCP
 // transport in index.ts. Both call the same readDmv() orchestrator — this file adds
@@ -94,6 +95,25 @@ function requireSession(req: IncomingMessage, res: ServerResponse): Session | nu
   return { username: session.username };
 }
 
+// Confirmed absent by grep before this was added: no route in this file had any
+// flood protection, and POST /api/login accepted unlimited password guesses. The
+// login limiter is deliberately stricter than the general one, since it's the one
+// route where a tight limit closes a real brute-force gap rather than just
+// generic abuse protection. Keyed by socket address, not X-Forwarded-For — this
+// server has no reverse proxy in front of it (per ADR-004), so the socket address
+// is the real, unspoofable client address for the current deployment topology.
+const generalRateLimiter = new RateLimiter({ windowMs: 60_000, maxRequests: 120 });
+const loginRateLimiter = new RateLimiter({ windowMs: 60_000, maxRequests: 5 });
+
+function clientKey(req: IncomingMessage): string {
+  return req.socket.remoteAddress ?? "unknown";
+}
+
+function sendRateLimited(res: ServerResponse, retryAfterMs: number, message: string) {
+  res.setHeader("Retry-After", Math.ceil(retryAfterMs / 1000).toString());
+  sendJson(res, 429, { error: "RATE_LIMITED", message });
+}
+
 // STORY-008 / REQ-016: single monitoring instance for the process, exposed via the
 // routes below so a demo can toggle it live and see it running, rather than reading
 // server logs. This module-level state is the process's only monitoring instance —
@@ -133,7 +153,9 @@ function stopMonitoringInternal(): void {
 // execution path in this codebase — approving a fictional "restart prod-app-server-03"
 // would have nothing real to do, so the proposed action is a genuinely restartable
 // service instead. See PROGRESS.md for the decision and why.
-const auditLog = new AuditLog();
+// ADR-005: an append-only JSONL file so the governance record survives a restart —
+// the in-memory-only version silently lost every approval decision on `npm restart`.
+const auditLog = new AuditLog({ persistTo: join(__dirname, "..", "data", "audit-log.jsonl") });
 const hitlQueue = new HitlQueue(auditLog);
 // The real, password-verified login identity — not OPERATOR_CONTACTS, which stays a
 // separate, notification-recipient display name for notifyOperators() (never
@@ -202,6 +224,13 @@ function buildRollbackRegistry(): Record<string, TaskRegistration> {
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+  const key = clientKey(req);
+
+  const generalLimit = generalRateLimiter.check(key);
+  if (!generalLimit.allowed) {
+    sendRateLimited(res, generalLimit.retryAfterMs, "Too many requests. Please slow down.");
+    return;
+  }
 
   if (req.method === "GET" && url.pathname === "/") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -252,6 +281,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/login") {
+    const loginLimit = loginRateLimiter.check(key);
+    if (!loginLimit.allowed) {
+      sendRateLimited(res, loginLimit.retryAfterMs, "Too many login attempts. Please wait before trying again.");
+      return;
+    }
+
     let body: { username?: unknown; password?: unknown };
     try {
       body = (await readJsonBody(req)) as typeof body;

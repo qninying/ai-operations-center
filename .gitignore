@@ -12,6 +12,10 @@ dist/
 # OS cruft
 .DS_Store
 
+# Runtime data (ADR-005: the persisted audit-trail JSONL file) — generated at
+# runtime, not source, and may contain operational detail not meant for the repo.
+mcp-server/data/
+
 # Internal Colaberry operating contract — contains a real production server
 # IP/SSH command and an internal escalation email. Not for the public repo.
 CLAUDE.md

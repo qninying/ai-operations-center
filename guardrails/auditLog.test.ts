@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { appendFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   AuditLog,
   AuditLogConflictError,
@@ -423,5 +426,101 @@ describe("AuditLog — system_event entries (docs/audit-trail-design.md)", () =>
     const trail = log.forCorrelationId("corr-shared");
     expect(trail).toHaveLength(2);
     expect(trail.map((e) => e.entryType).sort()).toEqual(["decision", "system_event"]);
+  });
+});
+
+describe("AuditLog — persistence (ADR-005)", () => {
+  const tempDirs: string[] = [];
+
+  afterEach(() => {
+    while (tempDirs.length > 0) {
+      const dir = tempDirs.pop();
+      if (dir) rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  function tempLogPath(): string {
+    const dir = mkdtempSync(join(tmpdir(), "audit-log-test-"));
+    tempDirs.push(dir);
+    return join(dir, "audit-log.jsonl");
+  }
+
+  it("stays purely in-memory when persistTo is omitted (default, every other test in this file)", () => {
+    const log = new AuditLog();
+    log.record(
+      buildSystemEventAuditEntry("test_event", "success", {}, "test", "sys-mem-1", "corr-mem-1")
+    );
+    expect(log.all()).toHaveLength(1);
+  });
+
+  it("appends a recorded entry to the persistence file as one JSON line", () => {
+    const path = tempLogPath();
+    const log = new AuditLog({ persistTo: path });
+    const entry = buildSystemEventAuditEntry("test_event", "success", {}, "test", "sys-1", "corr-1");
+
+    log.record(entry);
+
+    const lines = readFileSync(path, "utf-8").trim().split("\n");
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0])).toEqual(entry);
+  });
+
+  it("does not append again when the same id/content is recorded twice (idempotent write)", () => {
+    const path = tempLogPath();
+    const log = new AuditLog({ persistTo: path });
+    const entry = buildSystemEventAuditEntry("test_event", "success", {}, "test", "sys-1", "corr-1");
+
+    log.record(entry);
+    log.record(entry);
+
+    const lines = readFileSync(path, "utf-8").trim().split("\n");
+    expect(lines).toHaveLength(1);
+  });
+
+  it("rehydrates prior entries from disk when constructed with the same persistTo path", () => {
+    const path = tempLogPath();
+    const first = new AuditLog({ persistTo: path });
+    first.record(buildSystemEventAuditEntry("test_event", "success", {}, "test", "sys-1", "corr-1"));
+    first.record(buildSystemEventAuditEntry("test_event_2", "success", {}, "test", "sys-2", "corr-1"));
+
+    const second = new AuditLog({ persistTo: path });
+
+    expect(second.all()).toHaveLength(2);
+    expect(second.retrieve("sys-1").found).toBe(true);
+    expect(second.forCorrelationId("corr-1")).toHaveLength(2);
+  });
+
+  it("continues writing new entries to the same file after rehydration", () => {
+    const path = tempLogPath();
+    const first = new AuditLog({ persistTo: path });
+    first.record(buildSystemEventAuditEntry("test_event", "success", {}, "test", "sys-1", "corr-1"));
+
+    const second = new AuditLog({ persistTo: path });
+    second.record(buildSystemEventAuditEntry("test_event_2", "success", {}, "test", "sys-2", "corr-1"));
+
+    const lines = readFileSync(path, "utf-8").trim().split("\n");
+    expect(lines).toHaveLength(2);
+    expect(second.all()).toHaveLength(2);
+  });
+
+  it("skips an unreadable line during rehydration instead of crashing", () => {
+    const path = tempLogPath();
+    const first = new AuditLog({ persistTo: path });
+    first.record(buildSystemEventAuditEntry("test_event", "success", {}, "test", "sys-1", "corr-1"));
+    // Simulate a truncated final line from a crash mid-append.
+    appendFileSync(path, '{"id":"sys-2","entryType":"system_e', "utf-8");
+
+    const second = new AuditLog({ persistTo: path });
+
+    expect(second.all()).toHaveLength(1);
+    expect(second.retrieve("sys-1").found).toBe(true);
+  });
+
+  it("creates the parent directory if it does not exist yet", () => {
+    const dir = mkdtempSync(join(tmpdir(), "audit-log-test-"));
+    tempDirs.push(dir);
+    const path = join(dir, "nested", "audit-log.jsonl");
+
+    expect(() => new AuditLog({ persistTo: path })).not.toThrow();
   });
 });
