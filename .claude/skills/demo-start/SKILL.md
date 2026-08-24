@@ -30,14 +30,32 @@ the blocking scenario, not waiting on a cold start.
    Then poll `curl -s http://localhost:8787/health` (a few seconds apart, bounded —
    don't wait forever) until it returns ok.
 
-4. **Start continuous monitoring**, so it's already running before the presenter
+4. **Log in and capture a session cookie**, from `mcp-server/`. Every route past this
+   point requires a real, password-verified session (see `mcp-server/src/auth/`) —
+   `AUTH_USERNAME`/`AUTH_PASSWORD` must both be set in `mcp-server/.env` (the plaintext
+   password, not just the hash, since a hash alone can't be used to log in). Extract
+   just those two values with `grep`/`cut` rather than sourcing the whole `.env` file
+   as shell code — confirmed by testing directly that blanket-sourcing breaks, since
+   `OPERATOR_CONTACTS`'s unquoted value contains parentheses, which zsh tries to
+   glob-expand:
+   ```
+   AUTH_USERNAME=$(grep '^AUTH_USERNAME=' .env | cut -d= -f2-)
+   AUTH_PASSWORD=$(grep '^AUTH_PASSWORD=' .env | cut -d= -f2-)
+   curl -s -c /tmp/coreops-demo-cookies.txt -X POST http://localhost:8787/api/login \
+     -H "Content-Type: application/json" \
+     -d "{\"username\":\"$AUTH_USERNAME\",\"password\":\"$AUTH_PASSWORD\"}"
+   ```
+   Confirm the response shows the real `"username"`, not a `401`. Every gated call
+   below adds `-b /tmp/coreops-demo-cookies.txt`.
+
+5. **Start continuous monitoring**, so it's already running before the presenter
    triggers anything:
    ```
-   curl -s -X POST http://localhost:8787/api/monitoring/start
+   curl -s -b /tmp/coreops-demo-cookies.txt -X POST http://localhost:8787/api/monitoring/start
    ```
    Confirm the response shows `"running": true` and a real `taskId`.
 
-5. **Schedule a real fault injection in the background**, so the demo starts clean
+6. **Schedule a real fault injection in the background**, so the demo starts clean
    and healthy and a real incident appears on its own partway through — the
    presenter never has to trigger anything on camera. Write a small wrapper script
    rather than backgrounding `sleep && seedBlockingScenario` directly — `$!` capture
@@ -70,7 +88,7 @@ the blocking scenario, not waiting on a cold start.
    narration is "the lock cleared" or "the system's own guardrail is why we can't
    just auto-fix this yet."
 
-6. **Report readiness, don't open a browser tab yourself.** Tell the user the
+7. **Report readiness, don't open a browser tab yourself.** Tell the user the
    dashboard is ready at `http://localhost:8787/` and that they should open it in
    their own browser (the one they'll actually be screen-sharing) — the Claude Code
    Browser pane isn't what an audience sees. Mention that SQL Server may still take
@@ -88,9 +106,11 @@ or a server that never returns healthy means the demo isn't ready yet; say so pl
 ## Related
 
 - `demo-stop` — the matching teardown skill. It also cancels any fault injection
-  step 5 scheduled but hasn't fired yet, and kills it if it has — don't leave a
+  step 6 scheduled but hasn't fired yet, and kills it if it has — don't leave a
   scheduled or running blocking scenario behind after the demo ends.
 - `mcp-server/src/warmup.ts` — the actual warmup script this drives.
-- `mcp-server/src/seedBlockingScenario.ts` — the real blocking-scenario script step 5
+- `mcp-server/src/seedBlockingScenario.ts` — the real blocking-scenario script step 6
   schedules. Can still be run by hand instead, with different timing, if the
   presenter wants to trigger it live on camera rather than have it appear on its own.
+- `mcp-server/src/auth/` — session auth. `demo-stop` re-logs in rather than assuming
+  step 4's cookie jar is still valid (a demo can run past the 60-minute session TTL).

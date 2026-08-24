@@ -483,9 +483,12 @@
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
         <span class="badge" id="notif-badge" style="display:none;"></span>
       </button>
-      <span class="user-chip" style="cursor:default;" title="Quincy Ninying">
-        <div class="avatar">QN</div>
+      <span class="user-chip" style="cursor:default;" id="user-chip" title="">
+        <div class="avatar" id="user-avatar">—</div>
       </span>
+      <button class="icon-btn" id="logout-btn" aria-label="Sign out" title="Sign out">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
     </header>
 
     <main class="content" id="main-content">
@@ -679,6 +682,19 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+// Every request to the backend goes through this — the vanilla-JS equivalent of an
+// axios interceptor. A 401 means the session is missing or expired (never logged in,
+// or the 60-minute TTL ran out mid-session); redirect to /login rather than letting
+// each of this file's ~11 call sites fail differently.
+async function apiFetch(path, opts) {
+  const res = await fetch(path, opts);
+  if (res.status === 401) {
+    window.location.href = '/login';
+    throw new Error('Not authenticated — redirecting to sign in.');
+  }
+  return res;
+}
+
 const activityLog = [];
 
 function pushActivity(kind, html) {
@@ -727,7 +743,7 @@ async function loadHealth() {
   const kpiHealth = $('kpi-health');
   const kpiHealthMeta = $('kpi-health-meta');
   try {
-    const res = await fetch('/health');
+    const res = await apiFetch('/health');
     const body = await res.json();
     const healthy = body.status === 'ok';
     bannerDot.style.background = healthy ? 'var(--success)' : 'var(--danger)';
@@ -766,7 +782,7 @@ async function loadIncidents() {
   const kpiSessions = $('kpi-sessions');
   const kpiSessionsMeta = $('kpi-sessions-meta');
   try {
-    const res = await fetch('/dmv/exec-requests');
+    const res = await apiFetch('/dmv/exec-requests');
     const body = await res.json();
     const isLive = body.source === 'live';
     tagEl.textContent = body.source;
@@ -861,7 +877,7 @@ function renderMonitorStatus(body) {
 
 async function loadMonitorStatus() {
   try {
-    const res = await fetch('/api/monitoring/status');
+    const res = await apiFetch('/api/monitoring/status');
     const body = await res.json();
     renderMonitorStatus(body);
   } catch (e) {
@@ -870,11 +886,11 @@ async function loadMonitorStatus() {
 }
 
 async function startMonitoring() {
-  await fetch('/api/monitoring/start', { method: 'POST' });
+  await apiFetch('/api/monitoring/start', { method: 'POST' });
   await loadMonitorStatus();
 }
 async function stopMonitoring() {
-  await fetch('/api/monitoring/stop', { method: 'POST' });
+  await apiFetch('/api/monitoring/stop', { method: 'POST' });
   await loadMonitorStatus();
 }
 
@@ -884,7 +900,7 @@ async function rollbackMonitoring() {
   if (!currentTaskId) return;
   btn.disabled = true;
   try {
-    const res = await fetch('/api/rollback', {
+    const res = await apiFetch('/api/rollback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ taskId: currentTaskId, taskType: 'start_monitoring', actor: 'quincy', role: 'system_administrator' }),
@@ -929,7 +945,7 @@ async function getAiRecommendation() {
   try {
     const incidentId = 'inc-' + Date.now();
     const path = source === 'cloud' ? '/api/cloud-recommendation' : '/api/recommendation';
-    const res = await fetch(path + '?incidentId=' + encodeURIComponent(incidentId));
+    const res = await apiFetch(path + '?incidentId=' + encodeURIComponent(incidentId));
     const body = await res.json();
 
     if (!res.ok) {
@@ -987,7 +1003,7 @@ async function viewAuditTrail() {
   btn.disabled = true;
   btn.textContent = 'Loading…';
   try {
-    const res = await fetch('/api/audit?correlationId=' + encodeURIComponent(lastCorrelationId));
+    const res = await apiFetch('/api/audit?correlationId=' + encodeURIComponent(lastCorrelationId));
     const body = await res.json();
     if (!body.entries || body.entries.length === 0) {
       resultEl.innerHTML = '<div class="empty-state">No audit entries for this correlation ID.</div>';
@@ -1015,7 +1031,7 @@ async function proposeRemediation() {
   btn.disabled = true;
   btn.textContent = 'Proposing…';
   try {
-    const res = await fetch('/api/guardrail/propose', { method: 'POST' });
+    const res = await apiFetch('/api/guardrail/propose', { method: 'POST' });
     const body = await res.json();
     currentGuardrailItemId = body.itemId;
     const allowed = body.result.allowed;
@@ -1045,7 +1061,7 @@ async function decideRemediation(decision) {
   approveBtn.disabled = true;
   rejectBtn.disabled = true;
   try {
-    const res = await fetch('/api/guardrail/decide', {
+    const res = await apiFetch('/api/guardrail/decide', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ itemId: currentGuardrailItemId, decision }),
@@ -1086,7 +1102,7 @@ async function decideRemediation(decision) {
 /* ---------- notifications (real alerts, repurposed) ---------- */
 async function refreshNotifBadge() {
   try {
-    const res = await fetch('/api/monitoring/status');
+    const res = await apiFetch('/api/monitoring/status');
     const body = await res.json();
     $('notif-badge').style.display = (body.recentAlerts || []).length > 0 ? 'block' : 'none';
   } catch (e) { /* silent — badge just stays hidden */ }
@@ -1172,7 +1188,23 @@ $('notif-btn').addEventListener('click', () => {
   panel.focus();
 });
 
+/* ---------- session ---------- */
+async function loadSession() {
+  // Doubles as the page's initial auth check — apiFetch redirects to /login on a
+  // 401 before any other panel gets a chance to render with no data.
+  const res = await apiFetch('/api/session');
+  const body = await res.json();
+  $('user-chip').title = body.username;
+  $('user-avatar').textContent = body.username.slice(0, 2).toUpperCase();
+}
+
+$('logout-btn').addEventListener('click', async () => {
+  await apiFetch('/api/logout', { method: 'POST' }).catch(() => {});
+  window.location.href = '/login';
+});
+
 /* ---------- boot ---------- */
+loadSession();
 loadHealth();
 loadIncidents();
 loadMonitorStatus();

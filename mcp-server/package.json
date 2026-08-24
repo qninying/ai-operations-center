@@ -10,7 +10,8 @@
     "http": "tsx src/httpServer.ts",
     "build": "tsc",
     "start": "node dist/mcp-server/src/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "hash-password": "tsx src/auth/hashPassword.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

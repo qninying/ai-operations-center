@@ -24,19 +24,33 @@ running — every step here is idempotent, matching this repo's own idempotency 
    even if `demo-start`'s step 5 already fired and resolved on its own: killing an
    already-finished process's name match is harmless.
 
-2. **Stop monitoring next, while the server can still hear the request:**
+2. **Log in fresh**, from `mcp-server/` — don't assume `demo-start`'s cookie jar is
+   still valid (a demo can run past the session's 60-minute TTL, and re-logging in is
+   cheap and stateless either way). Extract credentials with `grep`/`cut` rather than
+   sourcing `.env` as shell code (see `demo-start`'s step 4 for why blanket-sourcing
+   breaks). If the server isn't running, this will just fail to connect — that's fine,
+   continue to step 3 rather than treating it as an error:
    ```
-   curl -s -X POST http://localhost:8787/api/monitoring/stop
+   AUTH_USERNAME=$(grep '^AUTH_USERNAME=' .env | cut -d= -f2-)
+   AUTH_PASSWORD=$(grep '^AUTH_PASSWORD=' .env | cut -d= -f2-)
+   curl -s -c /tmp/coreops-demo-cookies.txt -X POST http://localhost:8787/api/login \
+     -H "Content-Type: application/json" \
+     -d "{\"username\":\"$AUTH_USERNAME\",\"password\":\"$AUTH_PASSWORD\"}"
    ```
-   If the server isn't running, this will just fail to connect — that's fine,
-   continue to step 3 rather than treating it as an error.
 
-3. **Stop the HTTP server process:**
+3. **Stop monitoring next, while the server can still hear the request:**
+   ```
+   curl -s -b /tmp/coreops-demo-cookies.txt -X POST http://localhost:8787/api/monitoring/stop
+   ```
+   If step 2's login failed (server not running), this will just fail to connect too
+   — that's fine, continue to step 4 rather than treating it as an error.
+
+4. **Stop the HTTP server process:**
    ```
    pkill -f "tsx src/httpServer.ts"
    ```
 
-4. **Confirm it's actually down**, don't just assume the kill worked:
+5. **Confirm it's actually down**, don't just assume the kill worked:
    ```
    curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8787/health
    ```
@@ -44,7 +58,7 @@ running — every step here is idempotent, matching this repo's own idempotency 
    something else is holding the port or the process didn't die — investigate rather
    than reporting success.
 
-5. **Report the clean state.** Confirm to the user that any pending fault injection
+6. **Report the clean state.** Confirm to the user that any pending fault injection
    was cancelled, monitoring was stopped, and the server is down — don't leave them
    wondering whether something is still running in the background after they've
    closed their laptop.

@@ -31,6 +31,9 @@ import { checkRemediationGuardrail } from "../../guardrails/remediationGuardrail
 import type { RemediationAction, ApprovalDecision } from "../../guardrails/remediationGuardrail.js";
 import { AuditLog } from "../../guardrails/auditLog.js";
 import { HitlQueue, HitlItemNotFoundError, UnauthorizedDeciderError, MfaRequiredError } from "../../guardrails/hitlQueue.js";
+import { verifyPassword } from "./auth/credentials.js";
+import { SessionStore } from "./auth/sessionStore.js";
+import { serializeSessionCookie, clearSessionCookie, parseSessionCookie } from "./auth/cookies.js";
 
 // Thin HTTP transport for R2's DMV read path, alongside the existing stdio MCP
 // transport in index.ts. Both call the same readDmv() orchestrator — this file adds
@@ -43,6 +46,43 @@ const REQUEST_TIMEOUT_MS = 5000;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dashboardHtml = readFileSync(join(__dirname, "dashboard.html"), "utf-8");
+const loginHtml = readFileSync(join(__dirname, "login.html"), "utf-8");
+
+// Single-operator session auth. Fails fast at startup if either is unset — a
+// deliberate exception to this file's usual "missing config -> fall back
+// gracefully" convention (SQLSERVER_*, AZURE_* all degrade gracefully); falling
+// back here would mean silently serving the dashboard with no real auth, which
+// defeats the feature. See .env.example for how to generate AUTH_PASSWORD_HASH.
+if (!process.env.AUTH_USERNAME || !process.env.AUTH_PASSWORD_HASH) {
+  throw new Error(
+    "AUTH_USERNAME and AUTH_PASSWORD_HASH must both be set in mcp-server/.env — see .env.example. " +
+      "Generate a hash with: npm run hash-password -- '<your password>'"
+  );
+}
+// Re-bound to plain `string` consts — TypeScript doesn't carry the guard's
+// narrowing of process.env.X into route-handler closures defined later in this
+// file, since it can't prove process.env wasn't mutated between the check and use.
+const AUTH_USERNAME: string = process.env.AUTH_USERNAME;
+const AUTH_PASSWORD_HASH: string = process.env.AUTH_PASSWORD_HASH;
+const SESSION_COOKIE_SECURE = process.env.SESSION_COOKIE_SECURE === "true";
+const sessionStore = new SessionStore();
+
+interface Session {
+  username: string;
+}
+
+// Returns the verified session, or null (and has already sent a 401) if none.
+// Call at the top of every route that isn't GET /, GET /health, GET /login,
+// POST /api/login, or POST /api/logout.
+function requireSession(req: IncomingMessage, res: ServerResponse): Session | null {
+  const sessionId = parseSessionCookie(req.headers.cookie);
+  const session = sessionId ? sessionStore.verify(sessionId) : null;
+  if (!session) {
+    sendJson(res, 401, { error: "NOT_AUTHENTICATED", message: "Sign in required." });
+    return null;
+  }
+  return { username: session.username };
+}
 
 // STORY-008 / REQ-016: single monitoring instance for the process, exposed via the
 // routes below so a demo can toggle it live and see it running, rather than reading
@@ -85,7 +125,13 @@ function stopMonitoringInternal(): void {
 // service instead. See PROGRESS.md for the decision and why.
 const auditLog = new AuditLog();
 const hitlQueue = new HitlQueue(auditLog);
-const GUARDRAIL_PRIMARY_APPROVER = (process.env.OPERATOR_CONTACTS ?? "on-call operator").split(",")[0].trim();
+// The real, password-verified login identity — not OPERATOR_CONTACTS, which stays a
+// separate, notification-recipient display name for notifyOperators() (never
+// verified against anything). Propose-time assignment (here) and decide-time
+// identity (POST /api/guardrail/decide, below) both now trace back to the one real
+// login, so HitlQueue's "only the assigned approver may decide" check is finally
+// reachable instead of permanently dead code.
+const GUARDRAIL_PRIMARY_APPROVER = AUTH_USERNAME;
 const GUARDRAIL_BACKUP_APPROVER = "sre-oncall";
 
 interface PendingRemediation {
@@ -158,7 +204,68 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/login") {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(loginHtml);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/login") {
+    let body: { username?: unknown; password?: unknown };
+    try {
+      body = (await readJsonBody(req)) as typeof body;
+    } catch (error) {
+      sendJson(res, 400, {
+        error: "INVALID_JSON_BODY",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+
+    const { username, password } = body;
+    if (typeof username !== "string" || !username || typeof password !== "string" || !password) {
+      sendJson(res, 400, { error: "MISSING_FIELDS", message: "username and password are both required." });
+      return;
+    }
+
+    // One generic failure message for both a wrong username and a wrong password —
+    // distinguishing them would let a caller enumerate valid usernames.
+    if (username !== AUTH_USERNAME || !verifyPassword(password, AUTH_PASSWORD_HASH)) {
+      sendJson(res, 401, { error: "INVALID_CREDENTIALS", message: "Incorrect username or password." });
+      return;
+    }
+
+    const { sessionId, expiresAt } = sessionStore.create(username);
+    res.setHeader(
+      "Set-Cookie",
+      serializeSessionCookie(sessionId, { secure: SESSION_COOKIE_SECURE, maxAgeMs: expiresAt - Date.now() })
+    );
+    logEvent({ level: "info", event: "login", context: { username, outcome: "success" } });
+    sendJson(res, 200, { username });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/logout") {
+    // Idempotent — clearing an absent/expired session is a safe no-op, matching this
+    // repo's idempotency rule. No session required to call this.
+    const sessionId = parseSessionCookie(req.headers.cookie);
+    if (sessionId) {
+      sessionStore.destroy(sessionId);
+    }
+    res.setHeader("Set-Cookie", clearSessionCookie(SESSION_COOKIE_SECURE));
+    sendJson(res, 200, { loggedOut: true });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/session") {
+    const session = requireSession(req, res);
+    if (!session) return;
+    sendJson(res, 200, { username: session.username });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/dmv/exec-requests") {
+    if (!requireSession(req, res)) return;
     const databaseName = url.searchParams.get("databaseName") ?? undefined;
     try {
       const result = await readDmv({ dmvName: "sys.dm_exec_requests", databaseName });
@@ -178,6 +285,11 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     // and is unit-tested; this route is just plumbing plus the access-log call
     // ("Trust: Dashboard access is logged by user role") that a pure function can't
     // do for itself.
+    // NOTE: the separate frontend/ React app also calls this route, unauthenticated,
+    // via a same-origin Vite dev proxy — its own code already flags its deployment
+    // topology as undecided. Gating this now means that call will 401 until the
+    // frontend's cookie/CORS handling is addressed (flagged, not solved, per plan).
+    if (!requireSession(req, res)) return;
     const role = url.searchParams.get("role") ?? "";
     try {
       const dmvResult = await readDmv({ dmvName: "sys.dm_exec_requests" });
@@ -223,6 +335,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     // ADR-002 step 2: incidentId is generated once, right here, at the true entry
     // point for this chain — and is the correlation ID every downstream write below
     // (generateRecommendation, evaluateEscalation, notifyOperators) shares.
+    if (!requireSession(req, res)) return;
     const incidentId = url.searchParams.get("incidentId") ?? crypto.randomUUID();
     const description = url.searchParams.get("description") ?? "";
     try {
@@ -257,6 +370,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     // above — same rule, never falls back to fixture data on a cloud-service failure.
     // Every attempt is logged regardless of outcome by cloudRecommendationService.ts
     // itself ("Trust: all data access attempts are logged").
+    if (!requireSession(req, res)) return;
     const incidentId = url.searchParams.get("incidentId") ?? crypto.randomUUID();
     const description = url.searchParams.get("description") ?? "";
     try {
@@ -287,6 +401,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/monitoring/start") {
+    if (!requireSession(req, res)) return;
     // STORY-008 / REQ-016: idempotent by construction — calling start while already
     // running does not spin up a second interval loop (that would double every
     // cycle's log lines and alerts), matching this repo's idempotency rule.
@@ -302,6 +417,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/monitoring/stop") {
+    if (!requireSession(req, res)) return;
     if (!monitoringHandle) {
       sendJson(res, 200, { running: false, message: "Monitoring is already stopped." });
       return;
@@ -312,6 +428,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/monitoring/status") {
+    if (!requireSession(req, res)) return;
     sendJson(res, 200, {
       running: monitoringHandle !== null,
       taskId: currentMonitoringTaskId,
@@ -322,6 +439,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/rollback") {
+    if (!requireSession(req, res)) return;
     // STORY-011 / REQ-015: rollback for the two task types this process actually
     // knows about — see buildRollbackRegistry()'s header comment for why only these
     // two, and why notify_operators is registered rather than left unrecognized.
@@ -382,6 +500,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/guardrail/propose") {
+    if (!requireSession(req, res)) return;
     // Same real scenario as guardrails/demoUnsafeAction.ts: a recommendation that's
     // evidence-linked and of a valid, reversible type, missing only human approval.
     // Enqueues into the real HITL queue (guardrails/hitlQueue.ts) rather than doing a
@@ -408,6 +527,9 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/guardrail/decide") {
+    const session = requireSession(req, res);
+    if (!session) return;
+
     let body: { itemId?: unknown; decision?: unknown };
     try {
       body = (await readJsonBody(req)) as typeof body;
@@ -435,11 +557,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     }
 
     try {
-      // Demo-grade: the actor deciding is always the same primary approver the item
-      // was enqueued for, with MFA supplied as true — there's no real session/MFA
-      // concept in this walking skeleton, so this is an honest stand-in, not a claim
-      // that a real MFA challenge happened.
-      const item = hitlQueue.decide(itemId, decision, GUARDRAIL_PRIMARY_APPROVER, true);
+      // decidedBy is now the real, password-verified session identity (session.username),
+      // not a hardcoded constant — this is what makes HitlQueue's "only the assigned
+      // approver may decide" check meaningful. MFA itself is still not implemented
+      // anywhere in this system, so `true` remains an honest stand-in for that one
+      // factor only, not a claim that a real MFA challenge happened.
+      const item = hitlQueue.decide(itemId, decision, session.username, true);
 
       if (decision === "reject") {
         sendJson(res, 200, { itemId, status: item.status, executed: false });
@@ -496,6 +619,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/audit") {
+    if (!requireSession(req, res)) return;
     // ADR-002 "Consequences": the audit log's actual value is forCorrelationId()
     // reconstruction — this route is what makes that demoable live, not just
     // asserted in a test. Real data only: whatever correlationId a real
