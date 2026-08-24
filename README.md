@@ -50,13 +50,18 @@ Then open `http://localhost:8787/console?role=it-manager`.
 ## What's real
 
 Every claim below has a test behind it and was verified against a real running
-server, not just unit-tested. Current counts: **230 tests passing** — 167 in
+server, not just unit-tested. Current counts: **268 tests passing** — 205 in
 `mcp-server/`, 57 in `guardrails/`, 6 in `frontend/`.
 
 **Governance & security**
 - Session-based authentication (`mcp-server/src/auth/`) gates every route —
   `scrypt` password hashing, `HttpOnly`+`SameSite=Strict` session cookies, no
   raw credential ever touches client-side JS.
+- Real TOTP-based MFA (RFC 6238), hand-rolled with `node:crypto` — verified
+  against the published RFC test vectors, with drift-tolerant, replay-protected
+  code verification. Login requiring TOTP makes every session inherently
+  MFA-verified; a guardrail decision's `mfa` check used to be a hardcoded
+  placeholder — see [ADR-006](docs/ADR-006-totp-mfa.md) for the fix.
 - The human-approval guardrail (`guardrails/`) blocks any action lacking real
   evidence, an allowed reversible type, or a genuine approval — and only the
   assigned approver, verified by real login, can decide it. That check used to
@@ -86,7 +91,11 @@ server, not just unit-tested. Current counts: **230 tests passing** — 167 in
   (`mcp-server/src/reliability/`) around every upstream call — SQL Server and
   the Anthropic API alike.
 - Live data is honestly tagged `live` vs. `fallback` — an unreachable SQL
-  Server is a visible notification, never a silent fixture substitution.
+  Server is a visible notification, never a silent fixture substitution. The
+  same fixture-first pattern now also covers SSRS report-execution monitoring
+  (`mcp-server/src/ssrsReader.ts`, querying `ExecutionLog3`), and the pattern
+  itself has been live-verified against a real running open-source system
+  (Apache Superset — see `mcp-server/dev-superset/`), not just mocks.
 
 **Interfaces**
 - `dashboard.html` — the primary operations dashboard, `apiFetch()`-wrapped so
@@ -98,7 +107,7 @@ server, not just unit-tested. Current counts: **230 tests passing** — 167 in
 
 ## Architecture decisions
 
-Five ADRs, each with real alternatives considered and rejected, not just the
+Six ADRs, each with real alternatives considered and rejected, not just the
 choice made:
 
 | ADR | Decision |
@@ -108,6 +117,7 @@ choice made:
 | [ADR-003](docs/ADR-003-session-based-authentication.md) | Session-based auth over JWT — no distributed system for JWT's statelessness to help with, and a JWT in `localStorage` sits in the same XSS exposure class an audit had just closed |
 | [ADR-004](docs/ADR-004-console-serving-topology.md) | Serving the built console from `mcp-server` itself, not a reverse proxy that doesn't exist yet |
 | [ADR-005](docs/ADR-005-audit-trail-persistence.md) | Append-only JSONL persistence for the audit trail, chosen over SQLite to avoid a first-ever database dependency |
+| [ADR-006](docs/ADR-006-totp-mfa.md) | Real TOTP-based MFA over an ntfy-delivered OTP or WebAuthn — hand-rolled with `node:crypto`, and login itself requiring TOTP makes every session inherently MFA-verified, closing a hardcoded placeholder |
 
 The full architecture package — a written summary, layer diagrams, and a
 trust-boundary data-flow diagram — is in
