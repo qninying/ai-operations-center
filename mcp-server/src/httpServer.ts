@@ -395,6 +395,19 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       const result = await readDmv({ dmvName: "sys.dm_exec_requests", databaseName });
       sendJson(res, 200, result);
     } catch (error) {
+      // Unlike /api/dashboard/summary's equivalent catch, this route had no
+      // logEvent here — the client got the real message, but an unexpected DMV
+      // failure left zero server-side observable record. Found during an audit
+      // of this file's own "never swallow" convention; matches the pattern
+      // already established at /api/dashboard/summary.
+      logEvent({
+        level: "error",
+        event: "dmv_read_failed",
+        context: {
+          databaseName: databaseName ?? null,
+          errorClass: error instanceof Error ? error.name : "Error",
+        },
+      });
       sendJson(res, 500, {
         error: "DMV_READ_FAILED",
         message: error instanceof Error ? error.message : String(error),
@@ -481,6 +494,17 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         sendJson(res, 502, { error: "INVALID_DATA_FORMAT", message: error.message });
         return;
       }
+      // Reachable via real, currently-unlogged-upstream error types
+      // (MalformedResponseError from rootCauseAgent.ts, InvalidConfidenceScoreError
+      // from escalationService.ts) — found during an audit of this file's own
+      // "never swallow" convention. The two branches above are covered by logging
+      // already done in recommendationService.ts before those errors are thrown;
+      // this is the one path that wasn't.
+      logEvent({
+        level: "error",
+        event: "recommendation_failed",
+        context: { incidentId, errorClass: error instanceof Error ? error.name : "Error" },
+      });
       sendJson(res, 500, {
         error: "RECOMMENDATION_FAILED",
         message: error instanceof Error ? error.message : String(error),
@@ -516,6 +540,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         sendJson(res, 502, { error: "INVALID_DATA_FORMAT", message: error.message });
         return;
       }
+      // Same gap and same fix as /api/recommendation's equivalent catch-all —
+      // reachable via unlogged-upstream MalformedResponseError/InvalidConfidenceScoreError.
+      logEvent({
+        level: "error",
+        event: "recommendation_failed",
+        context: { incidentId, errorClass: error instanceof Error ? error.name : "Error" },
+      });
       sendJson(res, 500, {
         error: "RECOMMENDATION_FAILED",
         message: error instanceof Error ? error.message : String(error),
@@ -615,6 +646,15 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         sendJson(res, 409, { error: "ROLLBACK_DEPENDENCY_BLOCKED", message: error.message });
         return;
       }
+      // Reachable via a plain Error thrown inside buildRollbackRegistry()'s own
+      // revert() implementations (e.g. "no active monitoring session matches
+      // task"), which had no logging of its own — found during an audit of this
+      // file's own "never swallow" convention.
+      logEvent({
+        level: "error",
+        event: "rollback_failed",
+        context: { taskId, taskType, errorClass: error instanceof Error ? error.name : "Error" },
+      });
       sendJson(res, 500, {
         error: "ROLLBACK_FAILED",
         message: error instanceof Error ? error.message : String(error),

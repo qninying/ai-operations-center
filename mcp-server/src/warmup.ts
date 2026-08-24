@@ -54,7 +54,15 @@ async function warmupSqlServer(): Promise<WarmupResult> {
       return { ok: true, message: `Connected on attempt ${attempt}.` };
     } catch (error) {
       lastError = error;
-      await pool.close().catch(() => {});
+      // The pool's own connect()/query() already failed above (that's the error
+      // being handled here) — this closes the now-broken pool as best-effort
+      // cleanup. A failure closing an already-broken connection isn't silently
+      // discarded, though: found as a real (if low-stakes, demo-script-only)
+      // violation of this repo's "never swallow" rule during an audit.
+      await pool.close().catch((closeError) => {
+        const closeMsg = closeError instanceof Error ? closeError.message : String(closeError);
+        console.log(`[SQL Server] (secondary) failed to close the already-broken pool: ${closeMsg}`);
+      });
       const remaining = deadline - Date.now();
       if (remaining <= 0) break;
       const msg = error instanceof Error ? error.message : String(error);

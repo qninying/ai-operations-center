@@ -17,7 +17,13 @@ export function safeLogEvent(callerLabel: string, input: LogEventInput): void {
     try {
       console.error(`${callerLabel}: logEvent failed`, error);
     } catch {
-      // Truly nothing more can be done here; never let a log failure escape.
+      // A deliberate, audited exception to CLAUDE.md's "never swallow an error"
+      // rule, not an oversight — reviewed directly during a codebase-wide catch-
+      // block audit and kept as-is. This is the fallback-of-a-fallback: it exists
+      // specifically for console.error() itself throwing (e.g. a closed stdout/
+      // stderr), and there is no lower sink left to report to. Writing to a file
+      // as a third fallback would just move the same "what if this write also
+      // fails" problem one level deeper, not resolve it.
     }
   }
 }
