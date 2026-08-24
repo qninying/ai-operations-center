@@ -31,8 +31,8 @@ import { checkRemediationGuardrail } from "../../guardrails/remediationGuardrail
 import type { RemediationAction, ApprovalDecision } from "../../guardrails/remediationGuardrail.js";
 import { AuditLog } from "../../guardrails/auditLog.js";
 import { HitlQueue, HitlItemNotFoundError, UnauthorizedDeciderError, MfaRequiredError } from "../../guardrails/hitlQueue.js";
-import { verifyPassword } from "./auth/credentials.js";
 import { TotpVerifier } from "./auth/totp.js";
+import { findAuthenticatedUser, DirectoryUser } from "./auth/userDirectory.js";
 import { SessionStore } from "./auth/sessionStore.js";
 import { serializeSessionCookie, clearSessionCookie, parseSessionCookie } from "./auth/cookies.js";
 import { resolveStaticFilePath, mimeTypeFor } from "./staticFiles.js";
@@ -82,6 +82,31 @@ const MFA_TOTP_SECRET: string = process.env.MFA_TOTP_SECRET;
 const SESSION_COOKIE_SECURE = process.env.SESSION_COOKIE_SECURE === "true";
 const sessionStore = new SessionStore();
 const totpVerifier = new TotpVerifier(MFA_TOTP_SECRET);
+
+// Optional second identity for guardrails/hitlQueue.ts's escalation path — see
+// .env.example. Deliberately NOT fail-fast: unset keeps this a single-operator
+// deployment exactly as it works today. Each configured user gets its own
+// TotpVerifier instance — replay-protection state (lastAcceptedTimestep) is
+// private per-instance, so sharing one across two secrets would corrupt it for
+// both users.
+const BACKUP_APPROVER_USERNAME = process.env.BACKUP_APPROVER_USERNAME;
+const BACKUP_APPROVER_PASSWORD_HASH = process.env.BACKUP_APPROVER_PASSWORD_HASH;
+const BACKUP_APPROVER_TOTP_SECRET = process.env.BACKUP_APPROVER_TOTP_SECRET;
+const backupApproverConfigured = Boolean(
+  BACKUP_APPROVER_USERNAME && BACKUP_APPROVER_PASSWORD_HASH && BACKUP_APPROVER_TOTP_SECRET
+);
+
+const directoryUsers: DirectoryUser[] = [
+  { username: AUTH_USERNAME, passwordHash: AUTH_PASSWORD_HASH, totpVerifier, kind: "primary" },
+];
+if (backupApproverConfigured) {
+  directoryUsers.push({
+    username: BACKUP_APPROVER_USERNAME!,
+    passwordHash: BACKUP_APPROVER_PASSWORD_HASH!,
+    totpVerifier: new TotpVerifier(BACKUP_APPROVER_TOTP_SECRET!),
+    kind: "backup",
+  });
+}
 
 interface Session {
   username: string;
@@ -169,7 +194,13 @@ const hitlQueue = new HitlQueue(auditLog);
 // login, so HitlQueue's "only the assigned approver may decide" check is finally
 // reachable instead of permanently dead code.
 const GUARDRAIL_PRIMARY_APPROVER = AUTH_USERNAME;
-const GUARDRAIL_BACKUP_APPROVER = "sre-oncall";
+// Was always the literal string "sre-oncall" — a hardcoded placeholder no one
+// could ever actually log in as, so HitlQueue's escalation-to-backup-approver
+// path (see checkForTimeout()) was unit-tested with a mocked decidedBy string but
+// never reachable by a real second authenticated human. Now names a real,
+// loggable-in identity whenever BACKUP_APPROVER_* is configured (see ADR-007);
+// falls back to the same honest placeholder, unchanged, when it isn't.
+const GUARDRAIL_BACKUP_APPROVER = backupApproverConfigured ? BACKUP_APPROVER_USERNAME! : "sre-oncall";
 
 interface PendingRemediation {
   action: RemediationAction;
@@ -316,21 +347,19 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       return;
     }
 
-    // One generic failure message for a wrong username, wrong password, OR wrong
-    // TOTP code — distinguishing any of them would let a caller enumerate valid
-    // usernames or probe which factor was wrong. Short-circuit evaluation means a
-    // wrong password never reaches totpVerifier.verify(), so a mistyped password
-    // can't burn/replay-block the operator's real, currently-valid code.
-    if (
-      username !== AUTH_USERNAME ||
-      !verifyPassword(password, AUTH_PASSWORD_HASH) ||
-      !totpVerifier.verify(totpCode)
-    ) {
+    // One generic failure message regardless of a wrong username, wrong password,
+    // wrong TOTP code, or which of 1-2 configured users (if any) partially matched
+    // — distinguishing any of these would let a caller enumerate valid usernames
+    // or probe which factor was wrong. findAuthenticatedUser()'s own short-circuit
+    // per user means a wrong password never reaches that user's totpVerifier.verify(),
+    // so a mistyped password can't burn/replay-block that user's currently-valid code.
+    const matchedUser = findAuthenticatedUser(directoryUsers, username, password, totpCode);
+    if (!matchedUser) {
       sendJson(res, 401, { error: "INVALID_CREDENTIALS", message: "Incorrect username, password, or code." });
       return;
     }
 
-    const { sessionId, expiresAt } = sessionStore.create(username);
+    const { sessionId, expiresAt } = sessionStore.create(matchedUser.username);
     res.setHeader(
       "Set-Cookie",
       serializeSessionCookie(sessionId, { secure: SESSION_COOKIE_SECURE, maxAgeMs: expiresAt - Date.now() })
@@ -651,13 +680,22 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       return;
     }
 
+    // Without this, escalation to the backup approver (guardrails/hitlQueue.ts's
+    // checkForTimeout()) was fully unit-tested but never actually reachable from a
+    // live request — nothing in this file ever called it, so activeApprover could
+    // never genuinely switch from the primary to the backup approver in
+    // production, no matter how long a real deployment waited.
+    hitlQueue.checkForTimeout(itemId);
+
     try {
-      // decidedBy is now the real, password-verified session identity (session.username),
-      // not a hardcoded constant — this is what makes HitlQueue's "only the assigned
-      // approver may decide" check meaningful. `true` is no longer a placeholder: since
-      // POST /api/login now requires a valid TOTP code to issue a session at all (see
-      // totpVerifier above), every session past requireSession() was already
-      // MFA-verified at login — this reads that fact, not a hardcoded stand-in for it.
+      // decidedBy is now the real, password-verified session identity (session.username)
+      // of whichever real user is currently logged in — primary or backup approver —
+      // not a hardcoded constant, which is what makes HitlQueue's "only the assigned
+      // approver may decide" check meaningful across both identities. `true` is no
+      // longer a placeholder: since POST /api/login now requires a valid TOTP code
+      // from findAuthenticatedUser() to issue a session at all, every session past
+      // requireSession() was already MFA-verified at login for whichever user it
+      // belongs to — this reads that fact, not a hardcoded stand-in for it.
       const item = hitlQueue.decide(itemId, decision, session.username, true);
 
       if (decision === "reject") {
