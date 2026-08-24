@@ -1,47 +1,17 @@
-# CoreOps — AI Operations Center
+# CoreOps — AI Operations Platform
 
-An enterprise-grade AI Operations Center concept — an intelligent command center for
-SQL Server, SSIS, SSRS, Windows Servers, and enterprise data platforms. It
-continuously monitors operational telemetry, correlates failures across services,
-uses Claude to identify root causes and downstream business impact, recommends safe
-remediation, and presents both technical and executive-friendly incident summaries —
-with a read-only monitoring layer and mandatory human approval before anything writes
-to production.
+CoreOps is an AI operations platform for SQL Server, SSIS, SSRS, and Windows
+infrastructure: it monitors telemetry, correlates failures across services, uses
+Claude to reason about root cause and business impact, and proposes remediations —
+but nothing writes to a monitored system without a real, authenticated human
+approving it first, and every decision leaves a durable, reconstructable record of
+who approved what and when.
 
-This repo has two layers: a full **system design + planning artifact** (architecture,
-tech stack, MVP plan, browsable knowledge base), and a **working walking skeleton** —
-a real MCP server, a tested guardrail, and a live dashboard — built incrementally on
-top of that design, one small, tested, reversible step at a time.
-
-It also tracks two separate things, on purpose: `project-blueprint/requirements.md`
-covers the MCP/guardrail work below (requirements R1–R5), while `.colaberry/plan.json`
-+ `.colaberry/progress.json` track a larger, formally-scoped programme (11 stories
-across 5 releases, 18 requirements) — see the Command Center for that one.
-
-## Command Center
-
-The programme's live status dashboard — 9 tabs (Overview, Outcomes, Users & Use Case,
-Guardrails, Systems, Project Management, AI Agents, Knowledge Base, Data Model),
-reading `.colaberry/plan.json` and `.colaberry/progress.json` at runtime. Nothing on
-the page is hard-coded.
-
-```bash
-python3 -m http.server   # from the repo root; defaults to port 8000
-```
-
-Then open `http://localhost:8000/` — **must be served over HTTP, not opened as a
-`file://` path**, or the browser can't resolve the page's relative data/asset paths.
-
-Every tab has a **Sample / Real** toggle. Sample fills the page with clearly-labelled
-made-up data so the finished shape is visible on day one. Real shows exactly what's
-actually been built: 7 of 11 programme stories (STORY-000/001/002/003/004/005/006) with
-test-backed criteria, sitting at `"submitted"` — the guardrails those stories back
-(REQ-001/005) still show as not-yet-enforced on the Guardrails tab, because this
-repo only flips a story to `"verified"` on an external reviewer/commit sign-off, not
-a self-declaration. None of the four target systems are connected yet. That's not a
-bug in the dashboard — it's the real state of an early-stage programme, and the
-whole point of the "Trust" rule this page is built around: no tab shows a number, a
-connection, or a result the project hasn't actually produced.
+That last part is the design's actual center of gravity. Automation that ops teams
+can't audit or override doesn't get trusted into production; automation with no
+oversight at all is worse than the outage it's meant to prevent. CoreOps is built
+around the boundary between "the AI proposes" and "a verified human decides" being
+real, enforced in code, and provable after the fact — not a policy comment.
 
 ## See it running
 
@@ -51,83 +21,131 @@ npm install
 npm run http
 ```
 
-Then open `http://localhost:8787/` — a live dashboard showing real SQL Server DMV
-incident data and a "Recommend Remediation" button that triggers the real guardrail,
-live, in the browser. See [`project-blueprint/demo-script.md`](project-blueprint/demo-script.md)
-for a guided walkthrough, or [`project-blueprint/reviewer-one-pager.md`](project-blueprint/reviewer-one-pager.md)
-for a one-page technical summary.
+Then open `http://localhost:8787/` — sign in at `/login`, then a live dashboard
+showing real SQL Server DMV incident data and a "Recommend Remediation" flow that
+runs the real guardrail, live, in the browser: propose an action, approve or reject
+it as the authenticated user, and watch the decision land in the audit trail.
 
-For the role-based Operations Console (STORY-005), with `mcp-server`'s HTTP server
-already running as above:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Then open `http://localhost:5173/?role=it-manager` — role-specific operational
-summaries fetched from the real backend (dev-proxied to `:8787`, configured in
-`frontend/vite.config.ts`). Any other role value shows an honest error, not a guess.
-
-Or, to see the console served the way it would be in a real deployment (one origin,
-no dev proxy, session cookies just work), build it and let `mcp-server` serve it
-directly — the same way it already serves `dashboard.html`:
+For the network-facing MCP transport (AI agents connecting over HTTP, not just
+local stdio):
 
 ```bash
 cd mcp-server
-npm run build-console   # builds frontend/, output isn't committed
+npm run http-mcp
+```
+
+See [`.env.example`](mcp-server/.env.example) for the auth setup both need.
+
+For the role-based Operations Console served the way it would be in a real
+deployment (one origin, no dev proxy, session cookies just work):
+
+```bash
+cd mcp-server
+npm run build-console
 npm run http
 ```
 
-Then open `http://localhost:8787/console?role=it-manager`. This is the actual
-resolution to the "where does the built frontend reach the backend" question — no
-proxy, no CORS, real login required (sign in at `/login` first if you land on the
-"Sign in required" state).
+Then open `http://localhost:8787/console?role=it-manager`.
 
-## What's built and tested
+## What's real
 
-| Path | What it is |
+Every claim below has a test behind it and was verified against a real running
+server, not just unit-tested. Current counts: **230 tests passing** — 167 in
+`mcp-server/`, 57 in `guardrails/`, 6 in `frontend/`.
+
+**Governance & security**
+- Session-based authentication (`mcp-server/src/auth/`) gates every route —
+  `scrypt` password hashing, `HttpOnly`+`SameSite=Strict` session cookies, no
+  raw credential ever touches client-side JS.
+- The human-approval guardrail (`guardrails/`) blocks any action lacking real
+  evidence, an allowed reversible type, or a genuine approval — and only the
+  assigned approver, verified by real login, can decide it. That check used to
+  compare a hardcoded value against itself and could never actually fail; see
+  [ADR-003](docs/ADR-003-session-based-authentication.md) for the fix.
+- Rate limiting on every HTTP surface — closes a real, confirmed-absent gap
+  found during a trust audit, not a precaution added speculatively.
+- A network-facing MCP tool gateway (`mcp-server/src/httpMcpServer.ts`), gated
+  by bearer-token auth, giving AI agents read-only access to live diagnostics
+  with zero write privileges — see [ADR-001](docs/ADR-001-mcp-transport-selection.md).
+
+**Audit trail**
+- Every decision and action is recorded immutably and idempotently by ID
+  (`guardrails/auditLog.ts`), reconstructable end-to-end by correlation ID via
+  `GET /api/audit?correlationId=`.
+- Persisted to disk, not just in-memory — proven by killing the running server
+  mid-session and confirming a prior approval decision was still retrievable
+  afterward. See [ADR-005](docs/ADR-005-audit-trail-persistence.md).
+
+**Reasoning & reliability**
+- The Root Cause Analysis Agent (`mcp-server/src/rootCauseAgent.ts`) makes real
+  Claude Sonnet 5 calls over real DMV evidence — zod-validated output,
+  evidence-attributed, never fabricates a result when evidence is thin or the
+  API call fails. Below 80% confidence, it gathers a differential instead of
+  presenting one guess.
+- A generic timeout + capped-retry + circuit-breaker wrapper
+  (`mcp-server/src/reliability/`) around every upstream call — SQL Server and
+  the Anthropic API alike.
+- Live data is honestly tagged `live` vs. `fallback` — an unreachable SQL
+  Server is a visible notification, never a silent fixture substitution.
+
+**Interfaces**
+- `dashboard.html` — the primary operations dashboard, `apiFetch()`-wrapped so
+  a session expiring mid-use redirects to `/login` instead of failing silently.
+- The Operations Console (`frontend/`, React + Vite) — role-based summaries,
+  an honest error state for any unrecognized role, served same-origin from
+  `mcp-server` itself in the deployment path (see
+  [ADR-004](docs/ADR-004-console-serving-topology.md)).
+
+## Architecture decisions
+
+Five ADRs, each with real alternatives considered and rejected, not just the
+choice made:
+
+| ADR | Decision |
 |---|---|
-| [`mcp-server/`](mcp-server/) | A real MCP server (official `@modelcontextprotocol/sdk`) over stdio and HTTP, exposing a read-only `read_sql_server_dmv` tool — parameterized queries, honest fixture-fallback when no live SQL Server is connected, a live dashboard at `/`. The live path is now confirmed against a real Azure SQL Database, not fixture-only. |
-| [`mcp-server/src/rootCauseAgent.ts`](mcp-server/src/rootCauseAgent.ts) | The Root Cause Analysis Agent — a real Claude Sonnet 5 (Anthropic API) call over real DMV evidence, zod-validated structured output, evidence-attributed, never fabricates a result when evidence is thin or the API call itself fails. |
-| [`mcp-server/src/diagnosticsGatherer.ts`](mcp-server/src/diagnosticsGatherer.ts) | When the Root Cause Agent's confidence is below 80%, gathers a differential — several distinct possible causes over the same evidence, each attributed — instead of presenting one under-confident guess. |
-| [`mcp-server/src/dashboardSummary.ts`](mcp-server/src/dashboardSummary.ts) + [`GET /api/dashboard/summary`](mcp-server/src/httpServer.ts) | Role-based dashboard data — an IT Manager gets real DMV data reshaped into operational counts (incidents, blocked sessions), not raw technical rows. An unrecognized role is rejected (400), never rendered wrong. Every access is logged by role. |
-| [`mcp-server/src/recommendationService.ts`](mcp-server/src/recommendationService.ts) + [`GET /api/recommendation`](mcp-server/src/httpServer.ts) | Wires real SQL Server data into a real AI recommendation. Never falls back to fixture data and calls it real — an unreachable SQL Server is an honest notification, not a silent substitution. Verified against a real, live Azure SQL Database, including a genuine blocking scenario. |
-| [`mcp-server/src/reliability/`](mcp-server/src/reliability/) | A generic, reusable timeout + capped-retry-with-backoff wrapper and circuit breaker, wired around every upstream call — SQL Server and the Anthropic API alike. |
-| [`guardrails/`](guardrails/) | `checkRemediationGuardrail()` — the structural rule that no remediation can execute without evidence, an allowed action type, and an approved (not denied, not absent) human decision. `auditLog.ts` records every decision and action, retrievable by ID, timestamped, immutable, idempotent. |
-| [`frontend/`](frontend/) | The Operations Console — Vite + React + TypeScript. `?role=it-manager` renders a real operational summary fetched from `mcp-server`'s API (dev-proxied, no CORS surface added to the backend); any other role, or a failed fetch, shows an honest error state instead of guessing. |
-| [`project-blueprint/requirements.md`](project-blueprint/requirements.md) | Per-requirement traceability (UNMAPPED / PLANNED / BUILT) with a reviewer-verifiable acceptance checklist — every claim points at a real test. |
+| [ADR-001](docs/ADR-001-mcp-transport-selection.md) | MCP transport selection — StreamableHTTP for network callers, stdio kept for local dev, bearer-token auth |
+| [ADR-002](docs/ADR-002-audit-trail-correlation-id-unification.md) | Unifying correlation IDs between the audit log and `mcp-server`'s operational logging |
+| [ADR-003](docs/ADR-003-session-based-authentication.md) | Session-based auth over JWT — no distributed system for JWT's statelessness to help with, and a JWT in `localStorage` sits in the same XSS exposure class an audit had just closed |
+| [ADR-004](docs/ADR-004-console-serving-topology.md) | Serving the built console from `mcp-server` itself, not a reverse proxy that doesn't exist yet |
+| [ADR-005](docs/ADR-005-audit-trail-persistence.md) | Append-only JSONL persistence for the audit trail, chosen over SQLite to avoid a first-ever database dependency |
 
-62 tests in `mcp-server/` (`cd mcp-server && npm test`), 23 in `guardrails/`
-(`cd guardrails && npm test`), 5 in `frontend/` (`cd frontend && npm test`).
+The full architecture package — a written summary, layer diagrams, and a
+trust-boundary data-flow diagram — is in
+[`project-blueprint/expo/`](project-blueprint/expo/).
+
+## The core design guarantee
+
+Exactly one path in this system can write anything to a monitored server, and it
+can only act after a human explicitly approves a pending remediation. Every
+collector, every AI agent, and every read path is architecturally incapable of
+writing to production, not just policy-incapable. This is enforced in code and
+covered by tests — not just a design claim.
 
 ## The design + planning layer
 
 | Path | What it is |
 |---|---|
-| [`project-blueprint/architecture.md`](project-blueprint/architecture.md) | The system architecture: the idea, 18 components (with the plain-English reason each one exists), a Mermaid flowchart, a data-flow walkthrough, a 6-phase build order, assumptions, and what the design deliberately doesn't cover. |
-| [`project-blueprint/tech-stack.md`](project-blueprint/tech-stack.md) | One real, fit-rated technology recommendation per architecture component, plus alternatives considered and how hard each choice is to undo. |
-| [`project-blueprint/mvp-plan.md`](project-blueprint/mvp-plan.md) | A scoped Week 1 MVP: the single question it answers, a day-by-day plan, and explicit pass/partial/fail criteria. |
-| [`project-blueprint/index.html`](project-blueprint/index.html) + section pages | A multi-page, offline-capable knowledge-base site rendering all of the above, with offline search, inline-SVG illustrations, expandable Mermaid/Chart.js figures, dark/light theme, and print support. |
-| [`project-blueprint/one-pager.pdf`](project-blueprint/one-pager.pdf) | A one-page business/stakeholder pitch summary. |
-| [`project-blueprint/reviewer-one-pager.md`](project-blueprint/reviewer-one-pager.md) | A one-page *technical* summary for reviewers: problem, tools, guardrail, reliability measures. |
-| [`project-blueprint/demo-script.md`](project-blueprint/demo-script.md) | A 90-second screencast script — every command in it verified against real output before being written down. |
+| [`project-blueprint/architecture.md`](project-blueprint/architecture.md) | The full system architecture: 18 components, a Mermaid flowchart, a data-flow walkthrough, a 6-phase build order, and what the design deliberately doesn't cover. |
+| [`project-blueprint/tech-stack.md`](project-blueprint/tech-stack.md) | One fit-rated technology recommendation per component, plus alternatives considered. |
+| [`project-blueprint/requirements.md`](project-blueprint/requirements.md) | Per-requirement traceability (UNMAPPED / PLANNED / BUILT) — every claim points at a real test. |
+| [`project-blueprint/demo-script.md`](project-blueprint/demo-script.md) | A 90-second screencast script, every command verified against real output. |
 
-## The core design guarantee
+## Programme tracking (Command Center)
 
-Exactly one component in the architecture — the Execution Service — can write
-anything to a monitored server, and it can only act after a human explicitly approves
-a pending remediation. Every collector, every AI agent, and every read path is
-architecturally incapable of writing to production, not just policy-incapable. The
-guardrail in `guardrails/` is the first real piece of that guarantee, enforced in
-code and covered by tests — not just a design claim. See "The sentence that outranks
-everything else" in `architecture.md` for the full reasoning.
+This repo also tracks a separate, formally-scoped programme (11 stories across 5
+releases, 18 requirements) in `.colaberry/plan.json` + `.colaberry/progress.json`,
+viewable via a local status dashboard:
+
+```bash
+python3 -m http.server   # from the repo root
+```
+
+Then open `http://localhost:8000/` (must be served over HTTP, not `file://`).
+Every tab has a Sample/Real toggle — Real shows exactly what's been verified by
+an external reviewer sign-off, not a self-declaration.
 
 ## Status
 
-This is a walking skeleton, not a finished product. `project-blueprint/requirements.md`
-tracks the MCP/guardrail work (R1–R5), and `.colaberry/progress.json` tracks the
-programme (STORY-000 through STORY-011) — both are honest about what's real vs.
-planned, with a test or an in-browser check for every claim. Nothing is marked done
-without one.
+Not a finished product — `project-blueprint/requirements.md` and
+`.colaberry/progress.json` are both honest about what's real vs. planned, with a
+test or an in-browser check for every claim. Nothing is marked done without one.
