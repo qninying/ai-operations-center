@@ -74,6 +74,8 @@
       <input type="text" id="username" name="username" autocomplete="username" autofocus />
       <label for="password">Password</label>
       <input type="password" id="password" name="password" autocomplete="current-password" />
+      <label for="totpCode">Authentication code</label>
+      <input type="text" id="totpCode" name="totpCode" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="6" />
       <button type="submit" id="submit-btn">Sign in</button>
     </form>
   </div>
@@ -94,6 +96,7 @@
           body: JSON.stringify({
             username: document.getElementById('username').value,
             password: document.getElementById('password').value,
+            totpCode: document.getElementById('totpCode').value,
           }),
         });
         if (res.ok) {

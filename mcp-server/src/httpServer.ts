@@ -32,6 +32,7 @@ import type { RemediationAction, ApprovalDecision } from "../../guardrails/remed
 import { AuditLog } from "../../guardrails/auditLog.js";
 import { HitlQueue, HitlItemNotFoundError, UnauthorizedDeciderError, MfaRequiredError } from "../../guardrails/hitlQueue.js";
 import { verifyPassword } from "./auth/credentials.js";
+import { TotpVerifier } from "./auth/totp.js";
 import { SessionStore } from "./auth/sessionStore.js";
 import { serializeSessionCookie, clearSessionCookie, parseSessionCookie } from "./auth/cookies.js";
 import { resolveStaticFilePath, mimeTypeFor } from "./staticFiles.js";
@@ -59,15 +60,17 @@ const loginHtml = readFileSync(join(__dirname, "login.html"), "utf-8");
 const frontendDistDir = join(__dirname, "..", "..", "frontend", "dist");
 const frontendAssetsDir = join(frontendDistDir, "assets");
 
-// Single-operator session auth. Fails fast at startup if either is unset — a
-// deliberate exception to this file's usual "missing config -> fall back
-// gracefully" convention (SQLSERVER_*, AZURE_* all degrade gracefully); falling
-// back here would mean silently serving the dashboard with no real auth, which
-// defeats the feature. See .env.example for how to generate AUTH_PASSWORD_HASH.
-if (!process.env.AUTH_USERNAME || !process.env.AUTH_PASSWORD_HASH) {
+// Single-operator session auth, now including a real second factor. Fails fast at
+// startup if any is unset — a deliberate exception to this file's usual "missing
+// config -> fall back gracefully" convention (SQLSERVER_*, AZURE_* all degrade
+// gracefully); falling back here would mean silently serving the dashboard with no
+// real auth (or an MFA check permanently satisfied by nothing), which defeats the
+// feature. See .env.example for how to generate AUTH_PASSWORD_HASH/MFA_TOTP_SECRET.
+if (!process.env.AUTH_USERNAME || !process.env.AUTH_PASSWORD_HASH || !process.env.MFA_TOTP_SECRET) {
   throw new Error(
-    "AUTH_USERNAME and AUTH_PASSWORD_HASH must both be set in mcp-server/.env — see .env.example. " +
-      "Generate a hash with: npm run hash-password -- '<your password>'"
+    "AUTH_USERNAME, AUTH_PASSWORD_HASH, and MFA_TOTP_SECRET must all be set in mcp-server/.env — see .env.example. " +
+      "Generate a password hash with: npm run hash-password -- '<your password>' " +
+      "and a TOTP secret with: npm run generate-totp-secret"
   );
 }
 // Re-bound to plain `string` consts — TypeScript doesn't carry the guard's
@@ -75,8 +78,10 @@ if (!process.env.AUTH_USERNAME || !process.env.AUTH_PASSWORD_HASH) {
 // file, since it can't prove process.env wasn't mutated between the check and use.
 const AUTH_USERNAME: string = process.env.AUTH_USERNAME;
 const AUTH_PASSWORD_HASH: string = process.env.AUTH_PASSWORD_HASH;
+const MFA_TOTP_SECRET: string = process.env.MFA_TOTP_SECRET;
 const SESSION_COOKIE_SECURE = process.env.SESSION_COOKIE_SECURE === "true";
 const sessionStore = new SessionStore();
+const totpVerifier = new TotpVerifier(MFA_TOTP_SECRET);
 
 interface Session {
   username: string;
@@ -287,7 +292,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       return;
     }
 
-    let body: { username?: unknown; password?: unknown };
+    let body: { username?: unknown; password?: unknown; totpCode?: unknown };
     try {
       body = (await readJsonBody(req)) as typeof body;
     } catch (error) {
@@ -298,16 +303,30 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       return;
     }
 
-    const { username, password } = body;
-    if (typeof username !== "string" || !username || typeof password !== "string" || !password) {
-      sendJson(res, 400, { error: "MISSING_FIELDS", message: "username and password are both required." });
+    const { username, password, totpCode } = body;
+    if (
+      typeof username !== "string" || !username ||
+      typeof password !== "string" || !password ||
+      typeof totpCode !== "string" || !totpCode
+    ) {
+      sendJson(res, 400, {
+        error: "MISSING_FIELDS",
+        message: "username, password, and totpCode are all required.",
+      });
       return;
     }
 
-    // One generic failure message for both a wrong username and a wrong password —
-    // distinguishing them would let a caller enumerate valid usernames.
-    if (username !== AUTH_USERNAME || !verifyPassword(password, AUTH_PASSWORD_HASH)) {
-      sendJson(res, 401, { error: "INVALID_CREDENTIALS", message: "Incorrect username or password." });
+    // One generic failure message for a wrong username, wrong password, OR wrong
+    // TOTP code — distinguishing any of them would let a caller enumerate valid
+    // usernames or probe which factor was wrong. Short-circuit evaluation means a
+    // wrong password never reaches totpVerifier.verify(), so a mistyped password
+    // can't burn/replay-block the operator's real, currently-valid code.
+    if (
+      username !== AUTH_USERNAME ||
+      !verifyPassword(password, AUTH_PASSWORD_HASH) ||
+      !totpVerifier.verify(totpCode)
+    ) {
+      sendJson(res, 401, { error: "INVALID_CREDENTIALS", message: "Incorrect username, password, or code." });
       return;
     }
 
@@ -635,9 +654,10 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     try {
       // decidedBy is now the real, password-verified session identity (session.username),
       // not a hardcoded constant — this is what makes HitlQueue's "only the assigned
-      // approver may decide" check meaningful. MFA itself is still not implemented
-      // anywhere in this system, so `true` remains an honest stand-in for that one
-      // factor only, not a claim that a real MFA challenge happened.
+      // approver may decide" check meaningful. `true` is no longer a placeholder: since
+      // POST /api/login now requires a valid TOTP code to issue a session at all (see
+      // totpVerifier above), every session past requireSession() was already
+      // MFA-verified at login — this reads that fact, not a hardcoded stand-in for it.
       const item = hitlQueue.decide(itemId, decision, session.username, true);
 
       if (decision === "reject") {

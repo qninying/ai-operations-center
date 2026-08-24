@@ -38,12 +38,16 @@ the blocking scenario, not waiting on a cold start.
    as shell code — confirmed by testing directly that blanket-sourcing breaks, since
    `OPERATOR_CONTACTS`'s unquoted value contains parentheses, which zsh tries to
    glob-expand:
+   MFA is now real (TOTP, RFC 6238) — generate the current code fresh, right before
+   the curl, rather than reusing an old one (the drift tolerance gives slack, but no
+   reason to cut it close):
    ```
    AUTH_USERNAME=$(grep '^AUTH_USERNAME=' .env | cut -d= -f2-)
    AUTH_PASSWORD=$(grep '^AUTH_PASSWORD=' .env | cut -d= -f2-)
+   TOTP_CODE=$(npm run current-totp-code --silent)
    curl -s -c /tmp/coreops-demo-cookies.txt -X POST http://localhost:8787/api/login \
      -H "Content-Type: application/json" \
-     -d "{\"username\":\"$AUTH_USERNAME\",\"password\":\"$AUTH_PASSWORD\"}"
+     -d "{\"username\":\"$AUTH_USERNAME\",\"password\":\"$AUTH_PASSWORD\",\"totpCode\":\"$TOTP_CODE\"}"
    ```
    Confirm the response shows the real `"username"`, not a `401`. Every gated call
    below adds `-b /tmp/coreops-demo-cookies.txt`.

@@ -30,12 +30,15 @@ running — every step here is idempotent, matching this repo's own idempotency 
    sourcing `.env` as shell code (see `demo-start`'s step 4 for why blanket-sourcing
    breaks). If the server isn't running, this will just fail to connect — that's fine,
    continue to step 3 rather than treating it as an error:
+   MFA is now real (TOTP, RFC 6238) — generate the current code fresh, right before
+   the curl:
    ```
    AUTH_USERNAME=$(grep '^AUTH_USERNAME=' .env | cut -d= -f2-)
    AUTH_PASSWORD=$(grep '^AUTH_PASSWORD=' .env | cut -d= -f2-)
+   TOTP_CODE=$(npm run current-totp-code --silent)
    curl -s -c /tmp/coreops-demo-cookies.txt -X POST http://localhost:8787/api/login \
      -H "Content-Type: application/json" \
-     -d "{\"username\":\"$AUTH_USERNAME\",\"password\":\"$AUTH_PASSWORD\"}"
+     -d "{\"username\":\"$AUTH_USERNAME\",\"password\":\"$AUTH_PASSWORD\",\"totpCode\":\"$TOTP_CODE\"}"
    ```
 
 3. **Stop monitoring next, while the server can still hear the request:**
