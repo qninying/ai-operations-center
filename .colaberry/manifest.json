@@ -22,7 +22,7 @@
     },
     {
       "path": "artifacts/INDEX.md",
-      "sha256": "42fbc307fb671ac937411ad8df1dc466068f586764e5d9c2714d91f594e8ac34"
+      "sha256": "b149d572e9818bee55f00fc0fd2d6af0e771581d0acb90f2fd4fbca51539a04e"
     },
     {
       "path": "artifacts/week-01/workflow-diagram.pdf",
@@ -63,6 +63,10 @@
     {
       "path": "artifacts/week-10/hitl-escalation-path.csv",
       "sha256": "edb87e203e3f33dd1d55f59f906aabd1610e04aa6b0be424f97846eaf33184ad"
+    },
+    {
+      "path": "artifacts/week-11/7-layer-architecture-mapping.csv",
+      "sha256": "93e6e528be1ebbd7c19c3ea2dbe400742d9239b9fb35f7bd54c72225399bc55d"
     },
     {
       "path": "docs/REQUIREMENTS.md",

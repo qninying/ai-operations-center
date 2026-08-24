@@ -15,5 +15,6 @@ week by week. Each row links to the artifact in this repo.
 | Week 8 | Build Your Automation Platform — custom-commands.csv | [`custom-commands.csv`](./week-08/custom-commands.csv) | Own project | 2 KB |
 | Week 9 | Reliability Implementation Task — reliability-layer-design.csv | [`reliability-layer-design.csv`](./week-09/reliability-layer-design.csv) | Own project | 8 KB |
 | Week 10 | Implementation Task: Governance Engine — hitl-escalation-path.csv | [`hitl-escalation-path.csv`](./week-10/hitl-escalation-path.csv) | Own project | 5 KB |
+| Week 11 | Build Your Architecture Package — 7-layer-architecture-mapping.csv | [`7-layer-architecture-mapping.csv`](./week-11/7-layer-architecture-mapping.csv) | CoreOps | 6 KB |
 
-10 artifacts.
+11 artifacts.
