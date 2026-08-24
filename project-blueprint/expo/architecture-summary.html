@@ -1,0 +1,380 @@
+<title>CoreOps Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --bg-elevated: #ffffff;
+    --surface: #eef1f6;
+    --border: #d8dee6;
+    --border-strong: #b9c2cf;
+    --text: #161a20;
+    --text-secondary: #565f6c;
+    --text-tertiary: #88909c;
+    --accent: #3d5fe0;
+    --accent-dim: #e4e9fb;
+    --verified: #1f9d63;
+    --verified-dim: #e0f4ea;
+    --gap: #b9660f;
+    --gap-dim: #faecda;
+    --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+    --font-body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0a0d12;
+      --bg-elevated: #12161d;
+      --surface: #171c25;
+      --border: #262c37;
+      --border-strong: #3a4150;
+      --text: #e8ebf0;
+      --text-secondary: #99a2b1;
+      --text-tertiary: #626b7a;
+      --accent: #6b8aff;
+      --accent-dim: #1c2748;
+      --verified: #3ecf8e;
+      --verified-dim: #12291f;
+      --gap: #f0a860;
+      --gap-dim: #2e2213;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a0d12;
+    --bg-elevated: #12161d;
+    --surface: #171c25;
+    --border: #262c37;
+    --border-strong: #3a4150;
+    --text: #e8ebf0;
+    --text-secondary: #99a2b1;
+    --text-tertiary: #626b7a;
+    --accent: #6b8aff;
+    --accent-dim: #1c2748;
+    --verified: #3ecf8e;
+    --verified-dim: #12291f;
+    --gap: #f0a860;
+    --gap-dim: #2e2213;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--accent-dim); }
+
+  .wrap { max-width: 780px; margin: 0 auto; padding: 72px 24px 120px; }
+  .wide { max-width: 940px; }
+
+  h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; font-weight: 600; margin: 0; }
+  p { margin: 0 0 1.1em; max-width: 66ch; }
+  a { color: var(--accent); }
+
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--text-tertiary); margin-bottom: 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--verified); flex-shrink: 0; }
+
+  /* ---------- hero ---------- */
+  .hero { padding-bottom: 56px; border-bottom: 1px solid var(--border); }
+  .hero h1 { font-size: clamp(38px, 6vw, 56px); line-height: 1.05; letter-spacing: -0.01em; margin-bottom: 22px; }
+  .hero .dek { font-size: 19px; color: var(--text-secondary); max-width: 62ch; margin-bottom: 28px; }
+  .hero .facts {
+    display: flex; flex-wrap: wrap; gap: 10px; font-family: var(--font-mono); font-size: 13px;
+  }
+  .fact-pill {
+    border: 1px solid var(--border-strong); border-radius: 100px; padding: 6px 14px;
+    color: var(--text-secondary); background: var(--surface);
+  }
+  .fact-pill b { color: var(--text); font-weight: 500; }
+
+  /* ---------- sections ---------- */
+  section { padding: 56px 0; border-bottom: 1px solid var(--border); }
+  section:last-of-type { border-bottom: none; }
+  section h2 { font-size: 28px; margin-bottom: 20px; letter-spacing: -0.005em; }
+  section .lede { font-size: 17px; color: var(--text-secondary); margin-bottom: 28px; max-width: 64ch; }
+
+  /* ---------- flow (genuinely sequential — the only numbered section) ---------- */
+  .flow { display: flex; flex-direction: column; gap: 0; }
+  .flow-step {
+    display: grid; grid-template-columns: 40px 1fr; gap: 20px;
+    padding: 20px 0; border-top: 1px solid var(--border);
+  }
+  .flow-step:first-child { border-top: none; }
+  .flow-num {
+    font-family: var(--font-mono); font-size: 13px; color: var(--accent);
+    padding-top: 3px;
+  }
+  .flow-step h3 { font-size: 17px; font-family: var(--font-body); font-weight: 600; margin-bottom: 6px; }
+  .flow-step p { font-size: 15px; color: var(--text-secondary); margin-bottom: 0; }
+  .flow-step code {
+    font-family: var(--font-mono); font-size: 13px; background: var(--surface);
+    padding: 1px 6px; border-radius: 4px; color: var(--text);
+  }
+
+  /* ---------- ledger example (real captured data) ---------- */
+  .ledger {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 22px 24px; margin-top: 28px;
+  }
+  .ledger-title {
+    font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-tertiary); margin-bottom: 16px;
+  }
+  .ledger-row {
+    display: grid; grid-template-columns: 100px 1fr auto; gap: 14px; align-items: baseline;
+    padding: 9px 0; border-top: 1px solid var(--border); font-size: 14px;
+  }
+  .ledger-row:first-of-type { border-top: none; }
+  .ledger-actor { font-family: var(--font-mono); color: var(--text-tertiary); font-size: 12.5px; }
+  .ledger-event { color: var(--text); }
+  .ledger-time { font-family: var(--font-mono); color: var(--text-tertiary); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .ledger-caption { font-size: 13.5px; color: var(--text-tertiary); margin-top: 16px; margin-bottom: 0; }
+
+  /* ---------- status table ---------- */
+  .status-table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th {
+    text-align: left; font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-tertiary); font-weight: 500;
+    padding: 0 14px 10px 0; border-bottom: 1px solid var(--border-strong);
+  }
+  td { padding: 13px 14px 13px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  td:first-child, th:first-child { padding-left: 0; }
+  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono);
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 9px;
+    border-radius: 100px; white-space: nowrap;
+  }
+  .badge.built { background: var(--verified-dim); color: var(--verified); }
+  .badge.gap { background: var(--gap-dim); color: var(--gap); }
+
+  /* ---------- layer mapping table ---------- */
+  .layer-table td code {
+    font-family: var(--font-mono); font-size: 12.5px; background: var(--bg);
+    padding: 1px 5px; border-radius: 4px; color: var(--accent); white-space: nowrap;
+  }
+  .layer-table td { font-size: 13.5px; line-height: 1.5; }
+  .layer-num {
+    display: block; font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--text-tertiary); margin-bottom: 2px; letter-spacing: 0.03em;
+  }
+
+  /* ---------- stack ---------- */
+  .stack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+  .stack-item { border-top: 2px solid var(--border-strong); padding-top: 12px; }
+  .stack-item .label { font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); margin-bottom: 6px; }
+  .stack-item .value { font-size: 15px; }
+  .stack-item .value code { font-family: var(--font-mono); font-size: 14px; color: var(--accent); }
+
+  /* ---------- guardrail callout ---------- */
+  .principle {
+    font-family: var(--font-display); font-style: italic; font-size: 24px; line-height: 1.4;
+    color: var(--text); border-left: 3px solid var(--accent); padding-left: 24px;
+    margin: 0 0 32px;
+  }
+
+  /* ---------- footer / try it ---------- */
+  .try-it {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 32px;
+  }
+  .try-it h2 { font-size: 22px; margin-bottom: 12px; }
+  .try-it code {
+    display: block; font-family: var(--font-mono); font-size: 13.5px; background: var(--bg-elevated);
+    border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin: 14px 0;
+    color: var(--text); overflow-x: auto; white-space: pre;
+  }
+  footer { margin-top: 64px; font-size: 13px; color: var(--text-tertiary); font-family: var(--font-mono); }
+
+  @media (max-width: 600px) {
+    .wrap { padding: 48px 18px 80px; }
+    .flow-step { grid-template-columns: 28px 1fr; gap: 14px; }
+    .ledger-row { grid-template-columns: 1fr; gap: 4px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <section class="hero" style="border-top:none;padding-top:0;">
+    <div class="eyebrow"><span class="dot"></span>Architecture Summary — CoreOps</div>
+    <h1>The system can investigate.<br>It cannot act without you.</h1>
+    <p class="dek">CoreOps is an AI operations command center for SQL Server, SSIS, SSRS, and Windows Server infrastructure — it watches for incidents, explains root cause with Claude, and proposes fixes. Every proposal stops at a real, enforced human-approval gate before anything touches production.</p>
+    <div class="facts">
+      <span class="fact-pill">210 tests, <b>all passing</b></span>
+      <span class="fact-pill"><b>Live-verified</b>, not just unit-tested</span>
+      <span class="fact-pill">Real Azure SQL, Blob Storage, Claude API</span>
+      <span class="fact-pill">Zero fabricated data — <b>honest fallback</b> when a source is down</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">The problem</div>
+    <h2>Root-causing a SQL Server incident means manual cross-referencing, hours after the fact.</h2>
+    <p class="lede">A job fails, or a report comes back empty. Someone has to correlate job logs, blocking sessions, and downstream reports across a dozen tools to explain why — usually well after it mattered. CoreOps watches continuously, correlates related signals, and asks Claude to explain root cause from live evidence, not a static runbook.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">How it works</div>
+    <h2>Detection to decision, in one traceable chain</h2>
+    <p class="lede">Every step below shares one correlation ID — the whole story for a single incident is reconstructable after the fact, not just each step in isolation.</p>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-num">01</div>
+        <div><h3>Continuous monitoring detects it</h3><p>Polls SQL Server's live session state (<code>sys.dm_exec_requests</code>) on an interval. A genuinely blocked session — not noise — triggers the chain.</p></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">02</div>
+        <div><h3>Claude explains root cause</h3><p>A real model call over the actual evidence rows, not a canned response — returns a root-cause explanation and a confidence score.</p></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">03</div>
+        <div><h3>Low confidence escalates</h3><p>Below 60%, the system notifies the on-call operator by real push delivery rather than presenting a guess as settled.</p></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">04</div>
+        <div><h3>A remediation is proposed — and blocked</h3><p>The guardrail checks it's evidence-linked, of an allowed reversible type, and human-approved. Missing approval fails it, every time, no exceptions.</p></div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">05</div>
+        <div><h3>A signed-in operator decides</h3><p>Approve executes the one real reversible action wired up; reject leaves everything untouched. Both are logged under the same identity that logged in.</p></div>
+      </div>
+    </div>
+
+    <div class="ledger">
+      <div class="ledger-title">Real audit trail — one correlation ID, reconstructed</div>
+      <div class="ledger-row"><span class="ledger-actor">recommendationService</span><span class="ledger-event">recommendation_data_access — success</span><span class="ledger-time">14:35:06</span></div>
+      <div class="ledger-row"><span class="ledger-actor">escalationService</span><span class="ledger-event">escalation_triggered — confidence 55%</span><span class="ledger-time">14:35:11</span></div>
+      <div class="ledger-row"><span class="ledger-actor">notificationService</span><span class="ledger-event">operator_notification_delivered</span><span class="ledger-time">14:35:11</span></div>
+      <div class="ledger-row"><span class="ledger-actor">governance_engine</span><span class="ledger-event">hitl_enqueued — awaiting quincy</span><span class="ledger-time">14:36:02</span></div>
+      <div class="ledger-row"><span class="ledger-actor">quincy</span><span class="ledger-event">hitl_decision — approved</span><span class="ledger-time">14:36:09</span></div>
+      <p class="ledger-caption">Captured from a real run against the live system — every timestamp, actor, and event name is genuine output, not illustrative copy.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Layer mapping</div>
+    <h2>The same five steps, at implementation depth</h2>
+    <p class="lede">Every layer below is a real module in this repo, not a conceptual placeholder — the components column names the actual file.</p>
+    <div class="status-table-wrap">
+      <table class="layer-table">
+        <thead>
+          <tr><th>Layer</th><th>Purpose</th><th>Components &amp; technologies</th><th>Governance practice</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="layer-num">01</span>Application &amp; Interaction</td>
+            <td>Where a human sees system state and acts on it</td>
+            <td><code>dashboard.html</code> (vanilla JS), React&nbsp;19 + Vite console, a shared <code>apiFetch()</code> wrapper</td>
+            <td>Every call redirects to <code>/login</code> on a 401 — no widget fails silently unauthenticated</td>
+          </tr>
+          <tr>
+            <td><span class="layer-num">02</span>Governance &amp; Guardrail</td>
+            <td>Blocks any action lacking evidence, an allowed type, or a real approval</td>
+            <td><code>remediationGuardrail.ts</code>, <code>hitlQueue.ts</code>, <code>auth/</code> (scrypt hash, session store, cookies)</td>
+            <td>Pure &amp; deterministic — same input always produces the same allow/deny, no exceptions</td>
+          </tr>
+          <tr>
+            <td><span class="layer-num">03</span>Orchestration</td>
+            <td>Sequences detection → reasoning → escalation → notification</td>
+            <td><code>monitoringService.ts</code>, <code>escalationService.ts</code>, <code>reliability/circuitBreaker.ts</code></td>
+            <td>Every external call: explicit timeout, capped retries, circuit breaker after repeated failure</td>
+          </tr>
+          <tr>
+            <td><span class="layer-num">04</span>Reasoning / Model</td>
+            <td>Produces a root-cause explanation and a confidence score from evidence</td>
+            <td><code>rootCauseAgent.ts</code> — real Anthropic Claude API calls, no canned responses</td>
+            <td>Confidence below 60% auto-escalates rather than presenting a guess as settled</td>
+          </tr>
+          <tr>
+            <td><span class="layer-num">05</span>Data Integration / Tooling</td>
+            <td>Exposes the data layer to the rest of the system, safely</td>
+            <td>MCP Tool Gateway, <code>dmvLiveSource.ts</code>, <code>cloudBlobSource.ts</code></td>
+            <td>Parameterized queries only; every row schema-validated before it's trusted as evidence</td>
+          </tr>
+          <tr>
+            <td><span class="layer-num">06</span>Data &amp; Infrastructure</td>
+            <td>The real systems of record</td>
+            <td>Azure SQL Database, Azure Blob Storage</td>
+            <td>Read-only, least-privilege credentials; every response honestly tagged <code>live</code> / <code>fallback</code></td>
+          </tr>
+          <tr>
+            <td><span class="layer-num">07</span>Observability &amp; Audit</td>
+            <td>Makes the system's behavior reconstructable after the fact</td>
+            <td><code>auditLog.ts</code>, one correlation ID threaded through every service, structured JSON logs</td>
+            <td><code>GET /api/audit?correlationId=</code> — one ID reconstructs a full incident, not fragments</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">The guardrail</div>
+    <p class="principle">"An action gets blocked because it lacks approval — not because the system can't figure out what to do, but because it isn't allowed to decide alone."</p>
+    <h2>One rule outranks everything else in this design</h2>
+    <p class="lede">Every proposed remediation passes through a pure, deterministic check before an execution path is even reachable: it must be linked to real incident evidence, of an allowed reversible action type, and carry a genuine human approval record. This isn't a policy comment enforced by convention — it's a function every code path runs through, and it's what a login system exists to make meaningful: the approver on record is the operator who actually signed in, verified by a password hash, not a name string nobody checked.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">What's real</div>
+    <h2>Status, by claim — not by intention</h2>
+    <p class="lede">Everything below is backed by a test a reviewer can run, or a live run this session actually performed. Gaps are named, not hidden.</p>
+    <div class="status-table-wrap">
+      <table>
+        <thead><tr><th>Capability</th><th>Evidence</th><th class="num">Tests</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Continuous monitoring</td><td>Real polling interval, overlap-safe</td><td class="num">12</td><td><span class="badge built">Built</span></td></tr>
+          <tr><td>DMV / cloud read + fixture fallback</td><td>Parameterized query, honest <code>source</code> tag</td><td class="num">25</td><td><span class="badge built">Built</span></td></tr>
+          <tr><td>AI root-cause &amp; confidence</td><td>Real Claude calls over live evidence</td><td class="num">23</td><td><span class="badge built">Built</span></td></tr>
+          <tr><td>Escalation &amp; notification</td><td>Real ntfy.sh push delivery</td><td class="num">24</td><td><span class="badge built">Built</span></td></tr>
+          <tr><td>Remediation guardrail</td><td>Evidence + type + approval, pure &amp; deterministic</td><td class="num">10</td><td><span class="badge built">Built</span></td></tr>
+          <tr><td>Human-approval queue</td><td>Assigned-approver check, correlation-linked</td><td class="num">16</td><td><span class="badge built">Built</span></td></tr>
+          <tr><td>Correlation-ID audit trail</td><td>One ID reconstructs a full incident story</td><td class="num">24</td><td><span class="badge built">Built</span></td></tr>
+          <tr><td>Session-based auth</td><td>scrypt-hashed password, httpOnly cookie</td><td class="num">19</td><td><span class="badge built">Built</span></td></tr>
+          <tr><td>Rollback for reversible actions</td><td>Real revert, confirmed via live status check</td><td class="num">6</td><td><span class="badge built">Built</span></td></tr>
+          <tr><td>Multi-factor authentication</td><td>No second factor exists yet</td><td class="num">—</td><td><span class="badge gap">Honest gap</span></td></tr>
+          <tr><td>Live Azure SQL this month</td><td>Free-tier quota exhausted, renews Sep 1</td><td class="num">—</td><td><span class="badge gap">External, not this system</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="ledger-caption" style="margin-top:16px;">Counts above are the capability's own test file(s). The 210-test total also includes shared infrastructure — retry/timeout handling, static-asset serving, reliability circuit-breaking — that supports every row here but isn't one capability on its own.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Stack</div>
+    <h2>What it's actually built with</h2>
+    <div class="stack-grid">
+      <div class="stack-item"><div class="label">Language</div><div class="value"><code>TypeScript</code> end to end</div></div>
+      <div class="stack-item"><div class="label">Gateway</div><div class="value">Plain Node <code>http</code>, MCP over stdio</div></div>
+      <div class="stack-item"><div class="label">Governance</div><div class="value">Dependency-free, pure functions</div></div>
+      <div class="stack-item"><div class="label">Console</div><div class="value">React 19 + Vite, same-origin served</div></div>
+      <div class="stack-item"><div class="label">Data</div><div class="value">Azure SQL Database, Blob Storage</div></div>
+      <div class="stack-item"><div class="label">Reasoning</div><div class="value">Anthropic Claude API</div></div>
+      <div class="stack-item"><div class="label">Notifications</div><div class="value">ntfy.sh push delivery</div></div>
+      <div class="stack-item"><div class="label">Testing</div><div class="value">Vitest — 210 tests, 3 packages</div></div>
+    </div>
+  </section>
+
+  <section style="border-bottom:none;">
+    <div class="try-it">
+      <h2>See it running</h2>
+      <p style="color:var(--text-secondary);margin-bottom:0;">The whole stack runs locally against real Azure and Anthropic services — nothing here is mocked for the demo.</p>
+      <code>cd mcp-server && npm install && npm run http
+# open http://localhost:8787/</code>
+      <p style="color:var(--text-secondary);margin-bottom:0;">Repository: <a href="https://github.com/qninying/ai-operations-center">github.com/qninying/ai-operations-center</a></p>
+    </div>
+    <footer>CoreOps · Colaberry Enterprise AI Leadership Accelerator</footer>
+  </section>
+
+</div>

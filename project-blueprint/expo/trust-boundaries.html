@@ -1,0 +1,200 @@
+<title>Where CoreOps Stops Trusting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f7fa; --bg-elevated: #ffffff; --surface: #eef1f6;
+    --border: #d8dee6; --border-strong: #b9c2cf;
+    --text: #161a20; --text-secondary: #565f6c; --text-tertiary: #88909c;
+    --accent: #3d5fe0; --accent-dim: #e4e9fb;
+    --danger: #c23b3b;
+    --font-display: "Fraunces", Georgia, serif;
+    --font-body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0a0d12; --bg-elevated: #12161d; --surface: #171c25;
+      --border: #262c37; --border-strong: #3a4150;
+      --text: #e8ebf0; --text-secondary: #99a2b1; --text-tertiary: #626b7a;
+      --accent: #6b8aff; --accent-dim: #1c2748;
+      --danger: #e87979;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a0d12; --bg-elevated: #12161d; --surface: #171c25;
+    --border: #262c37; --border-strong: #3a4150;
+    --text: #e8ebf0; --text-secondary: #99a2b1; --text-tertiary: #626b7a;
+    --accent: #6b8aff; --accent-dim: #1c2748;
+    --danger: #e87979;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 56px 24px 80px; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--text-tertiary); margin-bottom: 14px;
+  }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(28px, 4.4vw, 40px);
+       line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 16px; text-wrap: balance; }
+  .dek { font-size: 16px; line-height: 1.6; color: var(--text-secondary); max-width: 68ch; margin: 0 0 36px; }
+
+  figure { margin: 0; }
+  .diagram-frame {
+    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 14px;
+    padding: 24px; overflow-x: auto;
+  }
+  svg { display: block; max-width: 100%; height: auto; margin: 0 auto; color: var(--text); min-width: 720px; }
+  svg text { font-family: var(--font-mono); }
+  svg .box-title { font-family: var(--font-body); font-weight: 600; }
+  figcaption {
+    font-size: 13.5px; color: var(--text-tertiary); line-height: 1.6; margin-top: 16px; max-width: 74ch;
+  }
+
+  .boundaries { margin-top: 48px; }
+  .boundaries h2 { font-family: var(--font-display); font-size: 20px; font-weight: 600; margin: 0 0 16px; }
+  .boundary-list { display: flex; flex-direction: column; gap: 0; }
+  .boundary-row {
+    display: grid; grid-template-columns: 190px 1fr; gap: 20px;
+    padding: 16px 0; border-top: 1px solid var(--border);
+  }
+  .boundary-row:first-child { border-top: none; }
+  .boundary-name { font-family: var(--font-mono); font-size: 12.5px; color: var(--danger); padding-top: 2px; }
+  .boundary-desc { font-size: 14px; line-height: 1.6; color: var(--text-secondary); }
+  .boundary-desc b { color: var(--text); font-weight: 500; }
+  .boundary-desc code { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface); padding: 1px 5px; border-radius: 4px; color: var(--text); }
+
+  footer { margin-top: 48px; font-size: 12.5px; color: var(--text-tertiary); font-family: var(--font-mono); }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">CoreOps — Trust Boundaries &amp; Data Flow</div>
+  <h1>Four places CoreOps stops trusting what it's holding</h1>
+  <p class="dek">Data enters from three real external services and a real human, crosses four points where its trust level changes, and only reaches a real action if it survives all four. This is that path, drawn as it actually runs — not as an inventory of components.</p>
+
+  <figure>
+    <div class="diagram-frame">
+      <svg viewBox="0 0 1080 580" role="img" aria-label="Data flows left to right from external sources — Azure SQL, the Claude API, and ntfy.sh — through a validating gateway and reasoning step, into the application where an operator views it, through a guardrail that requires the operator's real approval, to an orchestration step that executes the one real reversible action. Three vertical boundaries mark where trust changes along this path: an external-service boundary after the sources, a render boundary after reasoning, and an action boundary before execution. A fourth, identity boundary sits between the operator and the application, crossed only by a verified login. An observability and audit layer beneath the flow taps every stage with one shared correlation ID.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <!-- ============ operator (top) ============ -->
+        <rect x="460" y="30" width="220" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="480" y="55" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">OPERATOR</text>
+        <text x="480" y="76" font-size="12.5" class="box-title">A real person, browser-side</text>
+
+        <!-- identity boundary: horizontal dashed line just below operator -->
+        <line x1="460" y1="108" x2="680" y2="108" stroke="var(--danger)" stroke-width="1.6" stroke-dasharray="6 4"/>
+        <text x="686" y="112" font-size="10.5" fill="var(--danger)">IDENTITY BOUNDARY</text>
+
+        <!-- operator -> Application (view) -->
+        <line x1="540" y1="108" x2="540" y2="280" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="360" y="200" font-size="10.5" fill="var(--text-secondary)">views recommendation</text>
+
+        <!-- operator -> Guardrail (approve/reject), angled -->
+        <line x1="650" y1="108" x2="760" y2="280" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="765" y="200" font-size="10.5" fill="var(--text-secondary)">approve / reject</text>
+
+        <!-- ============ main horizontal flow, y 280-360 ============ -->
+        <!-- Box 1: External Sources, x 20-180 -->
+        <rect x="20" y="280" width="160" height="80" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="36" y="302" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">EXTERNAL SOURCES</text>
+        <text x="36" y="320" font-size="11" fill="var(--text-secondary)">Azure SQL Database</text>
+        <text x="36" y="335" font-size="11" fill="var(--text-secondary)">Anthropic Claude API</text>
+        <text x="36" y="350" font-size="11" fill="var(--text-secondary)">ntfy.sh push</text>
+
+        <!-- arrow box1 -> box2 -->
+        <line x1="180" y1="320" x2="240" y2="320" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- Boundary A: External-Service Boundary, x=210 -->
+        <line x1="210" y1="250" x2="210" y2="400" stroke="var(--danger)" stroke-width="1.6" stroke-dasharray="6 4"/>
+        <text x="210" y="238" font-size="9.5" text-anchor="middle" fill="var(--danger)">EXTERNAL-SERVICE</text>
+        <text x="210" y="225" font-size="9.5" text-anchor="middle" fill="var(--danger)">BOUNDARY</text>
+
+        <!-- Box 2: Gateway & Reasoning, x 240-400 -->
+        <rect x="240" y="280" width="160" height="80" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="256" y="302" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">GATEWAY &amp; REASONING</text>
+        <text x="256" y="322" font-size="11" fill="var(--text-secondary)">Parameterized query,</text>
+        <text x="256" y="337" font-size="11" fill="var(--text-secondary)">schema-checked → real</text>
+        <text x="256" y="352" font-size="11" fill="var(--text-secondary)">Claude call, confidence</text>
+
+        <line x1="400" y1="320" x2="460" y2="320" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- Boundary B: Render Boundary, x=430 -->
+        <line x1="430" y1="250" x2="430" y2="400" stroke="var(--danger)" stroke-width="1.6" stroke-dasharray="6 4"/>
+        <text x="430" y="238" font-size="9.5" text-anchor="middle" fill="var(--danger)">RENDER</text>
+        <text x="430" y="225" font-size="9.5" text-anchor="middle" fill="var(--danger)">BOUNDARY</text>
+
+        <!-- Box 3: Application, x 460-620 -->
+        <rect x="460" y="280" width="160" height="80" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="476" y="302" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">APPLICATION</text>
+        <text x="476" y="322" font-size="11" fill="var(--text-secondary)">Dashboard &amp; Console</text>
+        <text x="476" y="337" font-size="11" fill="var(--text-secondary)">show the recommendation</text>
+        <text x="476" y="352" font-size="11" fill="var(--text-secondary)">as text, not markup</text>
+
+        <line x1="620" y1="320" x2="680" y2="320" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- Boundary C: Action Boundary, x=650 -->
+        <line x1="650" y1="250" x2="650" y2="400" stroke="var(--danger)" stroke-width="1.6" stroke-dasharray="6 4"/>
+        <text x="650" y="238" font-size="9.5" text-anchor="middle" fill="var(--danger)">ACTION</text>
+        <text x="650" y="225" font-size="9.5" text-anchor="middle" fill="var(--danger)">BOUNDARY</text>
+
+        <!-- Box 4: Guardrail, x 680-840 -->
+        <rect x="680" y="280" width="160" height="80" rx="8" fill="none" stroke="currentColor" stroke-width="3"/>
+        <text x="696" y="302" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">GUARDRAIL</text>
+        <text x="696" y="322" font-size="11" fill="var(--text-secondary)">Evidence + type +</text>
+        <text x="696" y="337" font-size="11" fill="var(--text-secondary)">real approval —</text>
+        <text x="696" y="352" font-size="11" fill="var(--text-secondary)">or rejected, every time</text>
+
+        <line x1="840" y1="320" x2="900" y2="320" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- Box 5: Orchestration / Execution, x 900-1060 -->
+        <rect x="900" y="280" width="160" height="80" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="916" y="302" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">ORCHESTRATION</text>
+        <text x="916" y="322" font-size="11" fill="var(--text-secondary)">Restarts the monitoring</text>
+        <text x="916" y="337" font-size="11" fill="var(--text-secondary)">collector — the one</text>
+        <text x="916" y="352" font-size="11" fill="var(--text-secondary)">real reversible action</text>
+
+        <!-- ============ observability & audit, below ============ -->
+        <rect x="240" y="460" width="820" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="260" y="484" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">OBSERVABILITY &amp; AUDIT</text>
+        <text x="260" y="504" font-size="11" fill="var(--text-secondary)">One correlation ID, threaded through every stage above</text>
+
+        <!-- dashed taps from each main box down to the audit bar -->
+        <line x1="320" y1="360" x2="320" y2="460" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="540" y1="360" x2="540" y2="460" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="760" y1="360" x2="760" y2="460" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="980" y1="360" x2="980" y2="460" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+      </svg>
+    </div>
+    <figcaption>The dashed red lines are the only marks on this diagram that carry meaning beyond "connects to" — each one is a point where CoreOps stops assuming the data it's holding is safe and actually checks. The four boundary rows below name exactly what each check is.</figcaption>
+  </figure>
+
+  <div class="boundaries">
+    <h2>What each boundary actually enforces</h2>
+    <div class="boundary-list">
+      <div class="boundary-row">
+        <div class="boundary-name">IDENTITY BOUNDARY</div>
+        <div class="boundary-desc">An anonymous browser becomes a verified operator only after a real login — a password checked against a <code>scrypt</code> hash, a session id the page's own JavaScript can't read (<code>HttpOnly</code>). Before this existed, "approved by quincy" was a hardcoded string nobody had actually verified.</div>
+      </div>
+      <div class="boundary-row">
+        <div class="boundary-name">EXTERNAL-SERVICE BOUNDARY</div>
+        <div class="boundary-desc">Nothing from Azure SQL, Claude, or ntfy is trusted on arrival. SQL reads are parameterized, never string-built; every row is checked against a schema before it's allowed to become evidence; a live query and a fixture fallback are always tagged honestly, never blended.</div>
+      </div>
+      <div class="boundary-row">
+        <div class="boundary-name">RENDER BOUNDARY</div>
+        <div class="boundary-desc">Anything that reaches the page goes through <code>textContent</code> or an explicit escape function — never raw <code>innerHTML</code>. This is the one a real audit caught failing: a handful of API responses were being concatenated into the page unescaped, including one that echoed back whatever a caller sent it. Fixed and verified by actually running the exploit payload through the real code path.</div>
+      </div>
+      <div class="boundary-row">
+        <div class="boundary-name">ACTION BOUNDARY</div>
+        <div class="boundary-desc">The guardrail — a pure, deterministic function every proposed action must pass: linked to real evidence, an allowed reversible type, and a genuine human approval record. This is the boundary between "the system has an opinion" and "the system did something," and it's the one no other boundary is allowed to substitute for.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>CoreOps · Colaberry Enterprise AI Leadership Accelerator</footer>
+</div>

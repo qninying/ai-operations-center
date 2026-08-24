@@ -1,0 +1,171 @@
+<title>The Governance Gate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --bg-elevated: #ffffff;
+    --surface: #eef1f6;
+    --border: #d8dee6;
+    --border-strong: #b9c2cf;
+    --text: #161a20;
+    --text-secondary: #565f6c;
+    --text-tertiary: #88909c;
+    --accent: #3d5fe0;
+    --accent-dim: #e4e9fb;
+    --verified: #1f9d63;
+    --verified-dim: #e0f4ea;
+    --font-display: "Fraunces", Georgia, serif;
+    --font-body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0a0d12; --bg-elevated: #12161d; --surface: #171c25;
+      --border: #262c37; --border-strong: #3a4150;
+      --text: #e8ebf0; --text-secondary: #99a2b1; --text-tertiary: #626b7a;
+      --accent: #6b8aff; --accent-dim: #1c2748;
+      --verified: #3ecf8e; --verified-dim: #12291f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a0d12; --bg-elevated: #12161d; --surface: #171c25;
+    --border: #262c37; --border-strong: #3a4150;
+    --text: #e8ebf0; --text-secondary: #99a2b1; --text-tertiary: #626b7a;
+    --accent: #6b8aff; --accent-dim: #1c2748;
+    --verified: #3ecf8e; --verified-dim: #12291f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 56px 24px 80px; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--text-tertiary); margin-bottom: 14px;
+  }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(30px, 5vw, 42px);
+       line-height: 1.1; letter-spacing: -0.01em; margin: 0 0 16px; text-wrap: balance; }
+  .dek { font-size: 16px; line-height: 1.6; color: var(--text-secondary); max-width: 62ch; margin: 0 0 40px; }
+
+  figure { margin: 0; }
+  .diagram-frame {
+    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 14px;
+    padding: 28px; overflow-x: auto;
+  }
+  svg { display: block; max-width: 100%; height: auto; margin: 0 auto; color: var(--text); }
+  svg text { font-family: var(--font-mono); }
+  svg .label-title { font-family: var(--font-body); font-weight: 600; }
+  figcaption {
+    font-size: 13.5px; color: var(--text-tertiary); line-height: 1.6; margin-top: 16px;
+    max-width: 68ch;
+  }
+
+  .notes { margin-top: 48px; }
+  .notes h2 { font-family: var(--font-display); font-size: 20px; font-weight: 600; margin: 0 0 12px; }
+  .notes p { font-size: 14.5px; line-height: 1.65; color: var(--text-secondary); max-width: 66ch; margin: 0 0 14px; }
+  .notes code { font-family: var(--font-mono); font-size: 13px; background: var(--surface); padding: 1px 6px; border-radius: 4px; color: var(--text); }
+  footer { margin-top: 48px; font-size: 12.5px; color: var(--text-tertiary); font-family: var(--font-mono); }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">CoreOps — Reference Architecture</div>
+  <h1>Why the recommendation can't write back to production on its own</h1>
+  <p class="dek">Seven layers, but the argument isn't the count — it's the one arrow that doesn't exist: nothing routes from a model's output straight back to the data it read. It has to pass through a human first, and every hop along the way carries the same correlation ID.</p>
+
+  <figure>
+    <div class="diagram-frame">
+      <svg viewBox="0 0 860 760" role="img" aria-label="A six-layer pipeline runs from Data and Infrastructure up through Integration, Reasoning, and Orchestration to a Governance gate, which requires approval from a human at the Application layer before an approved action executes back down to Orchestration. A seventh layer, Observability and Audit, connects to every layer in the pipeline via one shared correlation ID.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+          <marker id="arrowAccent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+          </marker>
+        </defs>
+
+        <!-- ============ main pipeline column — boxes at consistent 56px gaps ============ -->
+        <!-- Application (top): y 30-94 -->
+        <rect x="60" y="30" width="380" height="64" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="82" y="56" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">01 · APPLICATION / INTERACTION</text>
+        <text x="82" y="78" font-size="14" class="label-title">Dashboard &amp; Console — a human sees state</text>
+
+        <!-- Application(94) <-> Governance(150) -->
+        <line x1="200" y1="94" x2="200" y2="150" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="212" y="126" font-size="10.5" fill="var(--text-secondary)">approve / reject</text>
+
+        <line x1="300" y1="150" x2="300" y2="94" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="312" y="126" font-size="10.5" fill="var(--text-secondary)">awaiting approval</text>
+
+        <!-- Governance (distinct: thicker border): y 150-220 -->
+        <rect x="60" y="150" width="380" height="70" rx="8" fill="none" stroke="currentColor" stroke-width="3"/>
+        <text x="82" y="176" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">02 · GOVERNANCE &amp; GUARDRAIL</text>
+        <text x="82" y="198" font-size="14" class="label-title">The gate — evidence + type + real approval, or it fails</text>
+
+        <!-- Governance(220) <-> Orchestration(276) -->
+        <line x1="150" y1="220" x2="150" y2="276" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrowAccent)"/>
+        <text x="162" y="252" font-size="10.5" fill="var(--accent)">approved → execute</text>
+
+        <line x1="350" y1="276" x2="350" y2="220" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="362" y="252" font-size="10.5" fill="var(--text-secondary)">proposes action</text>
+
+        <!-- Orchestration: y 276-340 -->
+        <rect x="60" y="276" width="380" height="64" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="82" y="302" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">03 · ORCHESTRATION</text>
+        <text x="82" y="324" font-size="14" class="label-title">Sequences detection → reasoning → escalation</text>
+
+        <line x1="250" y1="340" x2="250" y2="396" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="262" y="372" font-size="10.5" fill="var(--text-secondary)">recommendation + confidence</text>
+
+        <!-- Reasoning: y 396-460 -->
+        <rect x="60" y="396" width="380" height="64" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="82" y="422" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">04 · REASONING / MODEL</text>
+        <text x="82" y="444" font-size="14" class="label-title">A real model call over real evidence</text>
+
+        <line x1="250" y1="460" x2="250" y2="516" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="262" y="492" font-size="10.5" fill="var(--text-secondary)">evidence rows</text>
+
+        <!-- Integration: y 516-580 -->
+        <rect x="60" y="516" width="380" height="64" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="82" y="542" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">05 · DATA INTEGRATION / TOOLING</text>
+        <text x="82" y="564" font-size="14" class="label-title">Parameterized query — the first trust boundary</text>
+
+        <line x1="250" y1="580" x2="250" y2="636" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="262" y="612" font-size="10.5" fill="var(--text-secondary)">reads, honestly tagged</text>
+
+        <!-- Data & Infrastructure: y 636-700 -->
+        <rect x="60" y="636" width="380" height="64" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="82" y="662" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">06 · DATA &amp; INFRASTRUCTURE</text>
+        <text x="82" y="684" font-size="14" class="label-title">The system of record — SQL Server, Blob Storage</text>
+
+        <!-- ============ side: Observability & Audit — spans Governance top to Data&Infra bottom (150-700) ============ -->
+        <rect x="560" y="150" width="240" height="550" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="580" y="178" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">07 · OBSERVABILITY</text>
+        <text x="580" y="192" font-size="10" letter-spacing="1" fill="var(--text-tertiary)">&amp; AUDIT</text>
+        <text x="580" y="220" font-size="14" class="label-title">One correlation ID,</text>
+        <text x="580" y="240" font-size="14" class="label-title">every hop</text>
+        <text x="580" y="270" font-size="11" fill="var(--text-secondary)">Reconstructs the full</text>
+        <text x="580" y="288" font-size="11" fill="var(--text-secondary)">story after the fact —</text>
+        <text x="580" y="306" font-size="11" fill="var(--text-secondary)">not just each step</text>
+        <text x="580" y="324" font-size="11" fill="var(--text-secondary)">in isolation.</text>
+
+        <!-- connectors from each main-pipeline box's vertical center to the audit column, same style repeated once -->
+        <line x1="440" y1="185" x2="560" y2="185" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="440" y1="308" x2="560" y2="308" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="440" y1="428" x2="560" y2="428" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="440" y1="548" x2="560" y2="548" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="440" y1="668" x2="560" y2="668" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+      </svg>
+    </div>
+    <figcaption>The only path from a proposed action back to execution runs through Governance, and only after a human at the Application layer approves it — that dashed accent line is the one arrow the whole design hinges on. Observability &amp; Audit doesn't sit in the pipeline; it taps every hop with the same correlation ID, which is what makes the incident reconstructable afterward rather than just logged in pieces.</figcaption>
+  </figure>
+
+  <div class="notes">
+    <h2>The one arrow that isn't there</h2>
+    <p>There's no line from <code>04 · Reasoning</code> or <code>03 · Orchestration</code> straight down to <code>06 · Data &amp; Infrastructure</code>. That's deliberate, not an omission — a model's output is a recommendation until a real, password-verified human at the Application layer approves it. Remove the dashed line and the diagram still makes sense; remove Governance and it stops being a governed system at all.</p>
+    <h2>Why the correlation ID is drawn as its own layer</h2>
+    <p>Audit isn't bolted onto Governance — it's independent of every layer, which is exactly why it can catch a layer lying to another one. In practice this was a real bug: the monitoring path and the HTTP-request path in CoreOps originally minted two different IDs for the same incident, so the "one ID, every hop" line in this diagram wasn't true until it was fixed.</p>
+  </div>
+
+  <footer>CoreOps · Colaberry Enterprise AI Leadership Accelerator</footer>
+</div>
