@@ -11,7 +11,8 @@
     "build": "tsc",
     "start": "node dist/mcp-server/src/index.js",
     "test": "vitest run",
-    "hash-password": "tsx src/auth/hashPassword.ts"
+    "hash-password": "tsx src/auth/hashPassword.ts",
+    "build-console": "npm run build --prefix ../frontend"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

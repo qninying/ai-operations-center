@@ -70,6 +70,21 @@ Then open `http://localhost:5173/?role=it-manager` — role-specific operational
 summaries fetched from the real backend (dev-proxied to `:8787`, configured in
 `frontend/vite.config.ts`). Any other role value shows an honest error, not a guess.
 
+Or, to see the console served the way it would be in a real deployment (one origin,
+no dev proxy, session cookies just work), build it and let `mcp-server` serve it
+directly — the same way it already serves `dashboard.html`:
+
+```bash
+cd mcp-server
+npm run build-console   # builds frontend/, output isn't committed
+npm run http
+```
+
+Then open `http://localhost:8787/console?role=it-manager`. This is the actual
+resolution to the "where does the built frontend reach the backend" question — no
+proxy, no CORS, real login required (sign in at `/login` first if you land on the
+"Sign in required" state).
+
 ## What's built and tested
 
 | Path | What it is |

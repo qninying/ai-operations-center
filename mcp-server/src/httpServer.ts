@@ -1,6 +1,6 @@
 import "./loadEnv.js";
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { readDmv } from "./dmvReader.js";
@@ -34,6 +34,7 @@ import { HitlQueue, HitlItemNotFoundError, UnauthorizedDeciderError, MfaRequired
 import { verifyPassword } from "./auth/credentials.js";
 import { SessionStore } from "./auth/sessionStore.js";
 import { serializeSessionCookie, clearSessionCookie, parseSessionCookie } from "./auth/cookies.js";
+import { resolveStaticFilePath, mimeTypeFor } from "./staticFiles.js";
 
 // Thin HTTP transport for R2's DMV read path, alongside the existing stdio MCP
 // transport in index.ts. Both call the same readDmv() orchestrator — this file adds
@@ -47,6 +48,15 @@ const REQUEST_TIMEOUT_MS = 5000;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dashboardHtml = readFileSync(join(__dirname, "dashboard.html"), "utf-8");
 const loginHtml = readFileSync(join(__dirname, "login.html"), "utf-8");
+
+// Built React console (frontend/) — served from this same origin so its session
+// cookie just works, no CORS. Unlike dashboardHtml/loginHtml, frontend/dist/ only
+// exists if and after `npm run build-console` (or `npm run build` in frontend/) has
+// run — it's build output, not committed source — so these paths are resolved here
+// but deliberately NOT read at module load; see the GET /console and GET /assets/*
+// route handlers below for why they're read per-request instead.
+const frontendDistDir = join(__dirname, "..", "..", "frontend", "dist");
+const frontendAssetsDir = join(frontendDistDir, "assets");
 
 // Single-operator session auth. Fails fast at startup if either is unset — a
 // deliberate exception to this file's usual "missing config -> fall back
@@ -207,6 +217,37 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   if (req.method === "GET" && url.pathname === "/login") {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(loginHtml);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/console") {
+    // Checked per request, not cached at module load — dist/ may not exist yet at
+    // server startup (or may get built while the server is already running), and
+    // neither case should crash this route or affect anything else this server
+    // serves. 503, not 404: the route genuinely exists, it just isn't ready yet.
+    const consoleIndexPath = join(frontendDistDir, "index.html");
+    if (!existsSync(consoleIndexPath)) {
+      sendJson(res, 503, {
+        error: "CONSOLE_NOT_BUILT",
+        message:
+          "The Operations Console hasn't been built yet. Run `npm run build-console` " +
+          "(or `npm run build` inside frontend/), then reload.",
+      });
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(readFileSync(consoleIndexPath, "utf-8"));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname.startsWith("/assets/")) {
+    const filePath = resolveStaticFilePath(frontendAssetsDir, url.pathname.slice("/assets".length));
+    if (!filePath) {
+      sendJson(res, 404, { error: "NOT_FOUND", path: url.pathname });
+      return;
+    }
+    res.writeHead(200, { "Content-Type": mimeTypeFor(filePath) });
+    res.end(readFileSync(filePath));
     return;
   }
 
