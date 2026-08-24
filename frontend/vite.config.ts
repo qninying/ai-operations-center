@@ -9,11 +9,19 @@ import react from '@vitejs/plugin-react'
 // dist/ output; it only exists for `npm run dev`. Where the built frontend actually
 // reaches the backend in a real deployment is an open question this walking
 // skeleton doesn't answer yet — noted honestly, not silently assumed solved.
+//
+// /login is proxied too (not just /api) so the login page itself stays same-origin
+// with this dev server (e.g. localhost:5173, not localhost:8787) — the session
+// cookie mcp-server sets on a successful login is then scoped to the origin the
+// browser actually talked to, which is what makes it show up on this app's own
+// /api/* fetches afterward. Without this, App.tsx's "Sign in" link would take the
+// user to a different origin whose cookie this app could never see.
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
       '/api': 'http://localhost:8787',
+      '/login': 'http://localhost:8787',
     },
   },
   test: {

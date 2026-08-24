@@ -83,6 +83,21 @@ describe('App (STORY-005 dashboard)', () => {
     expect(screen.getByText('Unknown dashboard role "dba". Supported: it-manager.')).toBeInTheDocument()
   })
 
+  it('failure path — not signed in: a 401 shows a real sign-in link, not a generic error', async () => {
+    setRole('it-manager')
+    ;(fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: 'NOT_AUTHENTICATED', message: 'Sign in required.' }),
+    })
+
+    render(<App />)
+
+    await waitFor(() => screen.getByTestId('dashboard-unauthenticated'))
+    const link = screen.getByRole('link', { name: 'Sign in' })
+    expect(link).toHaveAttribute('href', '/login')
+  })
+
   it('failure path — dashboard not loading: a network failure shows an error state, not a blank or crashed page', async () => {
     setRole('it-manager')
     ;(fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new TypeError('Failed to fetch'))

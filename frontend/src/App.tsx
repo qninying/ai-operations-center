@@ -26,6 +26,7 @@ interface ApiErrorBody {
 type FetchState =
   | { status: 'loading' }
   | { status: 'success'; summary: ItManagerSummary }
+  | { status: 'unauthenticated' }
   | { status: 'error'; message: string }
 
 function getRoleFromUrl(): string {
@@ -51,14 +52,19 @@ function useDashboardSummary(role: string): FetchState {
 
     fetch(`/api/dashboard/summary?role=${encodeURIComponent(role)}`)
       .then(async (res) => {
+        // Session-based auth landed on the backend after this component was
+        // built — every /api/* route now requires a signed-in session. A 401 is
+        // a distinct, expected state (not signed in yet), not a generic failure:
+        // it needs a way to actually sign in, not just an error message.
+        if (res.status === 401) {
+          if (!cancelled) setState({ status: 'unauthenticated' })
+          return
+        }
         const body = (await res.json()) as ItManagerSummary | ApiErrorBody
         if (!res.ok) {
           throw new Error((body as ApiErrorBody).message ?? 'Unknown error')
         }
-        return body as ItManagerSummary
-      })
-      .then((summary) => {
-        if (!cancelled) setState({ status: 'success', summary })
+        if (!cancelled) setState({ status: 'success', summary: body as ItManagerSummary })
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -117,6 +123,17 @@ export default function App() {
 
   if (state.status === 'loading') {
     return <div data-testid="dashboard-loading">Loading dashboard…</div>
+  }
+
+  if (state.status === 'unauthenticated') {
+    return (
+      <div className="dashboard-error" data-testid="dashboard-unauthenticated">
+        <h1>Sign in required</h1>
+        <p>
+          <a href="/login">Sign in</a> to view the dashboard.
+        </p>
+      </div>
+    )
   }
 
   if (state.status === 'error') {
