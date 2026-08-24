@@ -77,11 +77,6 @@
     width: 44px; height: 44px; border-radius: 10px; font-size: 18px; cursor: pointer;
   }
   .nav button:hover { border-color: var(--accent); }
-  .logo-mark {
-    width: 32px; height: 32px; border-radius: 8px; background: var(--accent);
-    display: inline-flex; align-items: center; justify-content: center;
-    font-weight: 800; color: white; margin-right: 10px; vertical-align: middle;
-  }
   @media print {
     .nav { display: none; }
     .slide { position: relative; display: flex !important; opacity: 1 !important; page-break-after: always; height: 100vh; }
@@ -93,7 +88,7 @@
 
   <section class="slide active">
     <span class="eyebrow">Demo Day</span>
-    <h1><span class="logo-mark">C</span>CoreOps</h1>
+    <h1>CoreOps</h1>
     <p class="tagline">An AI operations platform for SQL Server, SSIS, and SSRS —
       with a governed, human-approval execution model.</p>
   </section>
@@ -132,11 +127,11 @@
         <div class="cap">saved per week in troubleshooting time</div>
       </div>
       <div class="stat">
-        <div class="num">268</div>
+        <div class="num">277</div>
         <div class="cap">tests passing</div>
       </div>
       <div class="stat">
-        <div class="num">3.17/4</div>
+        <div class="num">3.33/4</div>
         <div class="cap">trust posture score, up from 2.4</div>
       </div>
     </div>
@@ -153,14 +148,16 @@
     <div class="grid">
       <div class="card">
         <div class="label">Built</div>
-        <div class="value">Real auth with MFA, a durable audit trail, a
+        <div class="value">Real auth with MFA, a second real approver
+          identity with working escalation, a durable audit trail, a
           network-facing MCP tool gateway, SSRS report monitoring,
-          6 documented architecture decisions.</div>
+          7 documented architecture decisions.</div>
       </div>
       <div class="card">
         <div class="label">Next</div>
-        <div class="value">Multi-user approval roles, and restoring the
-          live SQL Server connection once the current quota resets.</div>
+        <div class="value">Restoring the live SQL Server connection once
+          the current quota resets, and an audit of generic error-class
+          usage in production paths.</div>
       </div>
     </div>
     <p class="repo" style="margin-top:32px;">github.com/qninying/ai-operations-center</p>

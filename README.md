@@ -50,7 +50,7 @@ Then open `http://localhost:8787/console?role=it-manager`.
 ## What's real
 
 Every claim below has a test behind it and was verified against a real running
-server, not just unit-tested. Current counts: **268 tests passing** — 205 in
+server, not just unit-tested. Current counts: **277 tests passing** — 214 in
 `mcp-server/`, 57 in `guardrails/`, 6 in `frontend/`.
 
 **Governance & security**
@@ -67,6 +67,13 @@ server, not just unit-tested. Current counts: **268 tests passing** — 205 in
   assigned approver, verified by real login, can decide it. That check used to
   compare a hardcoded value against itself and could never actually fail; see
   [ADR-003](docs/ADR-003-session-based-authentication.md) for the fix.
+- A second, real approver identity with its own credentials and MFA, closing a
+  single-operator gap — the queue's escalate-to-backup-approver path was fully
+  tested but unreachable from the live server (the timeout check it depends on
+  was never called). Live-verified with a genuine 15-minute wait: a real second
+  human decided an item after real escalation, and the original approver was
+  locked out with a `403` naming the switch — see
+  [ADR-007](docs/ADR-007-second-approver-identity.md).
 - Rate limiting on every HTTP surface — closes a real, confirmed-absent gap
   found during a trust audit, not a precaution added speculatively.
 - A network-facing MCP tool gateway (`mcp-server/src/httpMcpServer.ts`), gated
@@ -107,7 +114,7 @@ server, not just unit-tested. Current counts: **268 tests passing** — 205 in
 
 ## Architecture decisions
 
-Six ADRs, each with real alternatives considered and rejected, not just the
+Seven ADRs, each with real alternatives considered and rejected, not just the
 choice made:
 
 | ADR | Decision |
@@ -118,6 +125,7 @@ choice made:
 | [ADR-004](docs/ADR-004-console-serving-topology.md) | Serving the built console from `mcp-server` itself, not a reverse proxy that doesn't exist yet |
 | [ADR-005](docs/ADR-005-audit-trail-persistence.md) | Append-only JSONL persistence for the audit trail, chosen over SQLite to avoid a first-ever database dependency |
 | [ADR-006](docs/ADR-006-totp-mfa.md) | Real TOTP-based MFA over an ntfy-delivered OTP or WebAuthn — hand-rolled with `node:crypto`, and login itself requiring TOTP makes every session inherently MFA-verified, closing a hardcoded placeholder |
+| [ADR-007](docs/ADR-007-second-approver-identity.md) | A real second approver identity over a general N-user credential store — mirrors the existing single-user pattern for exactly the two roles the escalation model actually has |
 
 The full architecture package — a written summary, layer diagrams, and a
 trust-boundary data-flow diagram — is in
