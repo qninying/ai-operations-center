@@ -3,6 +3,7 @@ import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createCoreOpsMcpServer } from "./mcpServerFactory.js";
 import { verifyBearerToken } from "./auth/apiToken.js";
+import { RateLimiter } from "./rateLimiter.js";
 import { logEvent } from "./observability/logger.js";
 
 // ADR-001's network-reachable transport for the deployed Tool Gateway — AI agents,
@@ -25,6 +26,20 @@ const PORT = Number(process.env.MCP_HTTP_PORT ?? 8788);
 function sendJsonRpcError(res: ServerResponse, status: number, message: string) {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32000, message }, id: null }));
+}
+
+// Surfaced by the INPACT trust reassessment: rate limiting was added to
+// httpServer.ts but never carried over here, leaving this endpoint unprotected
+// against flood/DoS. No login-specific limiter is needed the way httpServer.ts
+// has one — every request here already requires a valid bearer token, so this
+// is one general limiter, not a credential-guessing surface. Same defaults and
+// same keying-by-socket-address reasoning as httpServer.ts (no reverse proxy
+// sits in front of this server, so the socket address is the real client
+// address for the current deployment topology).
+const generalRateLimiter = new RateLimiter({ windowMs: 60_000, maxRequests: 120 });
+
+function clientKey(req: IncomingMessage): string {
+  return req.socket.remoteAddress ?? "unknown";
 }
 
 // Stateless mode (sessionIdGenerator: undefined), per ADR-001's own decision driver:
@@ -63,6 +78,13 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse) {
 
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+
+  const limit = generalRateLimiter.check(clientKey(req));
+  if (!limit.allowed) {
+    res.setHeader("Retry-After", Math.ceil(limit.retryAfterMs / 1000).toString());
+    sendJsonRpcError(res, 429, "Too many requests. Please slow down.");
+    return;
+  }
 
   if (req.method === "GET" && url.pathname === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
