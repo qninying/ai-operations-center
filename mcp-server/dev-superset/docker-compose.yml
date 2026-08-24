@@ -1,0 +1,28 @@
+services:
+  superset:
+    image: apache/superset:latest
+    container_name: coreops-dev-superset
+    environment:
+      SUPERSET_SECRET_KEY: dev-only-not-a-real-secret
+    ports:
+      - "8088:8088"
+    volumes:
+      - superset_home:/app/superset_home
+    depends_on:
+      - verify-db
+
+  # A real, queryable data source for Superset's SQL Lab to run against — Superset
+  # blocks SQLite as a SQL Lab source ("cannot be used as a data source for security
+  # reasons"), so this small Postgres container is the target, not the point.
+  verify-db:
+    image: postgres:16-alpine
+    container_name: coreops-dev-superset-db
+    environment:
+      POSTGRES_USER: verify
+      POSTGRES_PASSWORD: verify
+      POSTGRES_DB: verify
+    ports:
+      - "5433:5432"
+
+volumes:
+  superset_home:
