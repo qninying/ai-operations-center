@@ -14,6 +14,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { dmExecRequestsFixture } from "./dmvFixtures.js";
 import { readDmv, SUPPORTED_DMVS, UnsupportedDmvError } from "./dmvReader.js";
+import { executionLogFixture } from "./ssrsFixtures.js";
+import { readSsrsExecutionLog, SUPPORTED_SSRS_QUERIES, UnsupportedSsrsQueryError } from "./ssrsReader.js";
 
 export function createCoreOpsMcpServer(): McpServer {
   const server = new McpServer({
@@ -73,6 +75,65 @@ export function createCoreOpsMcpServer(): McpServer {
           return {
             isError: true,
             content: [{ type: "text", text: `UnsupportedDmvError: ${error.message}` }],
+          };
+        }
+        throw error;
+      }
+    }
+  );
+
+  server.registerResource(
+    "ssrs-execution-log",
+    "ssrs://report-server/execution-log",
+    {
+      title: "SSRS ExecutionLog3: recent non-success report executions",
+      description:
+        "Read-only snapshot of recent SSRS report executions that did not complete successfully, including timeouts and processing errors. STUB: served from fixture data until a live SSRS ReportServer database connection is wired in.",
+      mimeType: "application/json",
+    },
+    async (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(executionLogFixture, null, 2),
+        },
+      ],
+    })
+  );
+
+  server.registerTool(
+    "read_ssrs_execution_log",
+    {
+      title: "Read SSRS execution log",
+      description:
+        "Reads recent SSRS report executions that did not complete successfully (timeouts, processing errors) from ExecutionLog3, returned as structured JSON. Read-only: performs no write of any kind.",
+      inputSchema: {
+        queryName: z
+          .enum(SUPPORTED_SSRS_QUERIES)
+          .describe(`SSRS query to read. Supported: ${SUPPORTED_SSRS_QUERIES.join(", ")}.`),
+        reportPath: z
+          .string()
+          .optional()
+          .describe("Optional report path to filter returned rows by, e.g. \"/Finance/MonthlyRevenue\"."),
+      },
+    },
+    async ({ queryName, reportPath }) => {
+      try {
+        const { source, rows } = await readSsrsExecutionLog({ queryName, reportPath });
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ queryName, source, rowCount: rows.length, rows }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        if (error instanceof UnsupportedSsrsQueryError) {
+          return {
+            isError: true,
+            content: [{ type: "text", text: `UnsupportedSsrsQueryError: ${error.message}` }],
           };
         }
         throw error;

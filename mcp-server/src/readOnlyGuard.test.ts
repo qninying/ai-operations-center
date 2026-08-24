@@ -49,7 +49,7 @@ describe("R2 read-only guard", () => {
     expect(unreviewed).toEqual([]);
   });
 
-  it.each(["dmvReader.ts", "dmvLiveSource.ts", "index.ts", "httpServer.ts"])(
+  it.each(["dmvReader.ts", "dmvLiveSource.ts", "ssrsReader.ts", "ssrsLiveSource.ts", "index.ts", "httpServer.ts"])(
     "%s contains no SQL write-statement keywords",
     (fileName) => {
       const source = readFileSync(join(__dirname, fileName), "utf-8");
