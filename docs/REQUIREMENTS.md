@@ -78,7 +78,14 @@ Fulfilled by: STORY-002
 
 The system must allow configuration of confidence thresholds for actions.
 
-_Not yet fulfilled by any story._
+Fulfilled directly, not through a platform story (this requirement was never
+assigned a STORY id in `.colaberry/plan.json` — a `should`, not a `must`, so it
+wasn't gating the plan). `mcp-server/src/confidenceThresholds.ts` reads each of
+the three real thresholds this system acts on — `rootCauseAgent.ts`'s
+insufficient-evidence cutoff, `diagnosticsGatherer.ts`'s differential-gathering
+cutoff, `escalationService.ts`'s human-escalation cutoff — from an optional env
+var each, validated and fail-fast on a malformed value, falling back to the
+existing default when unset. See `mcp-server/.env.example`.
 
 ## Efficiency
 

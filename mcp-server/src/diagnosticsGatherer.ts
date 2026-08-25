@@ -4,6 +4,7 @@ import { CircuitBreaker } from "./reliability/circuitBreaker.js";
 import { withReliability } from "./reliability/withReliability.js";
 import { logEvent } from "./observability/logger.js";
 import type { Incident, RootCauseResult } from "./rootCauseAgent.js";
+import { readConfidenceThreshold } from "./confidenceThresholds.js";
 
 // STORY-004 / REQ-010: "gather additional diagnostics when confidence is below 80%."
 // Deliberately a separate file from rootCauseAgent.ts (already 200 lines; a second
@@ -71,7 +72,8 @@ const MAX_DELAY_MS = 4_000;
 const MODEL = "claude-sonnet-5";
 
 // REQ-010's own threshold — confidence at or above this needs no further diagnostics.
-const GATHER_THRESHOLD = 80;
+// REQ-014: configurable via CONFIDENCE_THRESHOLD_GATHER — see confidenceThresholds.ts.
+const GATHER_THRESHOLD = readConfidenceThreshold("CONFIDENCE_THRESHOLD_GATHER", 80);
 
 const diagnosticsCircuitBreaker = new CircuitBreaker({
   failureThreshold: 5,

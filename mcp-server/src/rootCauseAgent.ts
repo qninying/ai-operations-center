@@ -3,6 +3,7 @@ import { z } from "zod";
 import { CircuitBreaker } from "./reliability/circuitBreaker.js";
 import { withReliability } from "./reliability/withReliability.js";
 import { logEvent } from "./observability/logger.js";
+import { readConfidenceThreshold } from "./confidenceThresholds.js";
 
 // R1 (project-blueprint/requirements.md) / STORY-003: the Root Cause Analysis Agent,
 // per architecture.md's Components table — "Asks Claude to explain why the
@@ -75,7 +76,8 @@ const MODEL = "claude-sonnet-5";
 // Below this, the result is treated as "insufficient evidence" rather than a usable
 // root cause — matches the threshold the prompt itself instructs the model to use,
 // but enforced here too so a misbehaving response can't claim otherwise.
-const INSUFFICIENT_CONFIDENCE_THRESHOLD = 30;
+// REQ-014: configurable via CONFIDENCE_THRESHOLD_INSUFFICIENT — see confidenceThresholds.ts.
+const INSUFFICIENT_CONFIDENCE_THRESHOLD = readConfidenceThreshold("CONFIDENCE_THRESHOLD_INSUFFICIENT", 30);
 
 // Shared module-level breaker so failures accumulate across every call, not just
 // within one call's own retries — same pattern as dmvLiveSource.ts's dmvCircuitBreaker.

@@ -3,6 +3,7 @@ import { safeLogEvent as sharedSafeLogEvent } from "./observability/safeLogEvent
 import { recordSystemEvent } from "./observability/auditWrite.js";
 import type { LogEventInput } from "./observability/logger.js";
 import type { AuditLog } from "../../guardrails/auditLog.js";
+import { readConfidenceThreshold } from "./confidenceThresholds.js";
 
 // STORY-009 / REQ-011: escalate an incident to a human operator when the AI's
 // confidence in its own recommendation is below 60%. Source-agnostic by design —
@@ -17,7 +18,8 @@ import type { AuditLog } from "../../guardrails/auditLog.js";
 // synchronous, unchanged return type (EscalationRecord | null), so STORY-009's
 // existing callers and tests needed no changes.
 
-const ESCALATION_THRESHOLD = 60;
+// REQ-014: configurable via CONFIDENCE_THRESHOLD_ESCALATION — see confidenceThresholds.ts.
+const ESCALATION_THRESHOLD = readConfidenceThreshold("CONFIDENCE_THRESHOLD_ESCALATION", 60);
 
 export interface EscalationRecord {
   incidentId: string;

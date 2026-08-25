@@ -50,7 +50,7 @@ Then open `http://localhost:8787/console?role=it-manager`.
 ## What's real
 
 Every claim below has a test behind it and was verified against a real running
-server, not just unit-tested. Current counts: **284 tests passing** — 214 in
+server, not just unit-tested. Current counts: **292 tests passing** — 222 in
 `mcp-server/`, 64 in `guardrails/`, 6 in `frontend/`.
 
 **Governance & security**
@@ -79,6 +79,10 @@ server, not just unit-tested. Current counts: **284 tests passing** — 214 in
 - A network-facing MCP tool gateway (`mcp-server/src/httpMcpServer.ts`), gated
   by bearer-token auth, giving AI agents read-only access to live diagnostics
   with zero write privileges — see [ADR-001](docs/ADR-001-mcp-transport-selection.md).
+- Every confidence threshold this system acts on (insufficient-evidence,
+  differential-gathering, human-escalation) is configurable via env var,
+  validated and fail-fast on a malformed value rather than silently disabling
+  the gate it controls — `mcp-server/src/confidenceThresholds.ts`.
 
 **Audit trail**
 - Every decision and action is recorded immutably and idempotently by ID

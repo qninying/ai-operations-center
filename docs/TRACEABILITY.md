@@ -19,7 +19,7 @@ none, because it is context rather than work.
 | REQ-011 | Functional | must | STORY-009 |
 | REQ-012 | Safety | must | STORY-010 |
 | REQ-013 | Functional | must | STORY-006, STORY-007 |
-| REQ-014 | Functional | should | **none** |
+| REQ-014 | Functional | should | _(fulfilled directly — `mcp-server/src/confidenceThresholds.ts`, no platform story assigned)_ |
 | REQ-015 | Safety | must | STORY-011 |
 | REQ-016 | Functional | must | STORY-008 |
 | REQ-017 | Non-functional | should | **none** |
