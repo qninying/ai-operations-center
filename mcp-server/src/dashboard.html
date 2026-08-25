@@ -27,6 +27,12 @@
     --radius-md: 10px;
     --radius-sm: 7px;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.24);
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
     --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, sans-serif;
     --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
     --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -206,9 +212,9 @@
   .user-chip:hover { background: var(--bg-elevated-2); }
   .avatar {
     width: 26px; height: 26px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), #8b6bff);
+    background: var(--accent-dim);
     display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 600; color: #06122b;
+    font-size: 11px; font-weight: 600; color: var(--accent);
   }
 
   /* ---------- content ---------- */
@@ -233,8 +239,8 @@
   .kpi-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
-    margin: 24px 0 32px;
+    gap: var(--space-3);
+    margin: var(--space-5) 0 var(--space-6);
   }
   .kpi-card {
     background: var(--bg-elevated);
@@ -266,20 +272,20 @@
   .layout-grid {
     display: grid;
     grid-template-columns: 1fr 320px;
-    gap: 20px;
+    gap: var(--space-5);
     align-items: start;
   }
   @media (max-width: 900px) {
     .layout-grid { grid-template-columns: 1fr; }
   }
 
-  .panel-stack { display: flex; flex-direction: column; gap: 20px; }
+  .panel-stack { display: flex; flex-direction: column; gap: var(--space-5); }
 
   .panel {
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 20px 22px;
+    padding: var(--space-5);
     scroll-margin-top: 76px;
   }
   .panel-head {
@@ -295,10 +301,13 @@
     font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
     padding: 3px 8px; border-radius: 100px;
     border: 1px solid var(--border-strong); color: var(--text-tertiary);
+    background: var(--bg-elevated-2);
   }
   .tag.live { color: var(--success); border-color: var(--success-dim); background: var(--success-dim); }
   .tag.fallback { color: var(--warning); border-color: var(--warning-dim); background: var(--warning-dim); }
   .tag.danger { color: var(--danger); border-color: var(--danger-dim); background: var(--danger-dim); }
+  .tag-caption { font-size: 11px; color: var(--text-tertiary); margin-left: var(--space-2); }
+  .tag-row { display: flex; align-items: center; }
 
   .btn {
     display: inline-flex; align-items: center; gap: 7px;
@@ -326,8 +335,8 @@
   .dot.pending { background: var(--warning); box-shadow: 0 0 0 3px var(--warning-dim); }
 
   .data-row {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px;
-    margin-top: 14px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: var(--space-3);
+    margin-top: var(--space-4);
   }
   .data-cell {
     border: 1px solid var(--border); border-radius: var(--radius-md);
@@ -335,11 +344,35 @@
   }
   .data-cell.blocked { border-color: #4d2129; background: var(--danger-dim); }
   .data-cell .k { font-size: 10.5px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
-  .data-cell .v { font-family: var(--mono); font-size: 13px; margin-top: 3px; }
+  .data-cell .v { font-family: var(--mono); font-size: 13px; font-weight: 600; margin-top: var(--space-2); }
   .data-cell .v-secondary { font-family: var(--mono); font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
 
-  .confidence-row { display: flex; align-items: baseline; gap: 12px; margin-top: 4px; }
-  .confidence-number { font-size: 40px; font-weight: 700; font-family: var(--mono); letter-spacing: -0.02em; }
+  /* ---------- incident cards (merged troubleshoot/fix flow) ---------- */
+  .incident-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-3);
+    margin-top: var(--space-4);
+  }
+  .incident-card {
+    border: 1px solid var(--border); border-radius: var(--radius-md);
+    padding: var(--space-4); background: var(--bg);
+    display: flex; flex-direction: column; gap: var(--space-2);
+  }
+  .incident-card.blocked { border-color: #4d2129; background: var(--danger-dim); }
+  .incident-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+  .incident-id { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  .incident-blocked-note { font-size: 12px; font-weight: 600; color: var(--danger); }
+  .incident-actions { margin-top: var(--space-2); }
+  .incident-detail {
+    display: none; margin-top: var(--space-3); padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+  }
+  .incident-detail.shown { display: block; }
+  .incident-correlation {
+    margin-top: var(--space-2); font-family: var(--mono); font-size: 11px; color: var(--text-tertiary);
+  }
+
+  .confidence-row { display: flex; align-items: baseline; gap: var(--space-3); margin-top: 4px; }
+  .confidence-number { font-size: 28px; font-weight: 700; font-family: var(--mono); letter-spacing: -0.02em; }
   .confidence-number.low { color: var(--danger); }
   .confidence-number.high { color: var(--success); }
   .confidence-caption { color: var(--text-tertiary); font-size: 12.5px; }
@@ -450,18 +483,6 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01M10.3 3.9 2.7 17.5a1.8 1.8 0 0 0 1.6 2.7h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0Z"/></svg>
       <span class="nav-label">Incidents</span>
     </a>
-    <a class="nav-item" href="#recommendation">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v2M12 19v2M5 5l1.4 1.4M17.6 17.6 19 19M3 12h2M19 12h2M5 19l1.4-1.4M17.6 6.4 19 5"/><circle cx="12" cy="12" r="4"/></svg>
-      <span class="nav-label">AI Recommendation</span>
-    </a>
-    <a class="nav-item" href="#guardrail">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 4 6v6c0 4.4 3.4 8.4 8 9 4.6-.6 8-4.6 8-9V6l-8-3Z"/></svg>
-      <span class="nav-label">Guardrail</span>
-    </a>
-    <a class="nav-item" href="#demo-evidence">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4v16h16"/><path d="M20 4 4 20"/></svg>
-      <span class="nav-label">Demo Evidence</span>
-    </a>
 
     <div class="sidebar-footer">
       <span class="icon-btn" style="width:auto;height:auto;padding:0;color:var(--text-tertiary);cursor:default;">
@@ -490,6 +511,9 @@
       <span class="user-chip" style="cursor:default;" id="user-chip" title="">
         <div class="avatar" id="user-avatar">—</div>
       </span>
+      <button class="icon-btn" id="restart-server-btn" aria-label="Restart server (demo)" title="Restart server (demo)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+      </button>
       <button class="icon-btn" id="logout-btn" aria-label="Sign out" title="Sign out">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
       </button>
@@ -576,87 +600,30 @@
           <section class="panel" id="incidents">
             <div class="panel-head">
               <div>
-                <h2 class="panel-title">Live incidents</h2>
-                <p class="panel-desc">Live session state from SQL Server. The source tag shows whether this is a live query or a fallback.</p>
+                <h2 class="panel-title">Incidents</h2>
+                <p class="panel-desc">Live session state from SQL Server, correlated with SSRS execution history where available. Troubleshoot an incident for an evidence-grounded AI recommendation, then fix it — nothing executes without human approval.</p>
               </div>
-              <span class="tag" id="dmv-tag">loading</span>
-            </div>
-            <div class="panel-body">
-              <div id="dmv-status" class="status-line">Loading…</div>
-              <div class="data-row" id="dmv-rows"></div>
-            </div>
-          </section>
-
-          <section class="panel" id="recommendation">
-            <div class="panel-head">
-              <div>
-                <h2 class="panel-title">AI recommendation &amp; escalation</h2>
-                <p class="panel-desc">An AI call grounded in live session evidence. Below 60% confidence, the system escalates and notifies the on-call operator.</p>
+              <div class="tag-row">
+                <span class="tag" id="dmv-tag">loading</span>
+                <span class="tag-caption" id="dmv-tag-caption"></span>
               </div>
             </div>
             <div class="panel-body">
-              <div class="field-group">
-                <select id="source-select" aria-label="Data source">
-                  <option value="sql">SQL Server</option>
+              <div class="field-group" style="margin-top:0;">
+                <select id="source-select" aria-label="Evidence source for Troubleshoot" title="Which evidence source Troubleshoot uses">
+                  <option value="correlated">SQL Server + SSRS (correlated)</option>
+                  <option value="sql">SQL Server only</option>
                   <option value="cloud">Cloud service (Blob Storage)</option>
                 </select>
-                <button class="btn btn-primary" id="recommend-ai-btn">Get AI recommendation</button>
               </div>
-              <div class="banner error" id="recommend-ai-error-banner"></div>
-              <div class="confidence-row" id="confidence-block" style="display:none;">
-                <div class="confidence-number" id="confidence-number">—</div>
-                <div class="confidence-caption">confidence</div>
-              </div>
-              <div class="root-cause" id="root-cause-text" style="display:none;"></div>
-              <div class="banner escalation" id="escalation-banner">
-                <div class="banner-title">Escalated to a human operator</div>
-                <div id="escalation-detail"></div>
-              </div>
-              <div class="btn-row" id="audit-trail-row" style="display:none; margin-top:12px;">
-                <button class="btn btn-secondary" id="view-audit-btn">View audit trail</button>
-              </div>
-              <div id="audit-trail-result"></div>
-            </div>
-          </section>
-
-          <section class="panel" id="guardrail">
-            <div class="panel-head">
-              <div>
-                <h2 class="panel-title">Remediation guardrail</h2>
-                <p class="panel-desc">A recommendation that's evidence-linked and of a valid, reversible action type — missing only human approval.</p>
-              </div>
-            </div>
-            <div class="panel-body">
-              <div class="btn-row">
-                <button class="btn btn-secondary" id="propose-btn">Propose: restart monitoring collector service</button>
-                <button class="btn btn-primary" id="approve-btn" style="display:none;">Approve</button>
-                <button class="btn btn-danger" id="reject-btn" style="display:none;">Reject</button>
-              </div>
-              <div class="banner" id="guardrail-result"></div>
-            </div>
-          </section>
-
-          <section class="panel" id="demo-evidence">
-            <div class="panel-head">
-              <div>
-                <h2 class="panel-title">Demo evidence</h2>
-                <p class="panel-desc">The correlation ID below is stored in this browser, not the server — it's what lets you prove the audit trail survives a real server restart, live.</p>
-              </div>
-            </div>
-            <div class="panel-body">
-              <div class="banner shown" id="demo-correlation-banner">
-                <div class="banner-title">Correlation ID</div>
-                <code id="demo-correlation-id">none yet — propose a remediation first</code>
-              </div>
-              <div class="btn-row" style="margin-top:12px;">
-                <button class="btn btn-danger" id="restart-server-btn">Restart server (demo)</button>
-              </div>
+              <div id="dmv-status" class="status-line">Loading…</div>
+              <div class="incident-grid" id="dmv-rows"></div>
               <div id="demo-restart-status"></div>
             </div>
           </section>
 
           <footer class="page-footer">
-            CoreOps · guardrail-enforced remediation
+            CoreOps &copy; <span id="footer-year"></span>
           </footer>
         </div>
 
@@ -798,10 +765,62 @@ function formatDuration(ms) {
   return h + 'h ' + (m % 60) + 'm';
 }
 
+// One card per incident: identity + evidence at the top, then a collapsed
+// detail region that Troubleshoot fills in and Fix acts on — everything for
+// one incident lives in one card, instead of three separate global panels.
+function renderIncidentCard(row) {
+  const blocked = row.blocking_session_id && row.blocking_session_id !== 0;
+  const cell = document.createElement('div');
+  cell.className = 'incident-card' + (blocked ? ' blocked' : '');
+  cell.dataset.sessionId = String(row.session_id);
+  cell.innerHTML = `
+    <div class="incident-head">
+      <div class="incident-id">Session ${row.session_id}</div>
+      <div class="v-secondary">${escapeHtml(row.status)}${row.wait_type ? ' · ' + escapeHtml(row.wait_type) : ''}</div>
+    </div>
+    <div class="v-secondary">${escapeHtml(row.command)} on ${escapeHtml(row.database_name)}</div>
+    <div class="v-secondary">${formatDuration(row.total_elapsed_time_ms)} elapsed · ${formatDuration(row.cpu_time_ms)} CPU</div>
+    ${blocked ? '<div class="incident-blocked-note">blocked by session ' + row.blocking_session_id + '</div>' : ''}
+    <div class="incident-actions">
+      <button class="btn btn-secondary troubleshoot-btn">Troubleshoot</button>
+    </div>
+    <div class="incident-detail">
+      <div class="banner error"></div>
+      <div class="confidence-row" style="display:none;">
+        <div class="confidence-number">—</div>
+        <div class="confidence-caption">confidence</div>
+      </div>
+      <div class="root-cause" style="display:none;"></div>
+      <div class="banner escalation">
+        <div class="banner-title">Escalated to a human operator</div>
+        <div class="escalation-detail"></div>
+      </div>
+      <div class="incident-actions incident-fix-actions" style="display:none;">
+        <button class="btn btn-primary fix-btn">Fix</button>
+        <button class="btn btn-primary approve-btn" style="display:none;">Approve</button>
+        <button class="btn btn-danger reject-btn" style="display:none;">Reject</button>
+      </div>
+      <div class="banner guardrail-result"></div>
+      <div class="incident-correlation" style="display:none;"></div>
+      <div class="btn-row audit-trail-row" style="display:none; margin-top:var(--space-2);">
+        <button class="btn btn-secondary view-audit-btn">View audit trail</button>
+      </div>
+      <div class="audit-trail-result"></div>
+    </div>
+  `;
+  cell.querySelector('.troubleshoot-btn').addEventListener('click', () => troubleshootIncident(row.session_id, cell));
+  cell.querySelector('.fix-btn').addEventListener('click', () => fixIncident(row.session_id, cell));
+  cell.querySelector('.approve-btn').addEventListener('click', () => decideRemediation('approve', cell));
+  cell.querySelector('.reject-btn').addEventListener('click', () => decideRemediation('reject', cell));
+  cell.querySelector('.view-audit-btn').addEventListener('click', () => viewAuditTrail(row.session_id, cell));
+  return cell;
+}
+
 async function loadIncidents() {
   const statusEl = $('dmv-status');
   const rowsEl = $('dmv-rows');
   const tagEl = $('dmv-tag');
+  const tagCaptionEl = $('dmv-tag-caption');
   const kpiSessions = $('kpi-sessions');
   const kpiSessionsMeta = $('kpi-sessions-meta');
   try {
@@ -810,6 +829,10 @@ async function loadIncidents() {
     const isLive = body.source === 'live';
     tagEl.textContent = body.source;
     tagEl.className = 'tag ' + (isLive ? 'live' : 'fallback');
+    tagEl.title = isLive
+      ? 'Live query against SQL Server right now.'
+      : 'SQL Server unreachable — showing fixture data, not live sessions.';
+    tagCaptionEl.textContent = isLive ? '' : 'showing fixture data — SQL Server unreachable';
     statusEl.innerHTML = (body.message ? escapeHtml(body.message) : (body.rows.length + ' session(s) observed'));
 
     const blockedCount = body.rows.filter(r => r.blocking_session_id && r.blocking_session_id !== 0).length;
@@ -819,21 +842,13 @@ async function loadIncidents() {
 
     rowsEl.innerHTML = '';
     for (const row of body.rows) {
-      const blocked = row.blocking_session_id && row.blocking_session_id !== 0;
-      const cell = document.createElement('div');
-      cell.className = 'data-cell' + (blocked ? ' blocked' : '');
-      cell.innerHTML =
-        '<div class="k">session ' + row.session_id + '</div>' +
-        '<div class="v">' + escapeHtml(row.status) + (row.wait_type ? ' · ' + escapeHtml(row.wait_type) : '') + '</div>' +
-        '<div class="v-secondary">' + escapeHtml(row.command) + ' on ' + escapeHtml(row.database_name) + '</div>' +
-        '<div class="v-secondary">' + formatDuration(row.total_elapsed_time_ms) + ' elapsed · ' + formatDuration(row.cpu_time_ms) + ' CPU</div>' +
-        (blocked ? '<div class="v" style="color:var(--danger);margin-top:4px;">blocked by session ' + row.blocking_session_id + '</div>' : '');
-      rowsEl.appendChild(cell);
+      rowsEl.appendChild(renderIncidentCard(row));
     }
   } catch (e) {
     statusEl.textContent = 'Failed to load: ' + e.message;
     tagEl.textContent = 'error';
     tagEl.className = 'tag danger';
+    tagCaptionEl.textContent = '';
   }
 }
 
@@ -945,29 +960,39 @@ async function rollbackMonitoring() {
   }
 }
 
-/* ---------- AI recommendation ---------- */
-async function getAiRecommendation() {
-  const btn = $('recommend-ai-btn');
-  const errorBanner = $('recommend-ai-error-banner');
-  const confBlock = $('confidence-block');
-  const confNumber = $('confidence-number');
-  const rootCauseEl = $('root-cause-text');
-  const escalationBanner = $('escalation-banner');
-  const escalationDetail = $('escalation-detail');
-  const source = $('source-select').value;
+/* ---------- AI recommendation (per incident) ---------- */
+// The recommendation endpoints don't accept a per-session filter — they
+// always analyze whatever the current live/fallback evidence is. Troubleshoot
+// triggers one call representing current system state, displayed inside
+// whichever card was clicked. Uses the SQL Server + SSRS correlated endpoint
+// by default (REQ-017) rather than the old single-source-only path.
+async function troubleshootIncident(sessionId, cardEl) {
+  const btn = cardEl.querySelector('.troubleshoot-btn');
+  const detail = cardEl.querySelector('.incident-detail');
+  const errorBanner = cardEl.querySelector('.banner.error');
+  const confBlock = cardEl.querySelector('.confidence-row');
+  const confNumber = cardEl.querySelector('.confidence-number');
+  const rootCauseEl = cardEl.querySelector('.root-cause');
+  const escalationBanner = cardEl.querySelector('.banner.escalation');
+  const escalationDetail = cardEl.querySelector('.escalation-detail');
+  const actionsRow = cardEl.querySelector('.incident-fix-actions');
   const kpiConfidence = $('kpi-confidence');
   const kpiConfidenceMeta = $('kpi-confidence-meta');
   const kpiEscalation = $('kpi-escalation');
   const kpiEscalationMeta = $('kpi-escalation-meta');
 
   btn.disabled = true;
-  btn.textContent = 'Asking the AI…';
+  btn.textContent = 'Troubleshooting…';
+  detail.classList.add('shown');
   errorBanner.className = 'banner error';
   escalationBanner.className = 'banner escalation';
 
   try {
     const incidentId = 'inc-' + Date.now();
-    const path = source === 'cloud' ? '/api/cloud-recommendation' : '/api/recommendation';
+    const source = $('source-select').value;
+    const path = source === 'cloud' ? '/api/cloud-recommendation'
+      : source === 'sql' ? '/api/recommendation'
+      : '/api/correlated-recommendation';
     const res = await apiFetch(path + '?incidentId=' + encodeURIComponent(incidentId));
     const body = await res.json();
 
@@ -976,7 +1001,7 @@ async function getAiRecommendation() {
       errorBanner.textContent = body.error + ': ' + body.message;
       confBlock.style.display = 'none';
       rootCauseEl.style.display = 'none';
-      pushActivity('danger', '<strong>Recommendation</strong> failed — ' + escapeHtml(body.error));
+      pushActivity('danger', '<strong>Troubleshoot</strong> failed for session ' + sessionId + ' — ' + escapeHtml(body.error));
       return;
     }
 
@@ -985,8 +1010,9 @@ async function getAiRecommendation() {
     confNumber.className = 'confidence-number ' + (body.confidence < 60 ? 'low' : 'high');
     rootCauseEl.style.display = 'block';
     rootCauseEl.textContent = body.rootCause;
+    actionsRow.style.display = 'flex';
 
-    setCorrelationId(incidentId);
+    setCorrelationId(sessionId, incidentId, cardEl);
 
     kpiConfidence.textContent = body.confidence + '%';
     kpiConfidence.className = 'kpi-value ' + (body.confidence < 60 ? 'danger' : 'success');
@@ -998,55 +1024,76 @@ async function getAiRecommendation() {
       kpiEscalation.textContent = 'Yes';
       kpiEscalation.className = 'kpi-value warning';
       kpiEscalationMeta.textContent = 'notification sent';
-      pushActivity('warning', '<strong>Escalated</strong> — confidence ' + escapeHtml(body.confidence) + '%, operator notified');
+      pushActivity('warning', '<strong>Escalated</strong> — session ' + sessionId + ', confidence ' + escapeHtml(body.confidence) + '%, operator notified');
     } else {
       kpiEscalation.textContent = 'No';
       kpiEscalation.className = 'kpi-value success';
       kpiEscalationMeta.textContent = 'confidence above threshold';
-      pushActivity('success', '<strong>Recommendation</strong> generated — ' + escapeHtml(body.confidence) + '% confidence');
+      pushActivity('success', '<strong>Troubleshoot</strong> — session ' + sessionId + ', ' + escapeHtml(body.confidence) + '% confidence');
     }
   } catch (e) {
     errorBanner.className = 'banner error shown';
     errorBanner.textContent = 'Request failed: ' + e.message;
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Get AI recommendation';
+    btn.textContent = 'Troubleshoot';
   }
 }
 
-/* ---------- audit trail ---------- */
-const CORRELATION_ID_STORAGE_KEY = 'coreops-demo-correlationId';
-let lastCorrelationId = null;
+/* ---------- audit trail (correlation ID kept per incident) ---------- */
+// Keyed by session_id, not one global slot — troubleshooting/fixing two
+// different incidents must not overwrite each other's correlation ID.
+// Persisted to localStorage (the browser, not the server) so each incident's
+// ID — and the audit entries behind it — survives a real server restart.
+const CORRELATION_IDS_STORAGE_KEY = 'coreops-demo-correlationIds';
 
-// Persisted to localStorage (the browser, not the server) so it survives a
-// real server restart — the whole point of the "Demo evidence" panel is
-// proving to a live audience that this value, and the audit entries behind
-// it, come back unchanged after the process dies and relaunches.
-function setCorrelationId(id) {
-  lastCorrelationId = id;
-  localStorage.setItem(CORRELATION_ID_STORAGE_KEY, id);
-  $('demo-correlation-id').textContent = id;
-  $('audit-trail-row').style.display = 'inline-flex';
-  $('audit-trail-result').innerHTML = '';
+function readStoredCorrelationIds() {
+  try {
+    return JSON.parse(localStorage.getItem(CORRELATION_IDS_STORAGE_KEY) || '{}');
+  } catch (e) {
+    return {};
+  }
 }
 
-function restoreCorrelationIdFromStorage() {
-  const saved = localStorage.getItem(CORRELATION_ID_STORAGE_KEY);
-  if (!saved) return;
-  lastCorrelationId = saved;
-  $('demo-correlation-id').textContent = saved;
-  $('audit-trail-row').style.display = 'inline-flex';
-  viewAuditTrail();
+function setCorrelationId(sessionId, correlationId, cardEl) {
+  const all = readStoredCorrelationIds();
+  all[sessionId] = { correlationId };
+  localStorage.setItem(CORRELATION_IDS_STORAGE_KEY, JSON.stringify(all));
+  renderCorrelationId(sessionId, correlationId, cardEl);
 }
 
-async function viewAuditTrail() {
-  if (!lastCorrelationId) return;
-  const btn = $('view-audit-btn');
-  const resultEl = $('audit-trail-result');
+function renderCorrelationId(sessionId, correlationId, cardEl) {
+  const correlationEl = cardEl.querySelector('.incident-correlation');
+  correlationEl.style.display = 'block';
+  correlationEl.textContent = 'Correlation ID: ' + correlationId;
+  cardEl.querySelector('.audit-trail-row').style.display = 'inline-flex';
+  cardEl.querySelector('.audit-trail-result').innerHTML = '';
+}
+
+// Called after loadIncidents() renders the cards — each stored correlation ID
+// is re-attached to the card whose session_id it belongs to, and that card's
+// own audit trail is fetched to prove the entries survived the restart too.
+function restoreCorrelationIdsFromStorage() {
+  const all = readStoredCorrelationIds();
+  for (const [sessionId, { correlationId }] of Object.entries(all)) {
+    const cardEl = $('dmv-rows').querySelector('[data-session-id="' + sessionId + '"]');
+    if (!cardEl) continue;
+    cardEl.querySelector('.incident-detail').classList.add('shown');
+    renderCorrelationId(sessionId, correlationId, cardEl);
+    viewAuditTrail(sessionId, cardEl);
+  }
+}
+
+async function viewAuditTrail(sessionId, cardEl) {
+  const all = readStoredCorrelationIds();
+  const correlationId = all[sessionId] && all[sessionId].correlationId;
+  if (!correlationId) return;
+  const btn = cardEl.querySelector('.view-audit-btn');
+  const resultEl = cardEl.querySelector('.audit-trail-result');
   btn.disabled = true;
   btn.textContent = 'Loading…';
   try {
-    const res = await apiFetch('/api/audit?correlationId=' + encodeURIComponent(lastCorrelationId));
+    const res = await apiFetch('/api/audit?correlationId=' + encodeURIComponent(correlationId));
     const body = await res.json();
     if (!body.entries || body.entries.length === 0) {
       resultEl.innerHTML = '<div class="empty-state">No audit entries for this correlation ID.</div>';
@@ -1065,21 +1112,22 @@ async function viewAuditTrail() {
   }
 }
 
-/* ---------- guardrail demo ---------- */
-let currentGuardrailItemId = null;
-
-async function proposeRemediation() {
-  const btn = $('propose-btn');
-  const resultEl = $('guardrail-result');
+/* ---------- guardrail demo (per incident) ---------- */
+// Pending guardrail item id lives on the card itself (dataset), not one
+// module-level variable — two incidents can each have their own pending
+// propose/decide flow without clobbering each other.
+async function fixIncident(sessionId, cardEl) {
+  const btn = cardEl.querySelector('.fix-btn');
+  const resultEl = cardEl.querySelector('.guardrail-result');
   btn.disabled = true;
-  btn.textContent = 'Proposing…';
+  btn.textContent = 'Proposing fix…';
   try {
     const res = await apiFetch('/api/guardrail/propose', { method: 'POST' });
     const body = await res.json();
-    currentGuardrailItemId = body.itemId;
-    setCorrelationId(body.correlationId);
+    cardEl.dataset.guardrailItemId = body.itemId;
+    setCorrelationId(sessionId, body.correlationId, cardEl);
     const allowed = body.result.allowed;
-    resultEl.className = 'banner shown ' + (allowed ? 'allowed' : 'blocked');
+    resultEl.className = 'banner guardrail-result shown ' + (allowed ? 'allowed' : 'blocked');
     let html = '<div class="banner-title">' + (allowed ? 'Allowed' : 'Blocked') + '</div>';
     if (!allowed) {
       for (const v of body.result.violations) html += '<div class="violation">' + escapeHtml(v) + '</div>';
@@ -1087,56 +1135,57 @@ async function proposeRemediation() {
     resultEl.innerHTML = html;
     pushActivity(
       allowed ? 'success' : 'danger',
-      '<strong>Guardrail</strong> ' + (allowed ? 'allowed' : 'blocked') + ' a monitoring collector restart — awaiting ' + escapeHtml(body.approver)
+      '<strong>Guardrail</strong> ' + (allowed ? 'allowed' : 'blocked') + ' a fix for session ' + sessionId + ' — awaiting ' + escapeHtml(body.approver)
     );
-    $('approve-btn').style.display = allowed ? 'none' : 'inline-flex';
-    $('reject-btn').style.display = allowed ? 'none' : 'inline-flex';
+    cardEl.querySelector('.approve-btn').style.display = allowed ? 'none' : 'inline-flex';
+    cardEl.querySelector('.reject-btn').style.display = allowed ? 'none' : 'inline-flex';
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Propose: restart monitoring collector service';
+    btn.textContent = 'Fix';
   }
 }
 
-async function decideRemediation(decision) {
-  if (!currentGuardrailItemId) return;
-  const approveBtn = $('approve-btn');
-  const rejectBtn = $('reject-btn');
-  const resultEl = $('guardrail-result');
+async function decideRemediation(decision, cardEl) {
+  const itemId = cardEl.dataset.guardrailItemId;
+  if (!itemId) return;
+  const approveBtn = cardEl.querySelector('.approve-btn');
+  const rejectBtn = cardEl.querySelector('.reject-btn');
+  const resultEl = cardEl.querySelector('.guardrail-result');
   approveBtn.disabled = true;
   rejectBtn.disabled = true;
   try {
     const res = await apiFetch('/api/guardrail/decide', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemId: currentGuardrailItemId, decision }),
+      body: JSON.stringify({ itemId, decision }),
     });
     const body = await res.json();
     if (!res.ok) {
-      resultEl.className = 'banner shown blocked';
+      resultEl.className = 'banner guardrail-result shown blocked';
       resultEl.innerHTML = '<div class="banner-title">' + escapeHtml(body.error) + '</div>' + escapeHtml(body.message);
       return;
     }
     if (decision === 'reject') {
-      resultEl.className = 'banner shown blocked';
+      resultEl.className = 'banner guardrail-result shown blocked';
       resultEl.innerHTML = '<div class="banner-title">Rejected</div>No action was taken.';
-      pushActivity('warning', '<strong>Guardrail</strong> remediation rejected');
+      pushActivity('warning', '<strong>Guardrail</strong> fix rejected for session ' + cardEl.dataset.sessionId);
     } else if (body.executed) {
-      resultEl.className = 'banner shown allowed';
+      resultEl.className = 'banner guardrail-result shown allowed';
       resultEl.innerHTML =
         '<div class="banner-title">Allowed — executed</div>Monitoring collector restarted at ' +
         new Date(body.executedAt).toLocaleTimeString() +
         ' (task ' + escapeHtml(body.taskId.slice(0, 8)) + ').';
-      pushActivity('success', '<strong>Guardrail</strong> approved — monitoring collector restarted');
+      pushActivity('success', '<strong>Guardrail</strong> approved — fix executed for session ' + cardEl.dataset.sessionId);
       loadMonitorStatus();
     } else {
-      resultEl.className = 'banner shown blocked';
+      resultEl.className = 'banner guardrail-result shown blocked';
       let html = '<div class="banner-title">Approved but not executed</div>';
       for (const v of body.result.violations) html += '<div class="violation">' + escapeHtml(v) + '</div>';
       resultEl.innerHTML = html;
     }
-    $('approve-btn').style.display = 'none';
-    $('reject-btn').style.display = 'none';
-    currentGuardrailItemId = null;
+    approveBtn.style.display = 'none';
+    rejectBtn.style.display = 'none';
+    delete cardEl.dataset.guardrailItemId;
   } finally {
     approveBtn.disabled = false;
     rejectBtn.disabled = false;
@@ -1175,9 +1224,11 @@ async function waitForServerRestart(statusEl) {
     try {
       const res = await fetch('/health');
       if (res.ok) {
-        statusEl.innerHTML = '<div class="empty-state">Server is back. Redirecting to sign in…</div>';
+        statusEl.innerHTML = '<div class="empty-state">Server is back — a fresh login code was just pushed to ntfy. Redirecting to sign in…</div>';
         // A restart always wipes the in-memory session store — there is no
-        // path back to the dashboard except logging in again.
+        // path back to the dashboard except logging in again. httpServer.ts's
+        // own startup sequence pushes a fresh TOTP code via notifyOperators()
+        // the moment it starts listening, so there's no need to ask for one.
         window.location.href = '/login';
         return;
       }
@@ -1202,19 +1253,11 @@ async function refreshNotifBadge() {
 const commands = [
   { label: 'Start monitoring', hint: 'POST /api/monitoring/start', run: startMonitoring },
   { label: 'Stop monitoring', hint: 'POST /api/monitoring/stop', run: stopMonitoring },
-  { label: 'Get AI recommendation', hint: 'GET /api/recommendation', run: getAiRecommendation },
-  { label: 'View audit trail', hint: 'GET /api/audit', run: viewAuditTrail },
-  { label: 'Propose remediation', hint: 'POST /api/guardrail/propose', run: proposeRemediation },
-  { label: 'Approve remediation', hint: 'POST /api/guardrail/decide', run: () => decideRemediation('approve') },
-  { label: 'Reject remediation', hint: 'POST /api/guardrail/decide', run: () => decideRemediation('reject') },
   { label: 'Roll back this session', hint: 'POST /api/rollback', run: rollbackMonitoring },
   { label: 'Restart server (demo)', hint: 'POST /api/demo/restart-server', run: restartServer },
   { label: 'Jump to Overview', hint: '#overview', run: () => location.hash = '#overview' },
   { label: 'Jump to Monitoring', hint: '#monitoring', run: () => location.hash = '#monitoring' },
   { label: 'Jump to Incidents', hint: '#incidents', run: () => location.hash = '#incidents' },
-  { label: 'Jump to Demo Evidence', hint: '#demo-evidence', run: () => location.hash = '#demo-evidence' },
-  { label: 'Jump to AI Recommendation', hint: '#recommendation', run: () => location.hash = '#recommendation' },
-  { label: 'Jump to Guardrail', hint: '#guardrail', run: () => location.hash = '#guardrail' },
   { label: 'Refresh all data', hint: 'reload live data', run: () => { loadHealth(); loadIncidents(); loadMonitorStatus(); } },
 ];
 let cmdkActiveIndex = 0;
@@ -1266,14 +1309,11 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ---------- wire up buttons ---------- */
+// Per-incident buttons (Troubleshoot/Fix/Approve/Reject/View audit trail) are
+// wired inside renderIncidentCard() itself, scoped to each card — not here.
 $('monitor-start-btn').addEventListener('click', startMonitoring);
 $('monitor-stop-btn').addEventListener('click', stopMonitoring);
 $('monitor-rollback-btn').addEventListener('click', rollbackMonitoring);
-$('recommend-ai-btn').addEventListener('click', getAiRecommendation);
-$('view-audit-btn').addEventListener('click', viewAuditTrail);
-$('propose-btn').addEventListener('click', proposeRemediation);
-$('approve-btn').addEventListener('click', () => decideRemediation('approve'));
-$('reject-btn').addEventListener('click', () => decideRemediation('reject'));
 $('restart-server-btn').addEventListener('click', restartServer);
 $('notif-btn').addEventListener('click', () => {
   const panel = $('activity-panel');
@@ -1297,10 +1337,12 @@ $('logout-btn').addEventListener('click', async () => {
 });
 
 /* ---------- boot ---------- */
+$('footer-year').textContent = new Date().getFullYear();
 loadSession();
-restoreCorrelationIdFromStorage();
 loadHealth();
-loadIncidents();
+// Correlation IDs are restored after the cards exist, not before — each
+// stored id needs a matching [data-session-id] card to attach itself to.
+loadIncidents().then(restoreCorrelationIdsFromStorage);
 loadMonitorStatus();
 refreshNotifBadge();
 setInterval(() => { loadMonitorStatus(); refreshNotifBadge(); }, 5000);

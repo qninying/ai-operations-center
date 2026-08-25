@@ -43,6 +43,8 @@ import { serializeSessionCookie, clearSessionCookie, parseSessionCookie } from "
 import { resolveStaticFilePath, mimeTypeFor } from "./staticFiles.js";
 import { RateLimiter } from "./rateLimiter.js";
 import { isDemoModeEnabled } from "./demoModeGate.js";
+import { notifyOperators } from "./notificationService.js";
+import { generateTotpCode } from "./auth/totp.js";
 
 // Thin HTTP transport for R2's DMV read path, alongside the existing stdio MCP
 // transport in index.ts. Both call the same readDmv() orchestrator — this file adds
@@ -902,4 +904,26 @@ server.requestTimeout = REQUEST_TIMEOUT_MS;
 
 server.listen(PORT, () => {
   console.error(`coreops-http: listening on http://localhost:${PORT}`);
+  // Demo-only: a demo restart wipes the in-memory SessionStore, forcing a
+  // fresh login (including a fresh TOTP code) every time. Rather than making
+  // the presenter ask for one by hand, push it themselves the moment this
+  // process is reachable again — fires on every demo-mode boot, not just a
+  // restart, so it also covers the very first boot of a demo session. Gated
+  // behind isDemoModeEnabled() exactly like POST /api/demo/restart-server, so
+  // it's structurally absent whenever DEMO_MODE isn't set (never written to
+  // .env, only ever passed as a shell prefix on the demo launch command).
+  if (isDemoModeEnabled()) {
+    const code = generateTotpCode(MFA_TOTP_SECRET, Date.now());
+    notifyOperators({
+      actionType: "demo_server_started",
+      incidentId: "demo-startup",
+      summary:
+        `CoreOps demo server is back up. Fresh TOTP code: ${code}. ` +
+        `This code is only valid for about 30 seconds from generation — if it doesn't work by the time you read this, ask for a fresh one.`,
+    }).catch(() => {
+      // notifyOperators() already logs and never rethrows on its own failure —
+      // this catch exists only so an unexpected rejection can't take down a
+      // server that otherwise started up successfully.
+    });
+  }
 });
