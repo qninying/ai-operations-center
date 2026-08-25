@@ -56,7 +56,18 @@ running — every step here is idempotent, matching this repo's own idempotency 
    pkill -f "tsx src/httpServer.ts"
    ```
 
-5. **Confirm it's actually down**, don't just assume the kill worked:
+5. **Tear down the Superset stack**, if `demo-start`'s step 8 started it — its own
+   README says plainly it's not meant to run unattended:
+   ```
+   cd mcp-server/dev-superset && docker compose down -v && cd -
+   ```
+   Safe to run even if nothing is up — `docker compose down` on an already-stopped
+   or never-started stack is a no-op, same idempotent-by-default reasoning as the
+   `pkill`s in step 1. Removes the containers, network, and volume together (`-v`),
+   so a later `demo-start` gets a genuinely fresh Superset init rather than reusing
+   stale state.
+
+6. **Confirm it's actually down**, don't just assume the kill worked:
    ```
    curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8787/health
    ```
@@ -64,11 +75,14 @@ running — every step here is idempotent, matching this repo's own idempotency 
    something else is holding the port or the process didn't die — investigate rather
    than reporting success.
 
-6. **Report the clean state.** Confirm to the user that any pending fault injection
-   was cancelled, monitoring was stopped, and the server is down — don't leave them
-   wondering whether something is still running in the background after they've
-   closed their laptop.
+7. **Report the clean state.** Confirm to the user that any pending fault injection
+   was cancelled, monitoring was stopped, the HTTP server is down, and the Superset
+   stack was torn down — don't leave them wondering whether something is still
+   running in the background after they've closed their laptop.
 
 ## Related
 
-- `demo-start` — the matching setup skill.
+- `demo-start` — the matching setup skill. Step 8 there starts the Superset stack
+  this skill's step 5 tears down.
+- `mcp-server/dev-superset/` — its own README explains why this teardown matters:
+  dev/verification tooling, explicitly not meant to be left running.

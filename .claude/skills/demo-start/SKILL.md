@@ -118,7 +118,29 @@ the blocking scenario, not waiting on a cold start.
    `/api/cloud-recommendation` on its own — the presenter (or a curl in the demo
    script) still triggers that live, same as any other route.
 
-8. **Report readiness, don't open a browser tab yourself.** Tell the user the
+8. **Start the Superset stack**, for the reporting-service integration demo
+   (`mcp-server/src/demoSsrsExecutionLog.ts` and
+   `mcp-server/dev-superset/verify-live-pattern.ts` — see
+   `project-blueprint/demo-script.md`'s Acts 4-5). Check first whether it's already
+   running, same idempotent-skip reasoning as step 1:
+   ```
+   docker ps --filter "name=coreops-dev-superset" --format "{{.Names}}"
+   ```
+   If that returns `coreops-dev-superset` and `coreops-dev-superset-db`, skip to
+   step 9 — don't re-run setup against an already-running stack. Otherwise, from
+   `mcp-server/dev-superset/`:
+   ```
+   ./setup.sh
+   ```
+   This starts Superset + Postgres, runs Superset's own migrations, and seeds one
+   real successful query and one real failing query so `verify-live-pattern.ts` has
+   genuine history to read — takes a real, noticeable amount of time (container
+   pull if this is the first run, migrations, driver install), which is exactly why
+   this belongs in prep, not triggered live on camera. Ends with "Done. Superset is
+   running at http://localhost:8088" on success — if it doesn't, stop here and
+   report the actual failure, same as step 2's warmup.
+
+9. **Report readiness, don't open a browser tab yourself.** Tell the user the
    dashboard is ready at `http://localhost:8787/` and that they should open it in
    their own browser (the one they'll actually be screen-sharing) — the Claude Code
    Browser pane isn't what an audience sees. Mention that SQL Server may still take
@@ -126,7 +148,9 @@ the blocking scenario, not waiting on a cold start.
    direct check succeeds, since the app's own connection pool is separate from the
    warmup script's. Also state plainly when the scheduled faults (SQL blocking scenario
    and cloud-diagnostics scenario, step 6 and step 7) will land and how long the SQL
-   one holds, so the presenter can pace their narration against both.
+   one holds, so the presenter can pace their narration against both. Confirm Superset
+   is up at `http://localhost:8088` (admin/admin, dev-only) and that Acts 4-5 are
+   ready to run live, per step 8.
 
 ## If something fails
 
@@ -149,3 +173,14 @@ or a server that never returns healthy means the demo isn't ready yet; say so pl
   instead of a random one, same reasoning as `seedBlockingScenario.ts` above.
 - `mcp-server/src/auth/` — session auth. `demo-stop` re-logs in rather than assuming
   step 4's cookie jar is still valid (a demo can run past the 60-minute session TTL).
+- `mcp-server/dev-superset/` — the Superset + Postgres stack step 8 starts. Its own
+  README explains what it is and, just as importantly, what it isn't: dev/verification
+  tooling proving the live-query-then-fallback pattern works against a real running
+  system, not a claim that Superset is CoreOps's actual reporting integration — that's
+  `ssrsReader.ts`/`demoSsrsExecutionLog.ts`, which needs no Docker at all.
+- `mcp-server/src/demoSsrsExecutionLog.ts` — the real SSRS reporting-service
+  integration (Act 4). Doesn't depend on step 8 at all; only needs the same SQL
+  Server connection step 2 already warms.
+- `mcp-server/dev-superset/verify-live-pattern.ts` — the Superset pattern-verification
+  script (Act 5). Depends on step 8; run it from inside `mcp-server/dev-superset/`,
+  not with a root-relative path.
