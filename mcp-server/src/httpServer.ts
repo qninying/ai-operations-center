@@ -42,6 +42,7 @@ import { SessionStore } from "./auth/sessionStore.js";
 import { serializeSessionCookie, clearSessionCookie, parseSessionCookie } from "./auth/cookies.js";
 import { resolveStaticFilePath, mimeTypeFor } from "./staticFiles.js";
 import { RateLimiter } from "./rateLimiter.js";
+import { isDemoModeEnabled } from "./demoModeGate.js";
 
 // Thin HTTP transport for R2's DMV read path, alongside the existing stdio MCP
 // transport in index.ts. Both call the same readDmv() orchestrator — this file adds
@@ -856,6 +857,32 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     }
     const entries = auditLog.forCorrelationId(correlationId);
     sendJson(res, 200, { correlationId, count: entries.length, entries });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/demo/restart-server") {
+    // Demo-only, human-triggered restart for Beat 6 of the Expo demo — proves
+    // the audit trail survives a real process restart, live, without a
+    // terminal. Absent from any non-demo run: isDemoModeEnabled() only
+    // returns true when the shell command that launched this process was
+    // prefixed with DEMO_MODE=true (see scripts/demoSupervisor.mjs and
+    // .claude/skills/demo-start/SKILL.md) — it's never set in .env, so a
+    // real deployment can't reach this route no matter who is logged in.
+    // Falling through to the generic 404 below when disabled means the
+    // route is indistinguishable from not existing, not just rejected.
+    if (!requireSession(req, res)) return;
+    if (!isDemoModeEnabled()) {
+      sendJson(res, 404, { error: "NOT_FOUND", path: url.pathname });
+      return;
+    }
+    logEvent({ level: "info", event: "demo_restart_requested", context: {} });
+    const payload = JSON.stringify({ restarting: true });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    // Exit only after the response is actually flushed to the client, so the
+    // dashboard's fetch() resolves with this 200 before the process dies —
+    // a bare process.exit() right after writeHead risks the connection
+    // closing before the body reaches the browser.
+    res.end(payload, () => process.exit(0));
     return;
   }
 

@@ -458,6 +458,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 4 6v6c0 4.4 3.4 8.4 8 9 4.6-.6 8-4.6 8-9V6l-8-3Z"/></svg>
       <span class="nav-label">Guardrail</span>
     </a>
+    <a class="nav-item" href="#demo-evidence">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4v16h16"/><path d="M20 4 4 20"/></svg>
+      <span class="nav-label">Demo Evidence</span>
+    </a>
 
     <div class="sidebar-footer">
       <span class="icon-btn" style="width:auto;height:auto;padding:0;color:var(--text-tertiary);cursor:default;">
@@ -629,6 +633,25 @@
                 <button class="btn btn-danger" id="reject-btn" style="display:none;">Reject</button>
               </div>
               <div class="banner" id="guardrail-result"></div>
+            </div>
+          </section>
+
+          <section class="panel" id="demo-evidence">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Demo evidence</h2>
+                <p class="panel-desc">The correlation ID below is stored in this browser, not the server — it's what lets you prove the audit trail survives a real server restart, live.</p>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="banner shown" id="demo-correlation-banner">
+                <div class="banner-title">Correlation ID</div>
+                <code id="demo-correlation-id">none yet — propose a remediation first</code>
+              </div>
+              <div class="btn-row" style="margin-top:12px;">
+                <button class="btn btn-danger" id="restart-server-btn">Restart server (demo)</button>
+              </div>
+              <div id="demo-restart-status"></div>
             </div>
           </section>
 
@@ -963,9 +986,7 @@ async function getAiRecommendation() {
     rootCauseEl.style.display = 'block';
     rootCauseEl.textContent = body.rootCause;
 
-    lastCorrelationId = incidentId;
-    $('audit-trail-row').style.display = 'inline-flex';
-    $('audit-trail-result').innerHTML = '';
+    setCorrelationId(incidentId);
 
     kpiConfidence.textContent = body.confidence + '%';
     kpiConfidence.className = 'kpi-value ' + (body.confidence < 60 ? 'danger' : 'success');
@@ -994,7 +1015,29 @@ async function getAiRecommendation() {
 }
 
 /* ---------- audit trail ---------- */
+const CORRELATION_ID_STORAGE_KEY = 'coreops-demo-correlationId';
 let lastCorrelationId = null;
+
+// Persisted to localStorage (the browser, not the server) so it survives a
+// real server restart — the whole point of the "Demo evidence" panel is
+// proving to a live audience that this value, and the audit entries behind
+// it, come back unchanged after the process dies and relaunches.
+function setCorrelationId(id) {
+  lastCorrelationId = id;
+  localStorage.setItem(CORRELATION_ID_STORAGE_KEY, id);
+  $('demo-correlation-id').textContent = id;
+  $('audit-trail-row').style.display = 'inline-flex';
+  $('audit-trail-result').innerHTML = '';
+}
+
+function restoreCorrelationIdFromStorage() {
+  const saved = localStorage.getItem(CORRELATION_ID_STORAGE_KEY);
+  if (!saved) return;
+  lastCorrelationId = saved;
+  $('demo-correlation-id').textContent = saved;
+  $('audit-trail-row').style.display = 'inline-flex';
+  viewAuditTrail();
+}
 
 async function viewAuditTrail() {
   if (!lastCorrelationId) return;
@@ -1034,6 +1077,7 @@ async function proposeRemediation() {
     const res = await apiFetch('/api/guardrail/propose', { method: 'POST' });
     const body = await res.json();
     currentGuardrailItemId = body.itemId;
+    setCorrelationId(body.correlationId);
     const allowed = body.result.allowed;
     resultEl.className = 'banner shown ' + (allowed ? 'allowed' : 'blocked');
     let html = '<div class="banner-title">' + (allowed ? 'Allowed' : 'Blocked') + '</div>';
@@ -1099,6 +1143,52 @@ async function decideRemediation(decision) {
   }
 }
 
+/* ---------- demo server restart (Beat 6) ---------- */
+async function restartServer() {
+  if (!confirm('Restart the CoreOps server now?')) return;
+  const btn = $('restart-server-btn');
+  const statusEl = $('demo-restart-status');
+  btn.disabled = true;
+  statusEl.innerHTML = '<div class="empty-state">Restarting…</div>';
+  try {
+    const res = await fetch('/api/demo/restart-server', { method: 'POST' });
+    if (res.status === 404) {
+      statusEl.innerHTML = '<div class="empty-state">Demo restart isn’t enabled on this server (DEMO_MODE is off).</div>';
+      btn.disabled = false;
+      return;
+    }
+    if (res.status === 401) {
+      window.location.href = '/login';
+      return;
+    }
+  } catch (e) {
+    // Expected: the connection can drop mid-response once the process
+    // actually exits — treat it as "restart is underway", not a failure.
+  }
+  await waitForServerRestart(statusEl);
+}
+
+async function waitForServerRestart(statusEl) {
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 1000));
+    try {
+      const res = await fetch('/health');
+      if (res.ok) {
+        statusEl.innerHTML = '<div class="empty-state">Server is back. Redirecting to sign in…</div>';
+        // A restart always wipes the in-memory session store — there is no
+        // path back to the dashboard except logging in again.
+        window.location.href = '/login';
+        return;
+      }
+    } catch (e) {
+      // still down — keep polling
+    }
+  }
+  statusEl.innerHTML = '<div class="empty-state">Server did not come back within 30s.</div>';
+  $('restart-server-btn').disabled = false;
+}
+
 /* ---------- notifications (real alerts, repurposed) ---------- */
 async function refreshNotifBadge() {
   try {
@@ -1118,9 +1208,11 @@ const commands = [
   { label: 'Approve remediation', hint: 'POST /api/guardrail/decide', run: () => decideRemediation('approve') },
   { label: 'Reject remediation', hint: 'POST /api/guardrail/decide', run: () => decideRemediation('reject') },
   { label: 'Roll back this session', hint: 'POST /api/rollback', run: rollbackMonitoring },
+  { label: 'Restart server (demo)', hint: 'POST /api/demo/restart-server', run: restartServer },
   { label: 'Jump to Overview', hint: '#overview', run: () => location.hash = '#overview' },
   { label: 'Jump to Monitoring', hint: '#monitoring', run: () => location.hash = '#monitoring' },
   { label: 'Jump to Incidents', hint: '#incidents', run: () => location.hash = '#incidents' },
+  { label: 'Jump to Demo Evidence', hint: '#demo-evidence', run: () => location.hash = '#demo-evidence' },
   { label: 'Jump to AI Recommendation', hint: '#recommendation', run: () => location.hash = '#recommendation' },
   { label: 'Jump to Guardrail', hint: '#guardrail', run: () => location.hash = '#guardrail' },
   { label: 'Refresh all data', hint: 'reload live data', run: () => { loadHealth(); loadIncidents(); loadMonitorStatus(); } },
@@ -1182,6 +1274,7 @@ $('view-audit-btn').addEventListener('click', viewAuditTrail);
 $('propose-btn').addEventListener('click', proposeRemediation);
 $('approve-btn').addEventListener('click', () => decideRemediation('approve'));
 $('reject-btn').addEventListener('click', () => decideRemediation('reject'));
+$('restart-server-btn').addEventListener('click', restartServer);
 $('notif-btn').addEventListener('click', () => {
   const panel = $('activity-panel');
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1205,6 +1298,7 @@ $('logout-btn').addEventListener('click', async () => {
 
 /* ---------- boot ---------- */
 loadSession();
+restoreCorrelationIdFromStorage();
 loadHealth();
 loadIncidents();
 loadMonitorStatus();

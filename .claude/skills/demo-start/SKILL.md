@@ -23,10 +23,18 @@ the blocking scenario, not waiting on a cold start.
    If it exits non-zero, stop here and report the actual failure message from the
    script — do not start the server against a dependency that isn't actually reachable.
 
-3. **Start the HTTP server in the background**, from `mcp-server/`:
+3. **Start the HTTP server, under the demo supervisor, in the background**, from
+   `mcp-server/`:
    ```
-   npm run http > /tmp/coreops-demo.log 2>&1 &
+   DEMO_MODE=true node scripts/demoSupervisor.mjs > /tmp/coreops-demo.log 2>&1 &
    ```
+   `DEMO_MODE=true` here is what enables `POST /api/demo/restart-server` (the
+   dashboard's "Restart server (demo)" button, used for Beat 6) — it's set only as
+   this one shell prefix, never written to `.env`, so a plain `npm run http` never
+   exposes that route. The supervisor (`mcp-server/scripts/demoSupervisor.mjs`)
+   relaunches the HTTP server automatically if it exits — which is what makes that
+   button a real, working restart instead of a dead process — capped at 10
+   restarts so a genuine crash loop still fails loud instead of looping forever.
    Then poll `curl -s http://localhost:8787/health` (a few seconds apart, bounded —
    don't wait forever) until it returns ok.
 
@@ -150,7 +158,11 @@ the blocking scenario, not waiting on a cold start.
    and cloud-diagnostics scenario, step 6 and step 7) will land and how long the SQL
    one holds, so the presenter can pace their narration against both. Confirm Superset
    is up at `http://localhost:8088` (admin/admin, dev-only) and that Acts 4-5 are
-   ready to run live, per step 8.
+   ready to run live, per step 8. Also mention that Beat 6 (proving the audit
+   trail survives a real restart) now runs entirely from the dashboard's "Demo
+   Evidence" panel — propose/approve a remediation first so it has a real
+   correlation ID to show, then the "Restart server (demo)" button there does a
+   genuine kill-and-relaunch live, no terminal needed.
 
 ## If something fails
 
@@ -173,6 +185,10 @@ or a server that never returns healthy means the demo isn't ready yet; say so pl
   instead of a random one, same reasoning as `seedBlockingScenario.ts` above.
 - `mcp-server/src/auth/` — session auth. `demo-stop` re-logs in rather than assuming
   step 4's cookie jar is still valid (a demo can run past the 60-minute session TTL).
+- `mcp-server/scripts/demoSupervisor.mjs` — the process supervisor step 3 launches
+  the server under. Watches and relaunches the HTTP server on exit (capped at 10
+  restarts), which is what makes `POST /api/demo/restart-server` (the dashboard's
+  "Restart server (demo)" button) a real restart instead of a dead process.
 - `mcp-server/dev-superset/` — the Superset + Postgres stack step 8 starts. Its own
   README explains what it is and, just as importantly, what it isn't: dev/verification
   tooling proving the live-query-then-fallback pattern works against a real running

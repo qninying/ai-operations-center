@@ -51,10 +51,18 @@ running — every step here is idempotent, matching this repo's own idempotency 
    If step 2's login failed (server not running), this will just fail to connect too
    — that's fine, continue to step 4 rather than treating it as an error.
 
-4. **Stop the HTTP server process:**
+4. **Stop the HTTP server process — via the supervisor, not the server directly.**
+   `demo-start` now launches the server under `scripts/demoSupervisor.mjs`, which
+   relaunches it automatically whenever it exits (that's what makes the dashboard's
+   "Restart server (demo)" button work for Beat 6). Killing `tsx src/httpServer.ts`
+   directly would just trigger an unwanted auto-restart — kill the supervisor
+   instead, which stops watching before it kills its own child cleanly:
    ```
-   pkill -f "tsx src/httpServer.ts"
+   pkill -f "demoSupervisor.mjs"
    ```
+   If the server was ever started the old way (plain `npm run http`, no
+   supervisor — e.g. outside this skill), fall back to
+   `pkill -f "tsx src/httpServer.ts"` as well; harmless if nothing matches.
 
 5. **Tear down the Superset stack**, if `demo-start`'s step 8 started it — its own
    README says plainly it's not meant to run unattended:
@@ -86,3 +94,7 @@ running — every step here is idempotent, matching this repo's own idempotency 
   this skill's step 5 tears down.
 - `mcp-server/dev-superset/` — its own README explains why this teardown matters:
   dev/verification tooling, explicitly not meant to be left running.
+- `mcp-server/scripts/demoSupervisor.mjs` — the process step 4 stops. Also stops
+  itself cleanly (kills its own child, no auto-restart) on SIGTERM, so a plain
+  `pkill -f "demoSupervisor.mjs"` is enough — no separate step needed for the
+  server it's watching.
