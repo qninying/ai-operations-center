@@ -22,7 +22,7 @@ none, because it is context rather than work.
 | REQ-014 | Functional | should | _(fulfilled directly — `mcp-server/src/confidenceThresholds.ts`, no platform story assigned)_ |
 | REQ-015 | Safety | must | STORY-011 |
 | REQ-016 | Functional | must | STORY-008 |
-| REQ-017 | Non-functional | should | **none** |
+| REQ-017 | Non-functional | should | _(fulfilled directly — `mcp-server/src/correlatedRecommendationService.ts`, no platform story assigned)_ |
 | REQ-018 | Constraint | must | _(constraint — no story)_ |
 
 ✅ Every must-have requirement is fulfilled by at least one story.

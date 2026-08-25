@@ -50,7 +50,7 @@ Then open `http://localhost:8787/console?role=it-manager`.
 ## What's real
 
 Every claim below has a test behind it and was verified against a real running
-server, not just unit-tested. Current counts: **292 tests passing** — 222 in
+server, not just unit-tested. Current counts: **301 tests passing** — 231 in
 `mcp-server/`, 64 in `guardrails/`, 6 in `frontend/`.
 
 **Governance & security**
@@ -112,6 +112,16 @@ server, not just unit-tested. Current counts: **292 tests passing** — 222 in
   (`mcp-server/src/ssrsReader.ts`, querying `ExecutionLog3`), and the pattern
   itself has been live-verified against a real running open-source system
   (Apache Superset — see `mcp-server/dev-superset/`), not just mocks.
+- Cross-system correlation (REQ-017): `GET /api/correlated-recommendation`
+  (`mcp-server/src/correlatedRecommendationService.ts`) gathers live evidence
+  from SQL Server DMVs and SSRS together and hands it all to one root-cause
+  call, instead of the two single-source routes that came before it —
+  correlation happens at the LLM reasoning layer, not a fabricated join key
+  (the two systems' row shapes share no real key in this codebase). Degrades
+  honestly when one source is down (flags `partialCorrelation`, never silently
+  drops to single-source and calls it complete); live-verified against the
+  real current state of this deployment, where both sources are genuinely
+  unavailable for two different real reasons.
 
 **Interfaces**
 - `dashboard.html` — the primary operations dashboard, `apiFetch()`-wrapped so

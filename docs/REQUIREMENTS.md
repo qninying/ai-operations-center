@@ -93,7 +93,23 @@ existing default when unset. See `mcp-server/.env.example`.
 
 The system must reduce manual incident correlation across systems by 50-70%.
 
-_Not yet fulfilled by any story._
+Fulfilled directly, not through a platform story (this requirement was never
+assigned a STORY id in `.colaberry/plan.json` — a `should`, not a `must`, so it
+wasn't gating the plan). `mcp-server/src/correlatedRecommendationService.ts`
+and `GET /api/correlated-recommendation` gather live evidence from SQL Server
+DMVs and SSRS ExecutionLog3 for one incident in a single call and hand it all
+to `analyzeIncidentRootCause()` together — the manual step this requirement
+names (a human separately querying SQL Server, separately querying SSRS, then
+cross-referencing both outputs by hand) now has a real, working alternative
+where none existed before. Correlation happens at the LLM reasoning layer,
+not a fabricated join key — `DmvExecRequestRow` and `SsrsExecutionLogRow`
+share no real key in this codebase, so building one would mean inventing data
+that doesn't exist.
+
+This closes the functional gap: cross-system evidence gathering did not exist
+in any code path prior to this change. It does not, and cannot yet,
+demonstrate the literal 50-70% figure — that requires production usage
+history to measure against, which does not exist yet.
 
 ## Integration
 

@@ -15,6 +15,11 @@ import {
   CloudServiceUnavailableError,
   InvalidCloudDataFormatError,
 } from "./cloudRecommendationService.js";
+import {
+  generateCorrelatedRecommendation,
+  AllEvidenceSourcesUnavailableError,
+  InvalidSsrsDataFormatError,
+} from "./correlatedRecommendationService.js";
 import { startMonitoring } from "./monitoringService.js";
 import type { MonitoringHandle, MonitoringCycleResult } from "./monitoringService.js";
 import { evaluateEscalation } from "./escalationService.js";
@@ -542,6 +547,48 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       }
       // Same gap and same fix as /api/recommendation's equivalent catch-all —
       // reachable via unlogged-upstream MalformedResponseError/InvalidConfidenceScoreError.
+      logEvent({
+        level: "error",
+        event: "recommendation_failed",
+        context: { incidentId, errorClass: error instanceof Error ? error.name : "Error" },
+      });
+      sendJson(res, 500, {
+        error: "RECOMMENDATION_FAILED",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/correlated-recommendation") {
+    // REQ-017: gathers evidence from BOTH SQL Server DMVs and SSRS ExecutionLog3
+    // for one incident and hands it ALL to analyzeIncidentRootCause() in a single
+    // call — see correlatedRecommendationService.ts for why there's no fabricated
+    // join key between the two systems' row shapes.
+    if (!requireSession(req, res)) return;
+    const incidentId = url.searchParams.get("incidentId") ?? crypto.randomUUID();
+    const description = url.searchParams.get("description") ?? "";
+    const reportPath = url.searchParams.get("reportPath") ?? undefined;
+    try {
+      const result = await generateCorrelatedRecommendation(incidentId, description, { reportPath, auditLog });
+      const escalation = evaluateEscalation(incidentId, result.confidence, result.rootCause, { auditLog });
+      sendJson(res, 200, { incidentId, ...result, escalation });
+    } catch (error) {
+      if (error instanceof AllEvidenceSourcesUnavailableError) {
+        sendJson(res, 503, {
+          error: "ALL_EVIDENCE_SOURCES_UNAVAILABLE",
+          message: "Could not connect to SQL Server or SSRS. No recommendation was generated.",
+        });
+        return;
+      }
+      if (error instanceof InvalidDataFormatError) {
+        sendJson(res, 502, { error: "INVALID_DATA_FORMAT", message: error.message });
+        return;
+      }
+      if (error instanceof InvalidSsrsDataFormatError) {
+        sendJson(res, 502, { error: "INVALID_SSRS_DATA_FORMAT", message: error.message });
+        return;
+      }
       logEvent({
         level: "error",
         event: "recommendation_failed",
