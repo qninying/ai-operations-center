@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoreOps — Solution Architecture Capstone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --bg-elevated: #ffffff;
+    --surface: #eef1f6;
+    --text-primary: #12151c;
+    --text-secondary: #444b58;
+    --text-tertiary: #767e8c;
+    --line: #dde2ea;
+    --accent: #3d5fe0;
+    --accent-dim: #e4e9fb;
+    --verified: #1f9d63;
+    --verified-dim: #e0f4ea;
+    --gap: #b9660f;
+    --gap-dim: #faecda;
+    --danger: #c23b3b;
+    --danger-dim: #fbe6e6;
+    --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+    --font-body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --shadow: 0 1px 2px rgba(18,21,28,0.04), 0 8px 24px rgba(18,21,28,0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0a0d12;
+      --bg-elevated: #12161d;
+      --surface: #181d26;
+      --text-primary: #eef1f6;
+      --text-secondary: #b4bbc8;
+      --text-tertiary: #7b8496;
+      --line: #262d3a;
+      --accent: #6b8aff;
+      --accent-dim: #1c2748;
+      --verified: #3ecf8e;
+      --verified-dim: #12291f;
+      --gap: #f0a860;
+      --gap-dim: #2e2213;
+      --danger: #ea6b6b;
+      --danger-dim: #351a1a;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a0d12;
+    --bg-elevated: #12161d;
+    --surface: #181d26;
+    --text-primary: #eef1f6;
+    --text-secondary: #b4bbc8;
+    --text-tertiary: #7b8496;
+    --line: #262d3a;
+    --accent: #6b8aff;
+    --accent-dim: #1c2748;
+    --verified: #3ecf8e;
+    --verified-dim: #12291f;
+    --gap: #f0a860;
+    --gap-dim: #2e2213;
+    --danger: #ea6b6b;
+    --danger-dim: #351a1a;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1, h2, h3, h4 { font-family: var(--font-display); text-wrap: balance; font-weight: 600; margin: 0 0 0.5em; color: var(--text-primary); }
+  h1 { font-size: 2.1rem; }
+  h2 { font-size: 1.5rem; letter-spacing: -0.01em; }
+  h3 { font-size: 1.15rem; }
+  code, .mono { font-family: var(--font-mono); }
+  p { margin: 0 0 1em; color: var(--text-secondary); }
+
+  /* Layout shell */
+  .shell { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+  .sidebar {
+    border-right: 1px solid var(--line);
+    background: var(--bg-elevated);
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    padding: 20px 16px 40px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--verified); flex-shrink: 0; box-shadow: 0 0 0 3px var(--verified-dim); }
+  .brand-name { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; }
+  .brand-sub { font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.04em; margin: 2px 0 18px; }
+
+  .searchbox { position: relative; margin-bottom: 18px; }
+  .searchbox input {
+    width: 100%; padding: 9px 12px 9px 32px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--text-primary); font-family: var(--font-body); font-size: 13.5px;
+  }
+  .searchbox input:focus { outline: none; border-color: var(--accent); }
+  .searchbox svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-tertiary); }
+
+  .navgroup { margin-bottom: 6px; }
+  .navgroup-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); font-family: var(--font-mono); margin: 18px 0 6px; padding: 0 8px; }
+  .navlink {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 7px 8px; border-radius: 6px; font-size: 13.5px; color: var(--text-secondary); cursor: pointer;
+  }
+  .navlink:hover { background: var(--surface); color: var(--text-primary); text-decoration: none; }
+  .navlink.active { background: var(--accent-dim); color: var(--accent); font-weight: 500; }
+  .navlink .count { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); }
+  .navlink.hidden { display: none; }
+
+  .theme-toggle {
+    margin-top: 20px; width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--text-secondary); font-family: var(--font-body); font-size: 12.5px; cursor: pointer;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  .main { padding: 40px 48px 100px; max-width: 980px; }
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar { position: relative; height: auto; }
+    .main { padding: 24px 20px 80px; }
+  }
+
+  /* Hero */
+  .hero { margin-bottom: 40px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--verified); background: var(--verified-dim);
+    padding: 4px 10px; border-radius: 20px; margin-bottom: 14px;
+  }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--verified); }
+  .hero p.lede { font-size: 1.05rem; color: var(--text-secondary); max-width: 640px; }
+  .byline { font-family: var(--font-mono); font-size: 13px; color: var(--text-tertiary); margin-top: 10px; }
+
+  .statgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin: 28px 0; }
+  .stat {
+    background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+    box-shadow: var(--shadow);
+  }
+  .stat .num { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; color: var(--accent); }
+  .stat .label { font-size: 11.5px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 2px; }
+
+  section.block { margin-bottom: 56px; scroll-margin-top: 24px; }
+  .section-kicker { font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 16px 0; }
+  th { text-align: left; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-tertiary); border-bottom: 1px solid var(--line); padding: 8px 10px; }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--line); color: var(--text-secondary); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .num-cell { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-family: var(--font-mono); font-weight: 600; }
+  .badge.verified { background: var(--verified-dim); color: var(--verified); }
+  .badge.gap { background: var(--gap-dim); color: var(--gap); }
+  .badge.must { background: var(--danger-dim); color: var(--danger); }
+  .badge.should { background: var(--gap-dim); color: var(--gap); }
+  .badge.constraint { background: var(--surface); color: var(--text-tertiary); }
+
+  .card { background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; box-shadow: var(--shadow); margin-bottom: 14px; }
+  .card h4 { display: flex; align-items: center; gap: 10px; }
+  .card .adr-num { font-family: var(--font-mono); font-size: 12px; color: var(--text-tertiary); }
+  .card details summary { cursor: pointer; font-size: 13px; color: var(--accent); font-family: var(--font-mono); margin-top: 10px; }
+  .card details[open] summary { margin-bottom: 8px; }
+  .card .rejected { color: var(--danger); }
+  .card .verify-line { background: var(--verified-dim); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--text-primary); margin-top: 10px; }
+  .card .verify-line strong { color: var(--verified); }
+
+  .callout { border-radius: 10px; padding: 14px 16px; font-size: 13.5px; margin: 14px 0; border-left: 3px solid var(--accent); background: var(--accent-dim); color: var(--text-primary); }
+  .callout.gapnote { border-left-color: var(--gap); background: var(--gap-dim); }
+  .callout.honest { border-left-color: var(--text-tertiary); background: var(--surface); }
+
+  svg text { font-family: var(--font-mono); }
+
+  /* Doc preview */
+  .doc-preview { background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); margin: 20px 0 40px; }
+  .doc-cover { padding: 26px 28px 20px; background: linear-gradient(135deg, var(--accent-dim), var(--bg-elevated)); border-bottom: 1px solid var(--line); }
+  .doc-cover .doc-num { font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; }
+  .doc-cover h3 { margin: 6px 0 4px; }
+  .doc-controls { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-mono); font-size: 12px; color: var(--text-tertiary); }
+  .doc-body { padding: 22px 28px; }
+  .doc-signoff { display: flex; justify-content: space-between; padding: 14px 28px; border-top: 1px solid var(--line); font-family: var(--font-mono); font-size: 12px; color: var(--text-tertiary); }
+  .doc-toolbar { display: flex; gap: 8px; padding: 12px 28px; border-top: 1px solid var(--line); background: var(--surface); }
+  .doc-toolbar button {
+    padding: 7px 14px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg-elevated);
+    color: var(--text-secondary); font-family: var(--font-body); font-size: 12.5px; cursor: pointer;
+  }
+  .doc-toolbar button:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Ask the guide */
+  .ask-fab {
+    position: fixed; bottom: 24px; right: 24px; z-index: 50;
+    background: var(--accent); color: #fff; border: none; border-radius: 30px; padding: 12px 20px;
+    font-family: var(--font-body); font-weight: 600; font-size: 13.5px; cursor: pointer; box-shadow: var(--shadow);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ask-panel {
+    position: fixed; bottom: 84px; right: 24px; z-index: 50; width: 380px; max-width: calc(100vw - 32px);
+    max-height: 60vh; background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow); display: none; flex-direction: column; overflow: hidden;
+  }
+  .ask-panel.open { display: flex; }
+  .ask-header { padding: 14px 16px; border-bottom: 1px solid var(--line); font-weight: 600; font-size: 13.5px; display: flex; justify-content: space-between; align-items: center; }
+  .ask-header button { background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 16px; }
+  .ask-log { flex: 1; overflow-y: auto; padding: 14px 16px; font-size: 13px; }
+  .ask-msg { margin-bottom: 14px; }
+  .ask-msg.q { color: var(--text-primary); font-weight: 600; }
+  .ask-msg.a { color: var(--text-secondary); background: var(--surface); border-radius: 8px; padding: 10px 12px; margin-top: 4px; }
+  .ask-msg.a .src { display: block; margin-top: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--accent); }
+  .ask-input-row { display: flex; border-top: 1px solid var(--line); }
+  .ask-input-row input { flex: 1; border: none; padding: 12px 14px; background: transparent; color: var(--text-primary); font-family: var(--font-body); font-size: 13px; }
+  .ask-input-row input:focus { outline: none; }
+  .ask-input-row button { border: none; background: var(--accent); color: #fff; padding: 0 16px; cursor: pointer; font-weight: 600; }
+
+  .footer-note { margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--text-tertiary); }
+  .footer-links a { margin-right: 16px; }
+  ::selection { background: var(--accent-dim); }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span><span class="brand-name">CoreOps</span></div>
+    <div class="brand-sub">Solution Architecture Capstone</div>
+    <div class="searchbox">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="navsearch" type="text" placeholder="Search this guide…" oninput="filterNav(this.value)">
+    </div>
+    <nav id="navlist">
+      <div class="navgroup">
+        <div class="navgroup-label">Start here</div>
+        <div class="navlink" data-kw="overview what is coreops solo build" onclick="jump('overview')">Overview</div>
+      </div>
+      <div class="navgroup">
+        <div class="navgroup-label">Architecture</div>
+        <div class="navlink" data-kw="architecture layers mcp-server guardrails frontend" onclick="jump('architecture')">System Architecture — 7 Layers</div>
+        <div class="navlink" data-kw="adr decision log jwt totp mfa session audit persistence" onclick="jump('adrlog')">Architecture Decision Log <span class="count">7</span></div>
+      </div>
+      <div class="navgroup">
+        <div class="navgroup-label">Evidence</div>
+        <div class="navlink" data-kw="requirements traceability matrix must should" onclick="jump('traceability')">Requirements Traceability <span class="count">18</span></div>
+        <div class="navlink" data-kw="test verification evidence live azure ntfy" onclick="jump('evidence')">Verification &amp; Test Evidence <span class="count">284</span></div>
+        <div class="navlink" data-kw="delivery timeline build log releases dates" onclick="jump('timeline')">Delivery Timeline</div>
+        <div class="navlink" data-kw="cost operating footprint azure free tier" onclick="jump('cost')">Operating Footprint &amp; Cost Posture</div>
+      </div>
+      <div class="navgroup">
+        <div class="navgroup-label">Close-out</div>
+        <div class="navlink" data-kw="executive summary go recommendation gaps not built" onclick="jump('execsummary')">Executive Summary</div>
+        <div class="navlink" data-kw="downloads documents" onclick="jump('downloads')">Downloadable Documents</div>
+      </div>
+    </nav>
+    <button class="theme-toggle" onclick="toggleTheme()">Toggle light / dark</button>
+  </aside>
+
+  <main class="main">
+
+    <section class="hero" id="overview">
+      <div class="eyebrow"><span class="dot"></span>Real system · 12/12 stories verified · 284/284 tests passing</div>
+      <h1>CoreOps — Solution Architecture Capstone</h1>
+      <p class="lede">An enterprise-grade AI Operations Dashboard for SQL Server, SSIS, SSRS, and Windows servers — an intelligent command center that detects, diagnoses, and proposes remediations for operational incidents, with every production-affecting action gated behind a real human approval. Built solo, end to end, with Claude Code as an AI pair, in 8 real calendar days.</p>
+      <p>This document is the architecture-and-evidence capstone for that build: the real decision log, the real requirement-to-story trace, the real test and live-verification record, and the real delivery timeline — everything traces to a file, a commit, or a test run in <a href="https://github.com/qninying/ai-operations-center" target="_blank" rel="noopener">github.com/qninying/ai-operations-center</a>. Nothing here is illustrative or hypothetical unless explicitly labeled as such.</p>
+      <div class="byline">Quincy Nkwain Ninying · Sole builder &amp; solution architect · Repo generated 2026-08-17 → this capstone 2026-08-24</div>
+
+      <div class="statgrid">
+        <div class="stat"><div class="num">12 / 12</div><div class="label">Stories verified</div></div>
+        <div class="stat"><div class="num">38 / 38</div><div class="label">Acceptance criteria passed</div></div>
+        <div class="stat"><div class="num">284</div><div class="label">Tests passing, 3 suites</div></div>
+        <div class="stat"><div class="num">7</div><div class="label">Architecture decision records</div></div>
+        <div class="stat"><div class="num">18</div><div class="label">Requirements traced</div></div>
+        <div class="stat"><div class="num">8 days</div><div class="label">2026-08-17 → 2026-08-24</div></div>
+        <div class="stat"><div class="num">84</div><div class="label">Real commits</div></div>
+        <div class="stat"><div class="num">5,600</div><div class="label">Production LOC</div></div>
+      </div>
+
+      <div class="callout honest">
+        <strong>How this differs from a course case study:</strong> the five prior Field Guides in this series (Business Analysis through the Week-12 capstone) documented a fictional insurance-claims initiative for a training curriculum. This document is the same knowledge-base format applied to a real, running codebase the author actually built — every table row below resolves to a real commit SHA, a real test file, or a real ADR file in this repo, cross-checked before writing rather than reused from the fictional series.
+      </div>
+    </section>
+
+    <section class="block" id="architecture">
+      <div class="section-kicker">System Architecture</div>
+      <h2>Seven real layers, one golden thread</h2>
+      <p>CoreOps maps onto the standard 7-layer reference architecture for AI systems. Every box below is a real module in this repo as of 2026-08-24, not a target diagram — the full write-up lives in <a href="7-layer-architecture-mapping.md">7-layer-architecture-mapping.md</a>, with companion diagrams in <a href="architecture-summary.html">architecture-summary.html</a> and <a href="trust-boundaries.html">trust-boundaries.html</a>. This section condenses that mapping; it doesn't replace it.</p>
+
+      <svg viewBox="0 0 860 430" style="width:100%;height:auto;margin:20px 0;">
+        <g font-size="11" fill="var(--text-secondary)">
+          <!-- Layer bands -->
+          <rect x="10" y="10" width="840" height="52" rx="8" fill="var(--accent-dim)" stroke="var(--line)"/>
+          <text x="24" y="30" font-weight="600" fill="var(--accent)">01 · Application &amp; Interaction</text>
+          <text x="24" y="48">dashboard.html · React Console (frontend/) · login.html</text>
+
+          <rect x="10" y="70" width="840" height="52" rx="8" fill="var(--danger-dim)" stroke="var(--line)"/>
+          <text x="24" y="90" font-weight="600" fill="var(--danger)">02 · Governance &amp; Guardrail</text>
+          <text x="24" y="108">remediationGuardrail.ts · hitlQueue.ts · auth/ (credentials, sessionStore, cookies) · rateLimiter.ts</text>
+
+          <rect x="10" y="130" width="840" height="52" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+          <text x="24" y="150" font-weight="600" fill="var(--text-primary)">03 · Orchestration</text>
+          <text x="24" y="168">monitoringService.ts · escalationService.ts · notificationService.ts · reliability/circuitBreaker.ts · httpServer.ts</text>
+
+          <rect x="10" y="190" width="840" height="52" rx="8" fill="var(--gap-dim)" stroke="var(--line)"/>
+          <text x="24" y="210" font-weight="600" fill="var(--gap)">04 · Reasoning / Model</text>
+          <text x="24" y="228">rootCauseAgent.ts (Claude Sonnet 5) · recommendationService.ts · cloudRecommendationService.ts</text>
+
+          <rect x="10" y="250" width="840" height="52" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+          <text x="24" y="270" font-weight="600" fill="var(--text-primary)">05 · Data Integration / Tooling</text>
+          <text x="24" y="288">MCP Tool Gateway (index.ts stdio, httpMcpServer.ts network) · dmvLiveSource.ts · cloudBlobSource.ts · dmvReader.ts</text>
+
+          <rect x="10" y="310" width="840" height="52" rx="8" fill="var(--accent-dim)" stroke="var(--line)"/>
+          <text x="24" y="330" font-weight="600" fill="var(--accent)">06 · Data &amp; Infrastructure</text>
+          <text x="24" y="348">Azure SQL Database (Free tier) · Azure Blob Storage · single Node.js process (mcp-server)</text>
+
+          <rect x="10" y="370" width="840" height="52" rx="8" fill="var(--verified-dim)" stroke="var(--line)"/>
+          <text x="24" y="390" font-weight="600" fill="var(--verified)">07 · Observability &amp; Audit</text>
+          <text x="24" y="408">guardrails/auditLog.ts (JSONL-persisted) · observability/logger.ts · one correlation ID per incident</text>
+        </g>
+      </svg>
+
+      <div class="callout">
+        <strong>The golden thread:</strong> a correlation ID is generated once, when a monitoring cycle starts (Layer 03), carried through the reasoning result (04), the guardrail evaluation (02), and recorded at every step by Layer 07 — so <code>GET /api/audit?correlationId=</code> reconstructs one entire incident, from first evidence to the human decision, as one connected trail rather than scattered fragments.
+      </div>
+
+      <div class="callout honest">
+        <strong>Target vs. built, stated plainly:</strong> <code>project-blueprint/architecture.md</code> names a larger target stack (Kafka, TimescaleDB, Faust, PostgreSQL, Telegraf) for a future, higher-scale version. None of that is implemented today. The real, running system holds its state in-process and in an append-only JSONL file (per <a href="#adrlog">ADR-005</a>) — a deliberate scale-appropriate choice, not an oversight, and it's disclosed here rather than left for a reader to discover independently.
+      </div>
+    </section>
+
+    <section class="block" id="adrlog">
+      <div class="section-kicker">Architecture Decision Log</div>
+      <h2>7 real ADRs — every one naming what it rejected</h2>
+      <p>All seven were written and closed inside the same 8-day build, most on 2026-08-23/24 in response to a documented trust-posture assessment. Each links a real decision to a real, cited alternative it beat, and to a real verification step — not just the choice made.</p>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-001</span> Transport selection for the MCP Tool Gateway <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> run two transports for two consumers — STDIO kept as a local, dev-only entry point; StreamableHTTP added for the deployed Tool Gateway, gated by a real bearer token (<code>auth/apiToken.ts</code>).</p>
+        <p><span class="rejected">Rejected:</span> STDIO alone (no cross-host reachability, no multi-client concurrency) · SSE / legacy HTTP ("not a serious contender" — the MCP spec is deprecating it in favor of StreamableHTTP).</p>
+        <div class="verify-line"><strong>Verified:</strong> a real random bearer token was generated; unauthenticated and wrong-token requests returned real <code>401</code>s; a real MCP handshake (<code>initialize</code> + <code>tools/list</code>) returned both real tools. 167 tests passing at time of writing; <code>tsc --noEmit</code> clean.</div>
+      </div>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-002</span> Unify correlation IDs across the audit trail <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> extend <code>guardrails/auditLog.ts</code> with a <code>SystemEventAuditEntry</code> type and wire every mcp-server service through one correlation ID per real-world incident, instead of building a second audit system.</p>
+        <p><span class="rejected">Rejected:</span> a second, parallel audit/telemetry system — explicitly named as the first decision driver to avoid.</p>
+        <div class="verify-line"><strong>Verified:</strong> a real <code>/api/recommendation</code> call at 55% confidence produced three real entries under one correlation ID — <code>recommendation_data_access</code>, <code>escalation_triggered</code>, and a real <code>operator_notification_delivered</code> ntfy dispatch.</div>
+      </div>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-003</span> Session-based authentication over JWT <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> in-process session store, <code>HttpOnly</code> + <code>SameSite=Strict</code> cookies, scrypt password hashing. Followed a real trust-boundary audit that found every dashboard route reachable by anyone, and a hardcoded approver comparison that could never fail.</p>
+        <p><span class="rejected">Rejected:</span> JWT — revocation would need a server-side blocklist (defeating statelessness); single-process deployment means JWT's core advantage buys nothing; an XSS audit had just found and fixed real unescaped <code>innerHTML</code> sinks, and a JWT in <code>localStorage</code> sits in that same exposure class. This was an explicit user decision point ("JWT or session-based?"), not a default.</p>
+        <div class="verify-line"><strong>Verified:</strong> every route except <code>/</code>, <code>/health</code>, <code>/login</code>, <code>POST /api/login</code>, <code>POST /api/logout</code> now runs through <code>requireSession()</code>; built, unit-tested, live-verified.</div>
+      </div>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-004</span> Serve the built React console from <code>mcp-server</code> itself <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> serve the compiled console at <code>GET /console</code> and root-relative <code>/assets/*</code> from the same Node process, with a path-traversal-guarded static file resolver.</p>
+        <p><span class="rejected">Rejected:</span> a <code>base: '/console/'</code>-prefixed build (higher cross-file coupling) · a reverse proxy / nginx ("this repo has zero reverse-proxy config today" — a legitimately bigger decision than this one) · leaving it unresolved, dev-proxy only ("not a decision, it's declining to make one").</p>
+        <div class="verify-line"><strong>Verified:</strong> <code>npm run build-console</code> was run for real; the emitted <code>dist/index.html</code> was inspected directly to confirm root-relative asset paths.</div>
+      </div>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-005</span> Append-only JSONL persistence for the audit trail, with size-based rotation <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> the audit log gains a <code>persistTo</code> path, rehydrates in memory on startup, appends synchronously, and rotates into numbered archive segments (default 5,000 lines/segment) — <strong>never deletes.</strong> Followed a trust-posture assessment that found the entire audit trail lived only in an in-memory <code>Map</code>, erased on every restart.</p>
+        <p><span class="rejected">Rejected:</span> SQLite ("no SQLite/database dependency exists in this repo today" — a new persistence idiom) · defer/document only ("the user explicitly asked for this fixed, not just re-documented") · time-based or delete-after-N-days rotation ("a burst of activity would produce one huge daily file just the same"; deletion "rejected outright" for a governance record).</p>
+        <div class="verify-line"><strong>Verified:</strong> proposed and approved a real remediation, killed the running server process outright, restarted it, confirmed both audit entries were still retrievable. Rotation was verified against a copy of the real, running system's actual <code>audit-log.jsonl</code> — <strong>48 real entries</strong> at the time — forced a rotation with a small threshold, confirmed byte-for-byte archive integrity and correct continuity to 49 entries.</div>
+      </div>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-006</span> Real TOTP-based MFA, replacing a hardcoded <code>mfa: true</code> <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> hand-rolled TOTP (RFC 6238) via <code>node:crypto</code>, required on every login. Because login itself now requires TOTP, every session is inherently MFA-verified by construction — no separate session-level MFA flag was needed, and the guardrail's <code>mfa</code> check "stops being a hardcoded lie."</p>
+        <p><span class="rejected">Rejected:</span> OTP delivered via ntfy.sh (weaker; depends on delivery availability) · WebAuthn / passkeys ("disproportionate complexity for what this system actually needs today").</p>
+        <div class="verify-line"><strong>Verified against the published RFC 6238 Appendix B SHA-1 test vectors</strong>, plus live: missing code → real 400; wrong code → real 401; correct code → real 200 + cookie; <strong>replaying the exact same code → real rejection, even with the correct username and password.</strong> 17 new tests.</div>
+      </div>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-007</span> A real second approver identity <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> a named second user (<code>userDirectory.ts</code>), each configured user with their own independent TOTP verifier state. Closed two gaps at once: the backup approver was a hardcoded string with no real login, and the escalation-timeout check existed and was tested but was never actually called from production code.</p>
+        <p><span class="rejected">Rejected:</span> a general N-user credential file — "the escalation model has no third role to justify it," called out explicitly as premature abstraction against this repo's own conventions.</p>
+        <div class="verify-line"><strong>Verified live, on the real clock:</strong> proposed a remediation as the primary approver, waited the real 15-minute decision window, logged in as the real backup approver and decided the item, then confirmed the primary could no longer decide it (<code>403 UNAUTHORIZED_DECIDER</code>). The full 4-event sequence — <code>hitl_enqueued → hitl_escalated → hitl_decision → hitl_decision_rejected</code> — is in the real audit log.</div>
+      </div>
+    </section>
+
+    <section class="block" id="traceability">
+      <div class="section-kicker">Requirements Traceability</div>
+      <h2>18 requirements, 12 stories, two named gaps</h2>
+      <p>Every <em>must</em>-priority requirement is fulfilled by at least one verified story. Two <em>should</em>/non-functional requirements are intentionally not yet built — named here rather than hidden, consistent with this repo's own traceability doc.</p>
+      <table id="req-table">
+        <thead><tr><th>Req</th><th>Kind</th><th>Priority</th><th>Requirement</th><th>Fulfilled by</th></tr></thead>
+        <tbody>
+          <tr><td class="num-cell">REQ-001</td><td>Safety</td><td><span class="badge must">must</span></td><td>Require human approval for any action that changes a production environment.</td><td>STORY-001</td></tr>
+          <tr><td class="num-cell">REQ-002</td><td>Functional</td><td><span class="badge must">must</span></td><td>Automatically detect, diagnose, correlate, and recommend actions without executing production changes.</td><td>STORY-003</td></tr>
+          <tr><td class="num-cell">REQ-003</td><td>Functional</td><td><span class="badge must">must</span></td><td>Provide confidence scores for recommended actions.</td><td>STORY-003</td></tr>
+          <tr><td class="num-cell">REQ-004</td><td>Functional</td><td><span class="badge must">must</span></td><td>Present evidence-backed reasoning for all recommendations.</td><td>STORY-003</td></tr>
+          <tr><td class="num-cell">REQ-005</td><td>Safety</td><td><span class="badge must">must</span></td><td>Log every decision and action for audit purposes.</td><td>STORY-002</td></tr>
+          <tr><td class="num-cell">REQ-006</td><td>Functional</td><td><span class="badge must">must</span></td><td>Provide role-based dashboards for different user types.</td><td>STORY-005</td></tr>
+          <tr><td class="num-cell">REQ-007</td><td>Constraint</td><td><span class="badge constraint">must</span></td><td>Support integration with SQL Server, SSIS, SSRS, and Windows servers.</td><td>STORY-006</td></tr>
+          <tr><td class="num-cell">REQ-008</td><td>Constraint</td><td><span class="badge constraint">must</span></td><td>Support integration with cloud services and enterprise applications through standardized connectors.</td><td>STORY-007</td></tr>
+          <tr><td class="num-cell">REQ-009</td><td>Functional</td><td><span class="badge must">must</span></td><td>Provide operational summaries for IT Managers and Engineering Leaders.</td><td>STORY-005</td></tr>
+          <tr><td class="num-cell">REQ-010</td><td>Functional</td><td><span class="badge must">must</span></td><td>Gather additional diagnostics when confidence is below <strong>80%</strong>.</td><td>STORY-004</td></tr>
+          <tr><td class="num-cell">REQ-011</td><td>Functional</td><td><span class="badge must">must</span></td><td>Escalate incidents to a human when confidence is below <strong>60%</strong>.</td><td>STORY-009</td></tr>
+          <tr><td class="num-cell">REQ-012</td><td>Safety</td><td><span class="badge must">must</span></td><td>Notify operators immediately of any autonomous actions taken.</td><td>STORY-010</td></tr>
+          <tr><td class="num-cell">REQ-013</td><td>Functional</td><td><span class="badge must">must</span></td><td>Provide explainable AI recommendations for all users.</td><td>STORY-006, STORY-007</td></tr>
+          <tr style="background:var(--gap-dim);"><td class="num-cell">REQ-014</td><td>Functional</td><td><span class="badge should">should</span></td><td>Allow configuration of confidence thresholds for actions.</td><td><span class="badge gap">Not yet fulfilled</span></td></tr>
+          <tr><td class="num-cell">REQ-015</td><td>Safety</td><td><span class="badge must">must</span></td><td>Support rollback capabilities for low-risk, reversible tasks.</td><td>STORY-011</td></tr>
+          <tr><td class="num-cell">REQ-016</td><td>Functional</td><td><span class="badge must">must</span></td><td>Provide continuous monitoring and AI-powered root cause analysis.</td><td>STORY-008</td></tr>
+          <tr style="background:var(--gap-dim);"><td class="num-cell">REQ-017</td><td>Non-functional</td><td><span class="badge should">should</span></td><td>Reduce manual incident correlation across systems by 50-70%.</td><td><span class="badge gap">Not yet fulfilled — unmeasured</span></td></tr>
+          <tr><td class="num-cell">REQ-018</td><td>Constraint</td><td><span class="badge constraint">context</span></td><td>Provide a plug-in connector architecture for extensibility.</td><td>Context for STORY-006/007 — constraints get no story of their own</td></tr>
+        </tbody>
+      </table>
+      <div class="callout gapnote">
+        <strong>Named, not hidden:</strong> REQ-014 (configurable thresholds) and REQ-017 (a 50-70% correlation-reduction target) are both <em>should</em>/non-functional priority — the project's own traceability rule is "every <em>must</em>-have requirement is fulfilled," which holds exactly. REQ-017 in particular can't honestly be marked done without a real measurement baseline, which doesn't exist yet — that's stated here rather than asserted away.
+      </div>
+    </section>
+
+    <section class="block" id="evidence">
+      <div class="section-kicker">Verification &amp; Test Evidence</div>
+      <h2>284 tests, and the live bugs they actually caught</h2>
+      <table>
+        <thead><tr><th>Package</th><th>Files</th><th>Tests</th><th>Runner</th><th>Production LOC</th></tr></thead>
+        <tbody>
+          <tr><td><code>mcp-server/</code></td><td class="num-cell">24</td><td class="num-cell">214</td><td>vitest</td><td class="num-cell">4,468</td></tr>
+          <tr><td><code>guardrails/</code></td><td class="num-cell">4</td><td class="num-cell">64</td><td>vitest</td><td class="num-cell">966</td></tr>
+          <tr><td><code>frontend/</code></td><td class="num-cell">1</td><td class="num-cell">6</td><td>vitest</td><td class="num-cell">166</td></tr>
+          <tr><td><strong>Total</strong></td><td class="num-cell"><strong>29</strong></td><td class="num-cell"><strong>284</strong></td><td>—</td><td class="num-cell"><strong>5,600</strong></td></tr>
+        </tbody>
+      </table>
+      <p>Re-run live for this document, 2026-08-24: all three suites reported <code>passed</code> with zero failures.</p>
+      <h3>Real bugs the tests and live verification actually caught before shipping</h3>
+      <table>
+        <thead><tr><th>Where</th><th>What was found live</th></tr></thead>
+        <tbody>
+          <tr><td>STORY-006 · SQL Server DMV</td><td>Sorting by <code>cpu_time DESC</code> alone silently buried a genuine blocking session (near-zero CPU by definition) under 40-50+ Azure background system sessions. Fixed by excluding <code>status = 'background'</code> and sorting any blocked session first, guarded by a regression test.</td></tr>
+          <tr><td>STORY-007 · Azure Blob Storage</td><td>Verified against a real, live account (<code>coreopsdiagnostics</code>/<code>diagnostics</code>) — a real read produced an honestly low-confidence recommendation; a nonexistent container produced a real <code>503</code>, not a hang or a fabricated result.</td></tr>
+          <tr><td>STORY-008 · Continuous monitoring</td><td>A cold-starting Azure SQL free-tier instance took ~30s to respond against a 10s polling interval — overlapping cycles piled up and tripped the shared circuit breaker on a false alarm. Fixed with an in-flight guard, covered by a regression test.</td></tr>
+          <tr><td>STORY-009 · Escalation</td><td>Boundary-tested at exactly 59% vs. 60% confidence. Live-verified on the real SQL path: a quiet database (20% confidence) correctly escalated; a real seeded blocking scenario (75% confidence) correctly did not.</td></tr>
+          <tr><td>STORY-010 · Notification</td><td>Verified live end-to-end — a real escalation triggered a real HTTP POST to ntfy.sh, confirmed by polling ntfy's own API for the delivered push (correct title, incident summary, operator name).</td></tr>
+          <tr><td>STORY-011 · Rollback</td><td>A denial's explanation text was keyed as <code>reason</code>, silently colliding with and overwriting the categorical denial code (also <code>reason</code>) in the same log line — caught by tests before shipping, renamed to <code>detail</code>.</td></tr>
+          <tr><td>ADR-006 · TOTP MFA</td><td>Verified against published RFC 6238 test vectors; live-verified that replaying an already-used code is rejected even with the correct password.</td></tr>
+          <tr><td>ADR-007 · Second approver</td><td>Verified on the real wall clock — a genuine 15-minute wait, a real escalation to a real second human, and a real lockout of the original approver afterward.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="block" id="timeline">
+      <div class="section-kicker">Delivery Timeline</div>
+      <h2>8 real calendar days, ahead of the platform's own plan</h2>
+      <svg viewBox="0 0 860 210" style="width:100%;height:auto;margin:16px 0;">
+        <g font-size="11" fill="var(--text-secondary)">
+          <text x="10" y="16" font-family="var(--font-mono)" fill="var(--text-tertiary)">08-17</text>
+          <text x="140" y="16" font-family="var(--font-mono)" fill="var(--text-tertiary)">08-18</text>
+          <text x="260" y="16" font-family="var(--font-mono)" fill="var(--text-tertiary)">08-19</text>
+          <text x="380" y="16" font-family="var(--font-mono)" fill="var(--text-tertiary)">08-20</text>
+          <text x="500" y="16" font-family="var(--font-mono)" fill="var(--text-tertiary)">08-21</text>
+          <text x="740" y="16" font-family="var(--font-mono)" fill="var(--text-tertiary)">08-24</text>
+
+          <rect x="10" y="26" width="90" height="24" rx="4" fill="var(--surface)" stroke="var(--line)"/>
+          <text x="16" y="42">STORY-000</text>
+
+          <rect x="105" y="26" width="150" height="24" rx="4" fill="var(--accent-dim)" stroke="var(--line)"/>
+          <text x="112" y="42" fill="var(--accent)">r0 · 001, 002</text>
+
+          <rect x="105" y="56" width="270" height="24" rx="4" fill="var(--gap-dim)" stroke="var(--line)"/>
+          <text x="112" y="72" fill="var(--gap)">r1 · 003, 004</text>
+
+          <rect x="260" y="86" width="120" height="24" rx="4" fill="var(--danger-dim)" stroke="var(--line)"/>
+          <text x="266" y="102" fill="var(--danger)">r2 · 005</text>
+
+          <rect x="260" y="116" width="240" height="24" rx="4" fill="var(--verified-dim)" stroke="var(--line)"/>
+          <text x="266" y="132" fill="var(--verified)">r3 · 006, 007</text>
+
+          <rect x="260" y="146" width="480" height="24" rx="4" fill="var(--accent-dim)" stroke="var(--line)"/>
+          <text x="266" y="162" fill="var(--accent)">r4 · 008, 009, 010, 011</text>
+
+          <rect x="380" y="176" width="450" height="24" rx="4" fill="var(--surface)" stroke="var(--line)"/>
+          <text x="386" y="192">Governance engine + 7 ADRs + trust-scorecard hardening</text>
+        </g>
+      </svg>
+      <table>
+        <thead><tr><th>Release</th><th>Goal</th><th>Stories</th><th>Real commit dates</th></tr></thead>
+        <tbody>
+          <tr><td>—</td><td>Build the Command Center (before any release)</td><td>STORY-000</td><td class="num-cell">2026-08-17</td></tr>
+          <tr><td>r0</td><td>Initial Setup and Trust Spine</td><td>STORY-001, STORY-002</td><td class="num-cell">2026-08-18</td></tr>
+          <tr><td>r1</td><td>AI Analysis and Recommendations</td><td>STORY-003, STORY-004</td><td class="num-cell">2026-08-18 → 08-19</td></tr>
+          <tr><td>r2</td><td>User Interface and Role-based Dashboards</td><td>STORY-005</td><td class="num-cell">2026-08-19</td></tr>
+          <tr><td>r3</td><td>Integration and Extensibility</td><td>STORY-006, STORY-007</td><td class="num-cell">2026-08-19</td></tr>
+          <tr><td>r4</td><td>Advanced Monitoring and Incident Management</td><td>STORY-008, 009, 010, 011</td><td class="num-cell">2026-08-19 → 08-21</td></tr>
+          <tr><td>Hardening</td><td>Governance engine (ABAC/HITL), ADR-002 → ADR-007, trust-scorecard closures</td><td>—</td><td class="num-cell">2026-08-20 → 08-24</td></tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <strong>Ahead of the platform's own generated plan, not behind it:</strong> <code>.colaberry/plan.json</code>'s own <code>schedule</code> block states <code>build_start: 2026-08-20</code>, <code>build_end: 2026-10-01</code>, <code>demo_day: 2026-10-08</code> — a planned ~6-week build. The real, git-dated history shows the first story commit landing 2026-08-17, three days <em>before</em> the plan's stated start, with all 12 stories (804/804 points) verified by 2026-08-24 — over five weeks ahead of the plan's own build-end date. Both facts are in the repo; this is a real, checkable pace, not a claimed one.
+      </div>
+    </section>
+
+    <section class="block" id="cost">
+      <div class="section-kicker">Operating Footprint &amp; Cost Posture</div>
+      <h2>What this actually costs to run — stated honestly</h2>
+      <p>There is no dollar-figure cost model anywhere in this repo, and this document doesn't invent one. What follows is only what's real and citable.</p>
+      <table>
+        <thead><tr><th>Component</th><th>Real, cited fact</th></tr></thead>
+        <tbody>
+          <tr><td>Azure SQL Database</td><td>Free tier. Auto-pauses when idle; observed cold-start wake time ~30–90s (<code>mcp-server/src/warmup.ts</code> budgets 90s for it). A real free-tier monthly quota exhaustion was hit and logged during this build, renewing 2026-09-01 UTC.</td></tr>
+          <tr><td>Azure Blob Storage</td><td>Real account (<code>coreopsdiagnostics</code> / <code>diagnostics</code> container) used for live verification — no documented paid spend.</td></tr>
+          <tr><td>ntfy.sh (operator push notifications)</td><td>Free, no signup, no API key — a topic name is the only "credential."</td></tr>
+          <tr><td>Claude Sonnet 5 (Anthropic API)</td><td>The model actually called by <code>rootCauseAgent.ts</code> and <code>diagnosticsGatherer.ts</code>. <strong>No token counts, invocation counts, or dollar cost are logged anywhere in this codebase</strong> — there is nothing to compute a real per-query cost from yet.</td></tr>
+          <tr><td>Hosting</td><td>A single Node.js process serves the API, the dashboard, and the built console (ADR-004) — no container orchestration, no reverse proxy, no separate database tier exist in this repo.</td></tr>
+        </tbody>
+      </table>
+      <h3>Real reliability numbers (not cost, but concrete)</h3>
+      <table>
+        <thead><tr><th>Control</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Upstream call timeout / retries</td><td class="num-cell">10s timeout · 3 retries (4 attempts total) · backoff 500ms→4s capped</td></tr>
+          <tr><td>Circuit breaker</td><td class="num-cell">Opens at 5 failures / 60s window · 30s cooldown · one half-open trial</td></tr>
+          <tr><td>Login rate limit</td><td class="num-cell">5 attempts / 60 seconds</td></tr>
+          <tr><td>Session TTL</td><td class="num-cell">60 minutes, sliding</td></tr>
+          <tr><td>HITL decision window</td><td class="num-cell">15 minutes (real wall-clock verified)</td></tr>
+          <tr><td>Audit log rotation</td><td class="num-cell">5,000 lines / segment default, never deleted</td></tr>
+        </tbody>
+      </table>
+      <div class="callout honest">
+        <strong>Stated plainly:</strong> this section could not honestly include a dollar total, a per-query cost, or a monthly run-rate — no invocation or token logging exists in this codebase to compute one from. Per this project's own data-contract philosophy ("grey and 'not checked from here' is honest; a confident zero is not"), the correct move is to name that gap rather than fabricate a number to fill it.
+      </div>
+    </section>
+
+    <section class="block" id="execsummary">
+      <div class="section-kicker">Executive Summary</div>
+      <h2>Where CoreOps actually stands, 2026-08-24</h2>
+      <div class="doc-preview" id="doc-exec">
+        <div class="doc-cover">
+          <div class="doc-num">Document 6 of 6</div>
+          <h3>Capstone Executive Summary</h3>
+          <div class="doc-controls">
+            <span>Author: Quincy Nkwain Ninying</span>
+            <span>Date: 2026-08-24</span>
+            <span>Status: <span class="badge verified">Ready for portfolio review</span></span>
+          </div>
+        </div>
+        <div class="doc-body">
+          <h4>Built</h4>
+          <p>12 of 12 stories verified (804/804 points, 38/38 acceptance criteria), across 5 releases plus the Command Center. Every <em>must</em>-priority requirement (16 of 18) is fulfilled by at least one verified story. 284 tests pass across 3 real suites, several with live verification against real external systems — a live Azure SQL Database, a live Azure Blob Storage account, a live Anthropic API, and a live ntfy.sh push channel, not mocks standing in for them. 7 architecture decision records exist, each naming a real rejected alternative, several closing gaps found through the project's own documented trust-posture assessments rather than left unexamined.</p>
+          <h4>Honestly not built</h4>
+          <p>REQ-014 (configurable confidence thresholds) and REQ-017 (a 50-70% manual-correlation reduction target) are named gaps, not silent ones — both are <em>should</em>/non-functional priority, and REQ-017 specifically has no measurement baseline to claim against yet. The target architecture's higher-scale components (Kafka, TimescaleDB, Faust, PostgreSQL, Telegraf) are not implemented; the real system runs in-process with JSONL-file persistence, a deliberate choice at this scale (ADR-005), not an oversight. No dollar cost or token-usage figure exists for the AI reasoning layer — nothing has instrumented it yet.</p>
+          <h4>Pace</h4>
+          <p>The platform-generated build plan projected 2026-08-20 through 2026-10-01 (demo 2026-10-08). The real, git-dated history shows work starting 2026-08-17 and every story verified by 2026-08-24 — three days ahead of the plan's own stated start, and finished more than five weeks ahead of its own stated end.</p>
+          <h4>Recommendation</h4>
+          <p><strong>Ready to present as portfolio evidence</strong> of real, verifiable solution-architecture and governance-engineering capability: a system with genuine external integrations, real bugs found and fixed through live testing (not just passing mocks), and a provable, restart-durable audit trail — not a toy CRUD demo. The two named non-must gaps and the absent cost-instrumentation are the honest next items, not disqualifying omissions.</p>
+        </div>
+        <div class="doc-signoff"><span>Prepared by: Quincy Nkwain Ninying</span><span>github.com/qninying/ai-operations-center</span></div>
+        <div class="doc-toolbar">
+          <button onclick="downloadDocHTML('doc-exec','CoreOps-Executive-Summary')">Download HTML</button>
+          <button onclick="printDoc('doc-exec')">Print / Save as PDF</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="downloads">
+      <div class="section-kicker">Downloadable Documents</div>
+      <h2>Six documents, sourced entirely from this repo</h2>
+
+      <div class="doc-preview" id="doc-adr">
+        <div class="doc-cover"><div class="doc-num">Document 1 of 6</div><h3>Architecture Decision Record Log</h3>
+          <div class="doc-controls"><span>7 ADRs</span><span>Status: <span class="badge verified">All implemented</span></span></div>
+        </div>
+        <div class="doc-body">
+          <table id="csv-adr">
+            <thead><tr><th>ADR</th><th>Title</th><th>Date</th><th>Decision</th><th>Rejected</th></tr></thead>
+            <tbody>
+              <tr><td>001</td><td>MCP transport selection</td><td>2026-08-12 / addendum 08-24</td><td>Dual transport: stdio (dev) + bearer-token StreamableHTTP (network)</td><td>stdio-only; SSE/legacy HTTP</td></tr>
+              <tr><td>002</td><td>Unify correlation IDs</td><td>2026-08-20</td><td>Extend auditLog.ts with SystemEventAuditEntry, one correlation ID per incident</td><td>A second, parallel audit system</td></tr>
+              <tr><td>003</td><td>Session-based auth over JWT</td><td>2026-08-23</td><td>In-process sessions, HttpOnly+SameSite=Strict cookies, scrypt hashing</td><td>JWT (blocklist needed for revocation; localStorage XSS exposure)</td></tr>
+              <tr><td>004</td><td>Console serving topology</td><td>2026-08-23</td><td>Serve built React console from mcp-server itself at /console + /assets/*</td><td>base-path-prefixed build; reverse proxy/nginx; leaving unresolved</td></tr>
+              <tr><td>005</td><td>Audit trail persistence + rotation</td><td>2026-08-24</td><td>Append-only JSONL, rehydrate on startup, size-based rotation (5,000/segment), never delete</td><td>SQLite; defer/document only; time-based or delete-after-N-days rotation</td></tr>
+              <tr><td>006</td><td>Real TOTP-based MFA</td><td>2026-08-24</td><td>Hand-rolled RFC 6238 TOTP gating login directly</td><td>OTP via ntfy.sh; WebAuthn/passkeys</td></tr>
+              <tr><td>007</td><td>Second approver identity</td><td>2026-08-24</td><td>Named second user, own TOTP verifier state, optional backup-approver env vars</td><td>General N-user credential file</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="doc-signoff"><span>Prepared by: Quincy Nkwain Ninying</span><span>Source: docs/ADR-001…007</span></div>
+        <div class="doc-toolbar">
+          <button onclick="downloadCSV('csv-adr','CoreOps-ADR-Log')">Download CSV</button>
+          <button onclick="downloadDocHTML('doc-adr','CoreOps-ADR-Log')">Download HTML</button>
+          <button onclick="printDoc('doc-adr')">Print / Save as PDF</button>
+        </div>
+      </div>
+
+      <div class="doc-preview" id="doc-req">
+        <div class="doc-cover"><div class="doc-num">Document 2 of 6</div><h3>Requirements Traceability Matrix</h3>
+          <div class="doc-controls"><span>18 requirements</span><span>16 must-fulfilled, 2 named gaps</span></div>
+        </div>
+        <div class="doc-body">
+          <p>See the full matrix in <a href="#traceability">Requirements Traceability</a> above; this document packages that same table for download.</p>
+          <div style="display:none;"><table id="csv-req"><thead><tr><th>Req</th><th>Kind</th><th>Priority</th><th>Requirement</th><th>Fulfilled by</th></tr></thead>
+          <tbody id="csv-req-body"></tbody></table></div>
+        </div>
+        <div class="doc-signoff"><span>Prepared by: Quincy Nkwain Ninying</span><span>Source: docs/REQUIREMENTS.md, docs/TRACEABILITY.md</span></div>
+        <div class="doc-toolbar">
+          <button onclick="cloneReqTable(); downloadCSV('csv-req','CoreOps-Requirements-Traceability')">Download CSV</button>
+          <button onclick="downloadDocHTML('req-table','CoreOps-Requirements-Traceability')">Download HTML</button>
+        </div>
+      </div>
+
+      <div class="doc-preview" id="doc-test">
+        <div class="doc-cover"><div class="doc-num">Document 3 of 6</div><h3>Verification &amp; Test Evidence Summary</h3>
+          <div class="doc-controls"><span>284 tests · 3 suites</span><span>Status: <span class="badge verified">All passing</span></span></div>
+        </div>
+        <div class="doc-body"><p>See <a href="#evidence">Verification &amp; Test Evidence</a> above for the full suite table and the live-bug list this document packages.</p></div>
+        <div class="doc-signoff"><span>Prepared by: Quincy Nkwain Ninying</span><span>Source: live npm test runs, 2026-08-24</span></div>
+        <div class="doc-toolbar"><button onclick="printDoc('evidence')">Print / Save as PDF</button></div>
+      </div>
+
+      <div class="doc-preview" id="doc-timeline">
+        <div class="doc-cover"><div class="doc-num">Document 4 of 6</div><h3>Delivery Timeline / Build Log</h3>
+          <div class="doc-controls"><span>8 real days</span><span>84 commits</span></div>
+        </div>
+        <div class="doc-body"><p>See <a href="#timeline">Delivery Timeline</a> above for the full release-by-release table and the plan-vs-actual comparison.</p></div>
+        <div class="doc-signoff"><span>Prepared by: Quincy Nkwain Ninying</span><span>Source: git log --all, .colaberry/plan.json</span></div>
+        <div class="doc-toolbar"><button onclick="printDoc('timeline')">Print / Save as PDF</button></div>
+      </div>
+
+      <div class="doc-preview" id="doc-cost">
+        <div class="doc-cover"><div class="doc-num">Document 5 of 6</div><h3>Operating Footprint &amp; Cost Posture</h3>
+          <div class="doc-controls"><span>No fabricated dollar figures</span></div>
+        </div>
+        <div class="doc-body"><p>See <a href="#cost">Operating Footprint &amp; Cost Posture</a> above for the full, real-only cost and reliability tables.</p></div>
+        <div class="doc-signoff"><span>Prepared by: Quincy Nkwain Ninying</span><span>Source: repo-wide grep for cost/pricing/token figures, 2026-08-24</span></div>
+        <div class="doc-toolbar"><button onclick="printDoc('cost')">Print / Save as PDF</button></div>
+      </div>
+
+      <p style="margin-top:24px;">Document 6 of 6, the Capstone Executive Summary, is above in <a href="#execsummary">Executive Summary</a>.</p>
+
+      <div class="footer-note">
+        <p>Companion architecture artifacts in this same package: <a href="architecture-summary.html">architecture-summary.html</a> · <a href="layer-diagram.html">layer-diagram.html</a> · <a href="trust-boundaries.html">trust-boundaries.html</a> · <a href="7-layer-architecture-mapping.md">7-layer-architecture-mapping.md</a>. Full traceability source: <a href="../requirements.md">project-blueprint/requirements.md</a>, <a href="../../docs/REQUIREMENTS.md">docs/REQUIREMENTS.md</a>, <a href="../../docs/TRACEABILITY.md">docs/TRACEABILITY.md</a>.</p>
+        <p class="footer-links">Repo: <a href="https://github.com/qninying/ai-operations-center" target="_blank" rel="noopener">github.com/qninying/ai-operations-center</a></p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<button class="ask-fab" id="askFab" onclick="toggleAsk()">💬 Ask the Guide</button>
+<div class="ask-panel" id="askPanel">
+  <div class="ask-header"><span>Ask about CoreOps</span><button onclick="toggleAsk()">✕</button></div>
+  <div class="ask-log" id="askLog">
+    <div class="ask-msg a">Ask me things like "how many tests pass," "what was rejected in ADR-003," or "what's not built yet." Answers are pulled only from the real facts in this document.</div>
+  </div>
+  <div class="ask-input-row">
+    <input id="askInput" type="text" placeholder="Ask a question…" onkeydown="if(event.key==='Enter')askSubmit()">
+    <button onclick="askSubmit()">Ask</button>
+  </div>
+</div>
+
+<script id="deepdive-metadata" type="application/json">
+{
+  "document_type": "solution_architecture_capstone",
+  "project": "CoreOps AI Operations Dashboard",
+  "repo_url": "https://github.com/qninying/ai-operations-center",
+  "author": "Quincy Nkwain Ninying",
+  "generated_at": "2026-08-24",
+  "build_span": { "first_commit": "2026-08-17", "last_commit_considered": "2026-08-24", "total_commits": 84 },
+  "stories_total": 12,
+  "stories_verified": 12,
+  "criteria_total": 38,
+  "criteria_passed": 38,
+  "points_awarded": 804,
+  "requirements_total": 18,
+  "requirements_must_fulfilled": 16,
+  "requirements_gaps_named": ["REQ-014", "REQ-017"],
+  "tests_total": 284,
+  "test_suites": [
+    { "package": "mcp-server", "files": 24, "tests": 214 },
+    { "package": "guardrails", "files": 4, "tests": 64 },
+    { "package": "frontend", "files": 1, "tests": 6 }
+  ],
+  "adrs_total": 7,
+  "production_loc_total": 5600,
+  "cost_model": "none_fabricated_no_real_usage_data_exists",
+  "nothing_faked": true
+}
+</script>
+
+<script>
+  function jump(id) {
+    document.getElementById(id).scrollIntoView({behavior:'smooth', block:'start'});
+    document.querySelectorAll('.navlink').forEach(n => n.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+  }
+  function toggleTheme() {
+    const root = document.documentElement;
+    const cur = root.getAttribute('data-theme');
+    if (cur === 'dark') root.setAttribute('data-theme','light');
+    else if (cur === 'light') root.removeAttribute('data-theme');
+    else root.setAttribute('data-theme','dark');
+  }
+  function filterNav(q) {
+    q = q.trim().toLowerCase();
+    document.querySelectorAll('.navlink').forEach(el => {
+      const hay = (el.textContent + ' ' + (el.dataset.kw||'')).toLowerCase();
+      el.classList.toggle('hidden', q.length > 0 && !hay.includes(q));
+    });
+  }
+  function tableToCSV(tableEl) {
+    const rows = Array.from(tableEl.querySelectorAll('tr'));
+    return rows.map(r => Array.from(r.querySelectorAll('th,td'))
+      .map(c => '"' + c.textContent.trim().replace(/"/g,'""') + '"').join(',')).join('\n');
+  }
+  function downloadCSV(tableId, filename) {
+    const table = document.getElementById(tableId);
+    const csv = tableToCSV(table);
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function downloadDocHTML(docId, filename) {
+    const el = document.getElementById(docId);
+    const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + filename +
+      '</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;} table{border-collapse:collapse;width:100%;} td,th{border:1px solid #ccc;padding:6px 10px;text-align:left;}</style></head><body>' +
+      el.outerHTML + '</body></html>';
+    const blob = new Blob([html], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename + '.html';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function printDoc(id) {
+    const el = document.getElementById(id);
+    const w = window.open('', '_blank');
+    w.document.write('<html><head><title>Print</title><style>body{font-family:sans-serif;max-width:800px;margin:30px auto;} table{border-collapse:collapse;width:100%;} td,th{border:1px solid #ccc;padding:6px 10px;text-align:left;}</style></head><body>' + el.outerHTML + '</body></html>');
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  }
+  function cloneReqTable() {
+    const src = document.getElementById('req-table').querySelectorAll('tbody tr');
+    const dst = document.getElementById('csv-req-body');
+    dst.innerHTML = '';
+    src.forEach(r => dst.appendChild(r.cloneNode(true)));
+  }
+
+  // Offline "Ask the Guide" — keyword-scored over real facts only.
+  const QA = [
+    {kw:['what','is','coreops'], a:'CoreOps is an enterprise-grade AI Operations Dashboard for SQL Server, SSIS, SSRS, and Windows servers — an intelligent command center that detects, diagnoses, and proposes remediations, with every production-affecting action gated behind a real human approval.', src:'CLAUDE.md'},
+    {kw:['who','built','solo','author'], a:'Quincy Nkwain Ninying built it solo, using Claude Code as an AI pair, across 8 real calendar days (2026-08-17 → 2026-08-24).', src:'git log --all'},
+    {kw:['how','many','requirements'], a:'18 requirements (REQ-001 through REQ-018), split Functional / Safety / Reliability / Constraint / Non-functional.', src:'docs/REQUIREMENTS.md'},
+    {kw:['requirements','not','fulfilled','gap','gaps','missing'], a:'REQ-014 (configurable confidence thresholds) and REQ-017 (a 50-70% manual-correlation-reduction target) are not yet fulfilled by any story — both are should/non-functional priority, named explicitly rather than hidden.', src:'docs/TRACEABILITY.md'},
+    {kw:['how','many','stories','verified'], a:'12 of 12 stories are verified — 804 of 804 points awarded, 38 of 38 acceptance criteria passed.', src:'.colaberry/progress.json'},
+    {kw:['adr','decision','how','many'], a:'7 architecture decision records, all implemented and live-verified: transport selection, correlation-ID unification, session auth over JWT, console serving topology, audit persistence, TOTP MFA, and a second approver identity.', src:'docs/ADR-001…007'},
+    {kw:['jwt','session','authentication','auth'], a:'Session-based authentication was chosen over JWT (ADR-003) — JWT would need a server-side blocklist for revocation, and a JWT in localStorage sits in the same exposure class an XSS audit had just closed. This was an explicit user decision point, not a default.', src:'ADR-003'},
+    {kw:['mfa','totp','multi-factor'], a:'Real TOTP (RFC 6238), hand-rolled with node:crypto, required on every login (ADR-006) — verified against the published RFC test vectors, with replay protection confirmed live even against the correct password.', src:'ADR-006'},
+    {kw:['audit','persist','restart','log'], a:'The audit trail persists to an append-only JSONL file (ADR-005), rehydrated on startup, rotated by size (5,000 lines/segment) and never deleted. Live-verified by killing the running server mid-session and confirming a prior decision was still retrievable after restart.', src:'ADR-005'},
+    {kw:['confidence','60','escalate','escalation'], a:'Below 60% confidence, an incident escalates to a human (REQ-011 / STORY-009) — boundary-tested at exactly 59% vs 60%, and live-verified on the real SQL path.', src:'STORY-009'},
+    {kw:['confidence','80','diagnostics','differential'], a:'Below 80% confidence, the system gathers a differential of additional possible causes instead of presenting one under-confident guess (REQ-010 / STORY-004).', src:'STORY-004'},
+    {kw:['how','many','tests','pass','passing'], a:'284 tests pass across 3 suites: 214 in mcp-server/, 64 in guardrails/, 6 in frontend/ — all re-run live for this document on 2026-08-24.', src:'live npm test'},
+    {kw:['real','systems','verified','against','live'], a:'Verified against a real, live Azure SQL Database (Free tier), a real Azure Blob Storage account, a real Anthropic API (Claude Sonnet 5), and a real ntfy.sh push channel — not mocks standing in for any of them.', src:'STORY-006, STORY-007, STORY-010'},
+    {kw:['how','long','take','build','time','days'], a:'8 real calendar days, 2026-08-17 to 2026-08-24, 84 commits — three days ahead of the platform-generated plan\'s own stated build_start, and over five weeks ahead of its stated build_end.', src:'.colaberry/plan.json vs. git log'},
+    {kw:['core','design','guarantee'], a:'Exactly one path in this system can write anything to a monitored server, and it can only act after a human explicitly approves a pending remediation — every collector, AI agent, and read path is architecturally incapable of writing to production, enforced in code and covered by tests.', src:'README.md'},
+    {kw:['not','built','aspirational','kafka','timescaledb','future'], a:'The target architecture names Kafka, TimescaleDB, Faust, PostgreSQL, and Telegraf for a future, higher-scale version — none of that is implemented today. The real system holds state in-process and in a JSONL file, a deliberate scale-appropriate choice.', src:'project-blueprint/architecture.md'},
+    {kw:['cost','price','pricing','dollar','budget'], a:'No dollar cost model exists — there is no token, invocation, or usage logging anywhere in this codebase to compute one from. Real, non-dollar facts: Azure SQL Free tier, free ntfy.sh, and Claude Sonnet 5 as the model actually called.', src:'repo-wide grep, 2026-08-24'},
+    {kw:['diagram','architecture','layer','deeper','more'], a:'The fuller architecture package — architecture-summary.html, layer-diagram.html, trust-boundaries.html, and the full 7-layer-architecture-mapping.md — lives alongside this document in project-blueprint/expo/.', src:'project-blueprint/expo/'}
+  ];
+  function scoreEntry(entry, tokens) {
+    return entry.kw.filter(k => tokens.includes(k)).length;
+  }
+  function askSubmit() {
+    const input = document.getElementById('askInput');
+    const q = input.value.trim();
+    if (!q) return;
+    const log = document.getElementById('askLog');
+    const qDiv = document.createElement('div');
+    qDiv.className = 'ask-msg q';
+    qDiv.textContent = q;
+    log.appendChild(qDiv);
+
+    const tokens = q.toLowerCase().replace(/[^a-z0-9%\s-]/g,'').split(/\s+/);
+    let best = null, bestScore = 0;
+    QA.forEach(entry => {
+      const s = scoreEntry(entry, tokens);
+      if (s > bestScore) { bestScore = s; best = entry; }
+    });
+    const aDiv = document.createElement('div');
+    aDiv.className = 'ask-msg a';
+    if (best && bestScore > 0) {
+      aDiv.innerHTML = best.a + '<span class="src">Source: ' + best.src + '</span>';
+    } else {
+      aDiv.textContent = 'No confident match in this document\'s indexed facts — try the search box in the sidebar, or ask about ADRs, requirements, tests, cost, or the timeline.';
+    }
+    log.appendChild(aDiv);
+    log.scrollTop = log.scrollHeight;
+    input.value = '';
+  }
+  function toggleAsk() {
+    document.getElementById('askPanel').classList.toggle('open');
+  }
+</script>
+</body>
+</html>

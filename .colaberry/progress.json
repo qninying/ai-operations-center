@@ -38,9 +38,24 @@
           "passed": true
         }
       ],
-      "files_touched": [],
+      "files_touched": [
+        ".colaberry/manifest.json",
+        ".colaberry/plan.json",
+        ".colaberry/progress.json",
+        "agents.html",
+        "assets/command-center.css",
+        "assets/command-center.js",
+        "data-model.html",
+        "guardrails.html",
+        "index.html",
+        "knowledge-base.html",
+        "outcomes.html",
+        "project-management.html",
+        "systems.html",
+        "users.html"
+      ],
       "tests_added": [],
-      "notes": null,
+      "notes": "Nine static tabs at the repo root (index.html + 8), reading .colaberry/plan.json, progress.json, and manifest.json at runtime rather than hard-coding plan content, per the story's own trust criterion. No test file exists for the Command Center itself — it is a static reader over the three JSON files, and its correctness is what the other stories' own tests (and this file's own accuracy) stand behind.",
       "updated_at": null,
       "verification": {
         "state": "verified",
@@ -72,9 +87,15 @@
           "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
+      "files_touched": [
+        "guardrails/remediationGuardrail.ts",
+        "guardrails/auditLog.ts"
+      ],
+      "tests_added": [
+        "guardrails/remediationGuardrail.test.ts",
+        "guardrails/auditLog.test.ts"
+      ],
+      "notes": "Originally implemented as guardrails/approvalAuditLog.ts (commit b55c117); superseded one commit later (5d47099, STORY-002) by the more general guardrails/auditLog.ts, which now carries the STORY-001 approval-decision tests directly — see the \"AuditLog — STORY-001 (decisions)\" describe block in auditLog.test.ts (approve/deny logging, idempotent re-recording, correlation-ID filtering). remediationGuardrail.ts is the gate an approval decision actually controls.",
       "updated_at": null,
       "verification": {
         "state": "verified",
@@ -106,9 +127,13 @@
           "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
+      "files_touched": [
+        "guardrails/auditLog.ts"
+      ],
+      "tests_added": [
+        "guardrails/auditLog.test.ts"
+      ],
+      "notes": "See the \"AuditLog — STORY-002 criterion 1/2/3\" describe blocks in auditLog.test.ts: an action once logged is retrievable by id (with an explicit not-found result, never undefined, for an id never logged); every entry's actor is required and rejected at write time if missing; every entry is timestamped, frozen against mutation of the returned reference, and a same-id/different-content write is treated as a conflict rather than a silent overwrite.",
       "updated_at": null,
       "verification": {
         "state": "verified",
@@ -140,9 +165,14 @@
           "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
+      "files_touched": [
+        "mcp-server/src/rootCauseAgent.ts",
+        "mcp-server/src/loadEnv.ts"
+      ],
+      "tests_added": [
+        "mcp-server/src/rootCauseAgent.test.ts"
+      ],
+      "notes": "analyzeIncidentRootCause is evidence-grounded (the prompt sent to the model includes the actual evidence data, not just a description) and returns attributed output citing the evidence IDs the model says it used. Explicitly non-fabricating: returns a deterministic low-confidence result WITHOUT calling the model when evidence is empty, rejects a confidence score outside 0-100 or a response missing evidenceIdsUsed, and throws MissingApiKeyError rather than attempting a call with no key configured. Retries then throws UpstreamCallFailedError on persistent failure — never a fabricated result.",
       "updated_at": null,
       "verification": {
         "state": "verified",
@@ -174,9 +204,13 @@
           "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
+      "files_touched": [
+        "mcp-server/src/diagnosticsGatherer.ts"
+      ],
+      "tests_added": [
+        "mcp-server/src/diagnosticsGatherer.test.ts"
+      ],
+      "notes": "gatherAdditionalDiagnostics does nothing when confidence is already >= 80 (REQ-010) — no model call, gathered: false — and that skip is itself logged, not silently skipped. When it does gather, the prompt includes the original low-confidence root cause and the real evidence, not just a description; rejects a response missing possibleCause, an empty diagnostics list, or non-JSON output; and retries then throws UpstreamCallFailedError on persistent failure.",
       "updated_at": null,
       "verification": {
         "state": "verified",

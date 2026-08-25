@@ -111,15 +111,129 @@ recommendation subsystem existed when this was written; R1 now does
 | module | `guardrails/auditLog.ts` |
 | tests | `guardrails/auditLog.test.ts` |
 
+## Cloud service → AI recommendation (STORY-007)
+
+`mcp-server/src/cloudBlobSource.ts` + `mcp-server/src/cloudRecommendationService.ts`
++ `GET /api/cloud-recommendation` — the cloud-service counterpart to STORY-006's
+SQL Server path, same shape: real Azure Blob Storage I/O (timeout + capped retry
++ its own circuit breaker, a separate failure domain from the DMV path) feeds a
+zod-validated recommendation step that never falls back to fixture data and
+calls it real.
+
+**Verified against a real, live Azure Blob Storage account** (`coreopsdiagnostics`
+/ `diagnostics` container), not mocked. Positive case: a real HTTP round trip
+read a real `diagnostics.json` blob and produced a real Claude recommendation
+(intentionally low-confidence, since the single test record genuinely lacks
+root-cause detail). Negative case: a server instance pointed at a nonexistent
+container returned a real 503 `CLOUD_SERVICE_UNAVAILABLE`, not a hang or a
+fabricated result.
+
+| | |
+|---|---|
+| module | `mcp-server/src/cloudBlobSource.ts`, `mcp-server/src/cloudRecommendationService.ts` |
+| tests | `mcp-server/src/cloudBlobSource.test.ts`, `mcp-server/src/cloudRecommendationService.test.ts` |
+
+## Continuous monitoring (STORY-008)
+
+`mcp-server/src/monitoringService.ts` + `GET/POST /api/monitoring/{start,stop,status}`
+— a real interval loop over `queryLiveDmv()` (never `dmvReader.ts`'s
+fixture-fallback), reusing STORY-006's blocking-session detection query.
+Idempotent start/stop: calling start while already running does not spin up a
+second interval.
+
+Live testing surfaced and fixed a real bug before shipping: the interval fired
+on a fixed schedule regardless of whether the previous cycle had finished, and
+a cold-starting Azure SQL free-tier instance took ~30s to respond against the
+10s default interval — overlapping cycles piled up concurrent connection
+attempts and tripped the shared circuit breaker on a false alarm. Fixed with an
+in-flight guard (skip a tick if the previous cycle hasn't finished), covered by
+a regression test.
+
+| | |
+|---|---|
+| module | `mcp-server/src/monitoringService.ts` |
+| tests | `mcp-server/src/monitoringService.test.ts` |
+
+## Confidence-based escalation (STORY-009)
+
+`mcp-server/src/escalationService.ts` — REQ-011 is source-agnostic ("escalate
+when confidence is below 60%," no system named), so this is a standalone
+evaluator wired into both existing recommendation paths (STORY-006 SQL,
+STORY-007 cloud) rather than duplicated per source. Below 60, logs a real
+`escalation_triggered` event with the score and an ISO timestamp; at or above
+60, returns `null` with no log call — tested explicitly, boundary-tested at
+exactly 59/60. A malformed confidence score (`NaN`, negative, >100, ±Infinity)
+throws a typed `InvalidConfidenceScoreError` rather than silently escalating or
+silently not.
+
+Follow-up (2026-08-20): verified live against real infrastructure on both wired
+paths — a quiet-database result (20% confidence) correctly escalated via
+`GET /api/recommendation`, and a real seeded blocking scenario
+(`mcp-server/src/seedBlockingScenario.ts`, 75% confidence) correctly returned
+`escalation: null`.
+
+| | |
+|---|---|
+| module | `mcp-server/src/escalationService.ts` |
+| tests | `mcp-server/src/escalationService.test.ts` |
+
+## Operator notification (STORY-010)
+
+`mcp-server/src/notificationService.ts` — wired into this system's two real
+autonomous actions (STORY-008's incident alert, STORY-009's escalation) rather
+than inventing a third. Retry is capped, not infinite (reuses the existing
+`withReliability` wrapper); an exhausted retry is logged but never propagates,
+so a delivery failure can't crash the action that triggered it. Both dispatch
+sites fire-and-forget with a `.catch()`, so a rejected dispatch is logged
+instead of becoming an unhandled rejection. The shared guarded-logging helper
+(`monitoringService.ts` and `escalationService.ts` each had their own copy) was
+extracted to `mcp-server/src/observability/safeLogEvent.ts` on its third
+duplication, per this repo's own extraction threshold.
+
+Follow-up (2026-08-20): the default delivery channel is now real, not a no-op
+— ntfy.sh (free, no signup, no API key, plain HTTP POST to a topic). Verified
+live end-to-end: triggered a real escalation via `GET /api/cloud-recommendation`
+and confirmed a real push notification landed on the ntfy topic, with the
+correct title, incident summary, and operator name.
+
+| | |
+|---|---|
+| module | `mcp-server/src/notificationService.ts` |
+| tests | `mcp-server/src/notificationService.test.ts` (plus added cases in `monitoringService.test.ts` and `escalationService.test.ts`) |
+
+## Rollback for low-risk tasks (STORY-011)
+
+`mcp-server/src/rollbackService.ts` + `POST /api/rollback` — no Execution
+Service exists in this codebase (nothing performs a real production write), so
+"roll back a low-risk task" targets the one genuinely real, already-idempotent,
+reversible action already built: `monitoringService.ts`'s `startMonitoring()`/
+`stop()`. `requestRollback()` checks permission (`system_administrator` only) →
+task identification (registry lookup) → reversibility → dependencies, in that
+order, so a denial always names the first real reason. A delivered push
+notification (STORY-010) is registered as honestly non-reversible rather than
+left unrecognized.
+
+Tests caught a real bug pre-ship: the non-reversible denial's explanation text
+was keyed as `reason`, colliding with and silently overwriting the categorical
+denial code (also `reason`) in the same log line — renamed to `detail`.
+
+| | |
+|---|---|
+| module | `mcp-server/src/rollbackService.ts` |
+| tests | `mcp-server/src/rollbackService.test.ts` |
+
 ## Test suites
 
 | Package | Files | Passing | Runner |
 |---|---|---|---|
-| `mcp-server/` | 9 | 62 | vitest |
-| `guardrails/` | 2 | 23 | vitest |
-| `frontend/` | 1 | 5 | vitest |
+| `mcp-server/` | 24 | 214 | vitest |
+| `guardrails/` | 4 | 64 | vitest |
+| `frontend/` | 1 | 6 | vitest |
 
 Run with `cd mcp-server && npm test` / `cd guardrails && npm test` /
-`cd frontend && npm test`. Keep these counts current when any suite
-changes — they're referenced from `README.md` and
-`project-blueprint/requirements.md` too.
+`cd frontend && npm test`. Re-verified live 2026-08-24 (all three suites run
+end to end, not inferred from file counts). Keep these counts current when any
+suite changes — they're also referenced from `README.md` (already current as
+of this same date) and `project-blueprint/requirements.md` (that file's counts
+are dated point-in-time verification snapshots per requirement, not a running
+total — leave those as-is).
