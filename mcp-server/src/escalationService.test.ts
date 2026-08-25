@@ -80,6 +80,8 @@ describe("evaluateEscalation", () => {
         actionType: "escalation",
         incidentId: "incident-9",
         summary: "Session 90 blocked",
+        priority: "high",
+        tags: "warning",
       },
       expect.anything()
     );

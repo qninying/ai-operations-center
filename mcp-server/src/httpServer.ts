@@ -45,6 +45,7 @@ import { RateLimiter } from "./rateLimiter.js";
 import { isDemoModeEnabled } from "./demoModeGate.js";
 import { notifyOperators } from "./notificationService.js";
 import { generateTotpCode } from "./auth/totp.js";
+import { startIncidentFeed, getRevealedIncidents, markResolved } from "./incidentFeedService.js";
 
 // Thin HTTP transport for R2's DMV read path, alongside the existing stdio MCP
 // transport in index.ts. Both call the same readDmv() orchestrator — this file adds
@@ -195,6 +196,10 @@ function stopMonitoringInternal(): void {
 // the in-memory-only version silently lost every approval decision on `npm restart`.
 const auditLog = new AuditLog({ persistTo: join(__dirname, "..", "data", "audit-log.jsonl") });
 const hitlQueue = new HitlQueue(auditLog);
+// Always on, independent of the "Continuous monitoring" Start/Stop feature above
+// (that one is a narrower, manually-toggled SQL-blocking-chain-only detector) —
+// the unified incident feed across SQL/Cloud/SSRS/Docker runs from boot.
+startIncidentFeed();
 // The real, password-verified login identity — not OPERATOR_CONTACTS, which stays a
 // separate, notification-recipient display name for notifyOperators() (never
 // verified against anything). Propose-time assignment (here) and decide-time
@@ -605,6 +610,38 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/incidents") {
+    // Unified feed across SQL/Cloud/SSRS/Docker — see incidentFeedService.ts.
+    // Only already-revealed incidents are returned; the background poller (not
+    // this request handler) owns reveal timing, so every client polling this
+    // route at any time sees the exact same state.
+    if (!requireSession(req, res)) return;
+    sendJson(res, 200, { incidents: getRevealedIncidents() });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/incidents/resolve") {
+    // Dashboard bookkeeping, deliberately separate from /api/guardrail/decide —
+    // that route is about the approval workflow itself; this just tells the
+    // feed "stop showing this one," called by the client right after a real
+    // Approve succeeds.
+    if (!requireSession(req, res)) return;
+    let body: { incidentId?: unknown };
+    try {
+      body = (await readJsonBody(req)) as typeof body;
+    } catch (error) {
+      sendJson(res, 400, { error: "INVALID_JSON_BODY", message: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+    if (typeof body.incidentId !== "string" || !body.incidentId) {
+      sendJson(res, 400, { error: "MISSING_FIELDS", message: "incidentId is required." });
+      return;
+    }
+    markResolved(body.incidentId);
+    sendJson(res, 200, { resolved: true });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/monitoring/start") {
     if (!requireSession(req, res)) return;
     // STORY-008 / REQ-016: idempotent by construction — calling start while already
@@ -915,11 +952,15 @@ server.listen(PORT, () => {
   if (isDemoModeEnabled()) {
     const code = generateTotpCode(MFA_TOTP_SECRET, Date.now());
     notifyOperators({
-      actionType: "demo_server_started",
+      actionType: "Auth_Code",
       incidentId: "demo-startup",
       summary:
         `CoreOps demo server is back up. Fresh TOTP code: ${code}. ` +
         `This code is only valid for about 30 seconds from generation — if it doesn't work by the time you read this, ask for a fresh one.`,
+      // Green-flavored: no elevated accent (default priority) — this isn't a
+      // problem, it's a delivered credential, so it shouldn't look urgent.
+      priority: "default",
+      tags: "white_check_mark",
     }).catch(() => {
       // notifyOperators() already logs and never rethrows on its own failure —
       // this catch exists only so an unexpected rejection can't take down a

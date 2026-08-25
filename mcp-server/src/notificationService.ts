@@ -39,6 +39,16 @@ export interface AutonomousAction {
   // no change.
   correlationId?: string;
   summary: string;
+  // Optional per-call override of the ntfy Priority/Tags headers, so different
+  // autonomous-action types can look visibly distinct in the ntfy app (a real
+  // incident vs. an escalation vs. a delivered credential) instead of every
+  // notification looking identical. ntfy has no literal color header — Priority
+  // (min/low/default/high/urgent) is what actually drives an accent/icon color
+  // in the app, Tags drives an emoji glyph prefix; combining both is the honest
+  // mechanism, not an assumed one. Defaults preserve today's exact behavior
+  // (high/rotating_light) for every existing call site that doesn't set these.
+  priority?: "min" | "low" | "default" | "high" | "urgent";
+  tags?: string;
 }
 
 export type NotificationChannel = (action: AutonomousAction, operators: string[]) => Promise<void>;
@@ -105,8 +115,8 @@ const defaultChannel: NotificationChannel = async (action, operators) => {
     method: "POST",
     headers: {
       Title: `CoreOps: ${action.actionType}`,
-      Priority: "high",
-      Tags: "rotating_light",
+      Priority: action.priority ?? "high",
+      Tags: action.tags ?? "rotating_light",
     },
     body: `${action.summary}\n\nIncident: ${action.incidentId}\nFor: ${operators.join(", ")}`,
   });

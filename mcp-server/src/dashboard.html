@@ -357,9 +357,16 @@
     padding: var(--space-4); background: var(--bg);
     display: flex; flex-direction: column; gap: var(--space-2);
   }
-  .incident-card.blocked { border-color: #4d2129; background: var(--danger-dim); }
+  .incident-card.error, .incident-card.critical { border-color: #4d2129; background: var(--danger-dim); }
+  .incident-card.warning { border-color: var(--warning-dim); background: var(--warning-dim); }
   .incident-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
   .incident-id { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+  .incident-source {
+    display: inline-flex; align-items: center;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 2px 7px; border-radius: 100px; margin-left: var(--space-2);
+    background: var(--bg-elevated-2); color: var(--text-tertiary); border: 1px solid var(--border-strong);
+  }
   .incident-blocked-note { font-size: 12px; font-weight: 600; color: var(--danger); }
   .incident-actions { margin-top: var(--space-2); }
   .incident-detail {
@@ -483,6 +490,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01M10.3 3.9 2.7 17.5a1.8 1.8 0 0 0 1.6 2.7h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0Z"/></svg>
       <span class="nav-label">Incidents</span>
     </a>
+    <a class="nav-item" href="#resolved">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m5 13 4 4L19 7"/></svg>
+      <span class="nav-label">Resolved</span>
+    </a>
 
     <div class="sidebar-footer">
       <span class="icon-btn" style="width:auto;height:auto;padding:0;color:var(--text-tertiary);cursor:default;">
@@ -601,7 +612,7 @@
             <div class="panel-head">
               <div>
                 <h2 class="panel-title">Incidents</h2>
-                <p class="panel-desc">Live session state from SQL Server, correlated with SSRS execution history where available. Troubleshoot an incident for an evidence-grounded AI recommendation, then fix it — nothing executes without human approval.</p>
+                <p class="panel-desc">Real problems across every monitored system — SQL Server, SSRS, cloud diagnostics, and the dev-superset stack — surface here automatically. Troubleshoot an incident for an evidence-grounded AI recommendation, then fix it — nothing executes without human approval.</p>
               </div>
               <div class="tag-row">
                 <span class="tag" id="dmv-tag">loading</span>
@@ -609,16 +620,23 @@
               </div>
             </div>
             <div class="panel-body">
-              <div class="field-group" style="margin-top:0;">
-                <select id="source-select" aria-label="Evidence source for Troubleshoot" title="Which evidence source Troubleshoot uses">
-                  <option value="correlated">SQL Server + SSRS (correlated)</option>
-                  <option value="sql">SQL Server only</option>
-                  <option value="cloud">Cloud service (Blob Storage)</option>
-                </select>
-              </div>
               <div id="dmv-status" class="status-line">Loading…</div>
               <div class="incident-grid" id="dmv-rows"></div>
               <div id="demo-restart-status"></div>
+            </div>
+          </section>
+
+          <section class="panel" id="resolved">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Resolved</h2>
+                <p class="panel-desc">Incidents that were fixed and approved — the real record of who acted and when, straight from the durable audit trail, surviving a restart.</p>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="activity-list" id="resolved-list">
+                <div class="empty-state">Nothing resolved yet this session.</div>
+              </div>
             </div>
           </section>
 
@@ -725,33 +743,55 @@ navItems.forEach(item => {
 });
 
 /* ---------- system health ---------- */
+// Two independent signals combine into one displayed health state: is the
+// gateway even reachable (loadHealth), and are there any currently-revealed
+// incidents (loadIncidents) — a reachable gateway with active incidents is
+// "Unhealthy," not "Healthy," which is the whole point of the dashboard
+// opening clean and flipping red as real problems reveal themselves.
 let lastKnownHealthy = null;
+let gatewayHealthy = null;
+let activeIncidentCount = 0;
 
-async function loadHealth() {
+function renderSystemHealth() {
   const bannerDot = $('system-banner-dot');
   const bannerText = $('system-banner-text');
   const kpiHealth = $('kpi-health');
   const kpiHealthMeta = $('kpi-health-meta');
-  try {
-    const res = await apiFetch('/health');
-    const body = await res.json();
-    const healthy = body.status === 'ok';
-    bannerDot.style.background = healthy ? 'var(--success)' : 'var(--danger)';
-    bannerText.innerHTML = healthy ? '<strong>All systems operational.</strong>' : 'Gateway unreachable.';
-    kpiHealth.textContent = healthy ? 'Healthy' : 'Down';
-    kpiHealth.className = 'kpi-value ' + (healthy ? 'success' : 'danger');
-    kpiHealthMeta.textContent = 'Gateway reachable';
-    if (lastKnownHealthy === false && healthy) {
-      pushActivity('success', '<strong>Gateway</strong> back online');
-    }
-    lastKnownHealthy = healthy;
-  } catch (e) {
+  if (gatewayHealthy === null) return;
+
+  if (!gatewayHealthy) {
     bannerDot.style.background = 'var(--danger)';
-    bannerText.textContent = 'Gateway unreachable: ' + e.message;
+    bannerText.textContent = 'Gateway unreachable.';
     kpiHealth.textContent = 'Down';
     kpiHealth.className = 'kpi-value danger';
     kpiHealthMeta.textContent = 'Connection failed';
+    return;
   }
+
+  const healthy = activeIncidentCount === 0;
+  bannerDot.style.background = healthy ? 'var(--success)' : 'var(--danger)';
+  bannerText.innerHTML = healthy
+    ? '<strong>All systems operational.</strong>'
+    : '<strong>' + activeIncidentCount + ' active incident' + (activeIncidentCount === 1 ? '' : 's') + '.</strong>';
+  kpiHealth.textContent = healthy ? 'Healthy' : 'Unhealthy';
+  kpiHealth.className = 'kpi-value ' + (healthy ? 'success' : 'danger');
+  kpiHealthMeta.textContent = healthy ? 'Gateway reachable' : activeIncidentCount + ' active';
+
+  if (lastKnownHealthy !== null && lastKnownHealthy !== healthy) {
+    pushActivity(healthy ? 'success' : 'danger', healthy ? '<strong>System</strong> back to healthy' : '<strong>System</strong> degraded — incidents active');
+  }
+  lastKnownHealthy = healthy;
+}
+
+async function loadHealth() {
+  try {
+    const res = await apiFetch('/health');
+    const body = await res.json();
+    gatewayHealthy = body.status === 'ok';
+  } catch (e) {
+    gatewayHealthy = false;
+  }
+  renderSystemHealth();
 }
 
 /* ---------- DMV incidents ---------- */
@@ -765,22 +805,24 @@ function formatDuration(ms) {
   return h + 'h ' + (m % 60) + 'm';
 }
 
+const SOURCE_LABELS = { sql: 'SQL Server', cloud: 'Cloud', ssrs: 'SSRS', docker: 'Docker' };
+
 // One card per incident: identity + evidence at the top, then a collapsed
 // detail region that Troubleshoot fills in and Fix acts on — everything for
 // one incident lives in one card, instead of three separate global panels.
-function renderIncidentCard(row) {
-  const blocked = row.blocking_session_id && row.blocking_session_id !== 0;
+// Incidents now come from the unified GET /api/incidents feed (SQL/Cloud/
+// SSRS/Docker together) — the card no longer knows or cares which source it
+// came from beyond routing Troubleshoot correctly and showing a badge.
+function renderIncidentCard(incident) {
   const cell = document.createElement('div');
-  cell.className = 'incident-card' + (blocked ? ' blocked' : '');
-  cell.dataset.sessionId = String(row.session_id);
+  cell.className = 'incident-card ' + incident.severity;
+  cell.dataset.incidentId = incident.id;
+  cell.dataset.source = incident.source;
   cell.innerHTML = `
     <div class="incident-head">
-      <div class="incident-id">Session ${row.session_id}</div>
-      <div class="v-secondary">${escapeHtml(row.status)}${row.wait_type ? ' · ' + escapeHtml(row.wait_type) : ''}</div>
+      <div><span class="incident-id">${escapeHtml(incident.title)}</span><span class="incident-source">${SOURCE_LABELS[incident.source] || incident.source}</span></div>
     </div>
-    <div class="v-secondary">${escapeHtml(row.command)} on ${escapeHtml(row.database_name)}</div>
-    <div class="v-secondary">${formatDuration(row.total_elapsed_time_ms)} elapsed · ${formatDuration(row.cpu_time_ms)} CPU</div>
-    ${blocked ? '<div class="incident-blocked-note">blocked by session ' + row.blocking_session_id + '</div>' : ''}
+    <div class="v-secondary">${escapeHtml(incident.detail)}</div>
     <div class="incident-actions">
       <button class="btn btn-secondary troubleshoot-btn">Troubleshoot</button>
     </div>
@@ -808,14 +850,20 @@ function renderIncidentCard(row) {
       <div class="audit-trail-result"></div>
     </div>
   `;
-  cell.querySelector('.troubleshoot-btn').addEventListener('click', () => troubleshootIncident(row.session_id, cell));
-  cell.querySelector('.fix-btn').addEventListener('click', () => fixIncident(row.session_id, cell));
+  cell.querySelector('.troubleshoot-btn').addEventListener('click', () => troubleshootIncident(incident.id, cell));
+  cell.querySelector('.fix-btn').addEventListener('click', () => fixIncident(incident.id, cell));
   cell.querySelector('.approve-btn').addEventListener('click', () => decideRemediation('approve', cell));
   cell.querySelector('.reject-btn').addEventListener('click', () => decideRemediation('reject', cell));
-  cell.querySelector('.view-audit-btn').addEventListener('click', () => viewAuditTrail(row.session_id, cell));
+  cell.querySelector('.view-audit-btn').addEventListener('click', () => viewAuditTrail(incident.id, cell));
   return cell;
 }
 
+// Polls the unified feed and diffs against what's currently rendered — new
+// incident ids get a fresh card, ids no longer present (resolved server-side,
+// or the underlying evidence genuinely cleared) get removed from the DOM.
+// The server (incidentFeedService.ts) owns reveal timing entirely — this only
+// ever renders exactly what GET /api/incidents currently says is revealed, so
+// every reload/poll sees the same state, nothing is re-randomized client-side.
 async function loadIncidents() {
   const statusEl = $('dmv-status');
   const rowsEl = $('dmv-rows');
@@ -823,27 +871,43 @@ async function loadIncidents() {
   const tagCaptionEl = $('dmv-tag-caption');
   const kpiSessions = $('kpi-sessions');
   const kpiSessionsMeta = $('kpi-sessions-meta');
+  const kpiAlerts = $('kpi-alerts');
+  const kpiAlertsMeta = $('kpi-alerts-meta');
   try {
-    const res = await apiFetch('/dmv/exec-requests');
+    const res = await apiFetch('/api/incidents');
     const body = await res.json();
-    const isLive = body.source === 'live';
-    tagEl.textContent = body.source;
-    tagEl.className = 'tag ' + (isLive ? 'live' : 'fallback');
-    tagEl.title = isLive
-      ? 'Live query against SQL Server right now.'
-      : 'SQL Server unreachable — showing fixture data, not live sessions.';
-    tagCaptionEl.textContent = isLive ? '' : 'showing fixture data — SQL Server unreachable';
-    statusEl.innerHTML = (body.message ? escapeHtml(body.message) : (body.rows.length + ' session(s) observed'));
+    const incidents = body.incidents;
 
-    const blockedCount = body.rows.filter(r => r.blocking_session_id && r.blocking_session_id !== 0).length;
-    kpiSessions.textContent = String(body.rows.length);
-    kpiSessions.className = 'kpi-value' + (blockedCount > 0 ? ' danger' : '');
-    kpiSessionsMeta.textContent = blockedCount > 0 ? blockedCount + ' blocked' : 'none blocked';
+    tagEl.textContent = incidents.length === 0 ? 'clear' : 'active';
+    tagEl.className = 'tag ' + (incidents.length === 0 ? 'live' : 'fallback');
+    tagEl.title = incidents.length === 0 ? 'No active incidents right now.' : 'One or more real incidents need attention.';
+    tagCaptionEl.textContent = '';
+    statusEl.textContent = incidents.length === 0 ? 'No active incidents.' : incidents.length + ' incident(s) observed';
 
-    rowsEl.innerHTML = '';
-    for (const row of body.rows) {
-      rowsEl.appendChild(renderIncidentCard(row));
+    kpiSessions.textContent = String(incidents.length);
+    kpiSessions.className = 'kpi-value' + (incidents.length > 0 ? ' danger' : '');
+    kpiSessionsMeta.textContent = incidents.length > 0 ? 'across ' + new Set(incidents.map(i => i.source)).size + ' source(s)' : 'none active';
+
+    kpiAlerts.textContent = String(incidents.length);
+    kpiAlerts.className = 'kpi-value' + (incidents.length > 0 ? ' warning' : '');
+    kpiAlertsMeta.textContent = incidents.length > 0 ? 'active right now' : 'none yet';
+
+    const seenIds = new Set(incidents.map((i) => i.id));
+    for (const existingCard of Array.from(rowsEl.children)) {
+      if (!seenIds.has(existingCard.dataset.incidentId)) existingCard.remove();
     }
+    const renderedIds = new Set(Array.from(rowsEl.children).map((c) => c.dataset.incidentId));
+    for (const incident of incidents) {
+      if (renderedIds.has(incident.id)) continue;
+      rowsEl.appendChild(renderIncidentCard(incident));
+      pushActivity(
+        incident.severity === 'critical' ? 'danger' : incident.severity === 'error' ? 'danger' : 'warning',
+        '<strong>New incident</strong> — ' + escapeHtml(incident.title)
+      );
+    }
+
+    activeIncidentCount = incidents.length;
+    renderSystemHealth();
   } catch (e) {
     statusEl.textContent = 'Failed to load: ' + e.message;
     tagEl.textContent = 'error';
@@ -867,8 +931,6 @@ function renderMonitorStatus(body) {
   const alertsEl = $('monitor-alerts');
   const kpiMonitoring = $('kpi-monitoring');
   const kpiMonitoringMeta = $('kpi-monitoring-meta');
-  const kpiAlerts = $('kpi-alerts');
-  const kpiAlertsMeta = $('kpi-alerts-meta');
   const rollbackBtn = $('monitor-rollback-btn');
 
   currentTaskId = body.taskId;
@@ -892,10 +954,6 @@ function renderMonitorStatus(body) {
   }
 
   const alerts = body.recentAlerts || [];
-  kpiAlerts.textContent = String(alerts.length);
-  kpiAlerts.className = 'kpi-value' + (alerts.length > 0 ? ' warning' : '');
-  kpiAlertsMeta.textContent = alerts.length > 0 ? 'since monitoring started' : 'none yet';
-
   alertsEl.innerHTML = '';
   for (const item of alerts.slice(0, 3)) {
     const div = document.createElement('div');
@@ -961,12 +1019,31 @@ async function rollbackMonitoring() {
 }
 
 /* ---------- AI recommendation (per incident) ---------- */
-// The recommendation endpoints don't accept a per-session filter — they
-// always analyze whatever the current live/fallback evidence is. Troubleshoot
-// triggers one call representing current system state, displayed inside
-// whichever card was clicked. Uses the SQL Server + SSRS correlated endpoint
-// by default (REQ-017) rather than the old single-source-only path.
-async function troubleshootIncident(sessionId, cardEl) {
+const ESCALATION_COUNT_STORAGE_KEY = 'coreops-demo-escalationCount';
+
+function bumpEscalationCount() {
+  const count = Number(localStorage.getItem(ESCALATION_COUNT_STORAGE_KEY) || '0') + 1;
+  localStorage.setItem(ESCALATION_COUNT_STORAGE_KEY, String(count));
+  return count;
+}
+
+function renderEscalationCount() {
+  const count = Number(localStorage.getItem(ESCALATION_COUNT_STORAGE_KEY) || '0');
+  const kpiEscalation = $('kpi-escalation');
+  const kpiEscalationMeta = $('kpi-escalation-meta');
+  kpiEscalation.textContent = String(count);
+  kpiEscalation.className = 'kpi-value' + (count > 0 ? ' warning' : '');
+  kpiEscalationMeta.textContent = count > 0 ? 'this session' : 'none yet';
+}
+
+// The recommendation endpoints don't accept a per-incident filter — they
+// always analyze whatever the current live/fallback evidence for that source
+// is. Troubleshoot routes to the endpoint matching the card's own source
+// (set by the unified feed, not a manual picker): sql/cloud have their own
+// single-source endpoint, ssrs uses the SQL+SSRS correlated one (closest real
+// fit, REQ-017), and docker skips the AI call entirely — there's no
+// evidence-grounded root-cause question to ask about "is a container up."
+async function troubleshootIncident(incidentId, cardEl) {
   const btn = cardEl.querySelector('.troubleshoot-btn');
   const detail = cardEl.querySelector('.incident-detail');
   const errorBanner = cardEl.querySelector('.banner.error');
@@ -976,10 +1053,9 @@ async function troubleshootIncident(sessionId, cardEl) {
   const escalationBanner = cardEl.querySelector('.banner.escalation');
   const escalationDetail = cardEl.querySelector('.escalation-detail');
   const actionsRow = cardEl.querySelector('.incident-fix-actions');
+  const source = cardEl.dataset.source;
   const kpiConfidence = $('kpi-confidence');
   const kpiConfidenceMeta = $('kpi-confidence-meta');
-  const kpiEscalation = $('kpi-escalation');
-  const kpiEscalationMeta = $('kpi-escalation-meta');
 
   btn.disabled = true;
   btn.textContent = 'Troubleshooting…';
@@ -987,13 +1063,23 @@ async function troubleshootIncident(sessionId, cardEl) {
   errorBanner.className = 'banner error';
   escalationBanner.className = 'banner escalation';
 
+  if (source === 'docker') {
+    rootCauseEl.style.display = 'block';
+    rootCauseEl.textContent = 'Superset containers unreachable — verify Docker Desktop is running and the dev-superset stack is up (cd mcp-server/dev-superset && docker compose up -d). No AI analysis applies here — this is a plain connectivity check, not evidence to reason over.';
+    actionsRow.style.display = 'flex';
+    setCorrelationId(incidentId, 'demo-docker-' + Date.now(), cardEl);
+    pushActivity('warning', '<strong>Troubleshoot</strong> — Docker/Superset unreachable');
+    btn.disabled = false;
+    btn.textContent = 'Troubleshoot';
+    return;
+  }
+
   try {
-    const incidentId = 'inc-' + Date.now();
-    const source = $('source-select').value;
+    const aiIncidentId = 'inc-' + Date.now();
     const path = source === 'cloud' ? '/api/cloud-recommendation'
       : source === 'sql' ? '/api/recommendation'
       : '/api/correlated-recommendation';
-    const res = await apiFetch(path + '?incidentId=' + encodeURIComponent(incidentId));
+    const res = await apiFetch(path + '?incidentId=' + encodeURIComponent(aiIncidentId));
     const body = await res.json();
 
     if (!res.ok) {
@@ -1001,7 +1087,7 @@ async function troubleshootIncident(sessionId, cardEl) {
       errorBanner.textContent = body.error + ': ' + body.message;
       confBlock.style.display = 'none';
       rootCauseEl.style.display = 'none';
-      pushActivity('danger', '<strong>Troubleshoot</strong> failed for session ' + sessionId + ' — ' + escapeHtml(body.error));
+      pushActivity('danger', '<strong>Troubleshoot</strong> failed — ' + escapeHtml(body.error));
       return;
     }
 
@@ -1012,24 +1098,20 @@ async function troubleshootIncident(sessionId, cardEl) {
     rootCauseEl.textContent = body.rootCause;
     actionsRow.style.display = 'flex';
 
-    setCorrelationId(sessionId, incidentId, cardEl);
+    setCorrelationId(incidentId, aiIncidentId, cardEl);
 
     kpiConfidence.textContent = body.confidence + '%';
     kpiConfidence.className = 'kpi-value ' + (body.confidence < 60 ? 'danger' : 'success');
-    kpiConfidenceMeta.textContent = 'incident ' + incidentId.slice(-6);
+    kpiConfidenceMeta.textContent = 'incident ' + aiIncidentId.slice(-6);
 
     if (body.escalation) {
       escalationBanner.className = 'banner escalation shown';
       escalationDetail.textContent = 'Confidence ' + body.escalation.confidence + '% is below the 60% threshold — a notification was sent at ' + new Date(body.escalation.escalatedAt).toLocaleTimeString() + '.';
-      kpiEscalation.textContent = 'Yes';
-      kpiEscalation.className = 'kpi-value warning';
-      kpiEscalationMeta.textContent = 'notification sent';
-      pushActivity('warning', '<strong>Escalated</strong> — session ' + sessionId + ', confidence ' + escapeHtml(body.confidence) + '%, operator notified');
+      bumpEscalationCount();
+      renderEscalationCount();
+      pushActivity('warning', '<strong>Escalated</strong> — confidence ' + escapeHtml(body.confidence) + '%, operator notified');
     } else {
-      kpiEscalation.textContent = 'No';
-      kpiEscalation.className = 'kpi-value success';
-      kpiEscalationMeta.textContent = 'confidence above threshold';
-      pushActivity('success', '<strong>Troubleshoot</strong> — session ' + sessionId + ', ' + escapeHtml(body.confidence) + '% confidence');
+      pushActivity('success', '<strong>Troubleshoot</strong> — ' + escapeHtml(body.confidence) + '% confidence');
     }
   } catch (e) {
     errorBanner.className = 'banner error shown';
@@ -1071,16 +1153,16 @@ function renderCorrelationId(sessionId, correlationId, cardEl) {
 }
 
 // Called after loadIncidents() renders the cards — each stored correlation ID
-// is re-attached to the card whose session_id it belongs to, and that card's
+// is re-attached to the card whose incident id it belongs to, and that card's
 // own audit trail is fetched to prove the entries survived the restart too.
 function restoreCorrelationIdsFromStorage() {
   const all = readStoredCorrelationIds();
-  for (const [sessionId, { correlationId }] of Object.entries(all)) {
-    const cardEl = $('dmv-rows').querySelector('[data-session-id="' + sessionId + '"]');
+  for (const [incidentId, { correlationId }] of Object.entries(all)) {
+    const cardEl = $('dmv-rows').querySelector('[data-incident-id="' + incidentId + '"]');
     if (!cardEl) continue;
     cardEl.querySelector('.incident-detail').classList.add('shown');
-    renderCorrelationId(sessionId, correlationId, cardEl);
-    viewAuditTrail(sessionId, cardEl);
+    renderCorrelationId(incidentId, correlationId, cardEl);
+    viewAuditTrail(incidentId, cardEl);
   }
 }
 
@@ -1116,7 +1198,7 @@ async function viewAuditTrail(sessionId, cardEl) {
 // Pending guardrail item id lives on the card itself (dataset), not one
 // module-level variable — two incidents can each have their own pending
 // propose/decide flow without clobbering each other.
-async function fixIncident(sessionId, cardEl) {
+async function fixIncident(incidentId, cardEl) {
   const btn = cardEl.querySelector('.fix-btn');
   const resultEl = cardEl.querySelector('.guardrail-result');
   btn.disabled = true;
@@ -1125,7 +1207,7 @@ async function fixIncident(sessionId, cardEl) {
     const res = await apiFetch('/api/guardrail/propose', { method: 'POST' });
     const body = await res.json();
     cardEl.dataset.guardrailItemId = body.itemId;
-    setCorrelationId(sessionId, body.correlationId, cardEl);
+    setCorrelationId(incidentId, body.correlationId, cardEl);
     const allowed = body.result.allowed;
     resultEl.className = 'banner guardrail-result shown ' + (allowed ? 'allowed' : 'blocked');
     let html = '<div class="banner-title">' + (allowed ? 'Allowed' : 'Blocked') + '</div>';
@@ -1135,21 +1217,105 @@ async function fixIncident(sessionId, cardEl) {
     resultEl.innerHTML = html;
     pushActivity(
       allowed ? 'success' : 'danger',
-      '<strong>Guardrail</strong> ' + (allowed ? 'allowed' : 'blocked') + ' a fix for session ' + sessionId + ' — awaiting ' + escapeHtml(body.approver)
+      '<strong>Guardrail</strong> ' + (allowed ? 'allowed' : 'blocked') + ' a fix — awaiting ' + escapeHtml(body.approver)
     );
+    // Real bug, not just UX: Fix must not stay clickable once a decision is
+    // pending — clicking it again would silently orphan this guardrailItemId
+    // by overwriting it with a second proposal. Hide it; the only next moves
+    // are Approve or Reject.
+    btn.style.display = 'none';
     cardEl.querySelector('.approve-btn').style.display = allowed ? 'none' : 'inline-flex';
     cardEl.querySelector('.reject-btn').style.display = allowed ? 'none' : 'inline-flex';
+    if (allowed) {
+      // Nothing pending human approval — this incident is already resolved.
+      await resolveIncident(incidentId, cardEl, body.approver);
+    }
   } finally {
     btn.disabled = false;
     btn.textContent = 'Fix';
   }
 }
 
+/* ---------- resolved incidents (survives a restart via the real audit trail) ---------- */
+const RESOLVED_STORAGE_KEY = 'coreops-demo-resolvedIncidents';
+
+function readResolvedIndex() {
+  try {
+    return JSON.parse(localStorage.getItem(RESOLVED_STORAGE_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function addToResolvedIndex(entry) {
+  const all = readResolvedIndex();
+  all.unshift(entry);
+  localStorage.setItem(RESOLVED_STORAGE_KEY, JSON.stringify(all.slice(0, 20)));
+}
+
+// Only the lightweight index (incidentId/title/correlationId) is stored
+// client-side — the actual "who fixed it, when" always comes fresh from the
+// real durable audit trail (GET /api/audit?correlationId=), never a cached
+// client-side guess, so it's correct even after a restart.
+async function renderResolvedList() {
+  const listEl = $('resolved-list');
+  const entries = readResolvedIndex();
+  if (entries.length === 0) {
+    listEl.innerHTML = '<div class="empty-state">Nothing resolved yet this session.</div>';
+    return;
+  }
+  const rows = await Promise.all(entries.map(async (entry) => {
+    try {
+      const res = await apiFetch('/api/audit?correlationId=' + encodeURIComponent(entry.correlationId));
+      const body = await res.json();
+      const decision = (body.entries || []).find((e) => e.hitlEventType === 'hitl_decision' || e.entryType === 'action');
+      const actor = decision ? decision.actor : (entry.approver || 'unknown');
+      const at = decision ? new Date(decision.loggedAt).toLocaleTimeString() : '';
+      return '<div class="activity-item"><span class="activity-dot success"></span>' +
+        '<span class="activity-text"><strong>' + escapeHtml(entry.title) + '</strong><br>' +
+        'Fixed by ' + escapeHtml(actor) + (at ? ' at ' + at : '') + '</span></div>';
+    } catch (e) {
+      return '<div class="activity-item"><span class="activity-dot success"></span>' +
+        '<span class="activity-text"><strong>' + escapeHtml(entry.title) + '</strong><br>Fixed (audit lookup failed)</span></div>';
+    }
+  }));
+  listEl.innerHTML = rows.join('');
+}
+
+// Called once an incident is genuinely resolved (guardrail allowed it
+// outright, or a human approved it) — clears it from the active list, tells
+// the server to stop rediscovering it (incidentFeedService.markResolved),
+// and records it in the Resolved panel with a real, durable "who/when."
+async function resolveIncident(incidentId, cardEl, approver) {
+  const title = cardEl.querySelector('.incident-id').textContent;
+  const all = readStoredCorrelationIds();
+  const correlationId = all[incidentId] && all[incidentId].correlationId;
+  try {
+    await apiFetch('/api/incidents/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ incidentId }),
+    });
+  } catch (e) {
+    // Best-effort — even if this call fails, still clear the card locally
+    // and record it as resolved; the next real poll will reconcile.
+  }
+  if (correlationId) {
+    addToResolvedIndex({ incidentId, title, correlationId, approver });
+  }
+  cardEl.remove();
+  activeIncidentCount = Math.max(0, activeIncidentCount - 1);
+  renderSystemHealth();
+  await renderResolvedList();
+}
+
 async function decideRemediation(decision, cardEl) {
   const itemId = cardEl.dataset.guardrailItemId;
   if (!itemId) return;
+  const incidentId = cardEl.dataset.incidentId;
   const approveBtn = cardEl.querySelector('.approve-btn');
   const rejectBtn = cardEl.querySelector('.reject-btn');
+  const fixBtn = cardEl.querySelector('.fix-btn');
   const resultEl = cardEl.querySelector('.guardrail-result');
   approveBtn.disabled = true;
   rejectBtn.disabled = true;
@@ -1168,24 +1334,27 @@ async function decideRemediation(decision, cardEl) {
     if (decision === 'reject') {
       resultEl.className = 'banner guardrail-result shown blocked';
       resultEl.innerHTML = '<div class="banner-title">Rejected</div>No action was taken.';
-      pushActivity('warning', '<strong>Guardrail</strong> fix rejected for session ' + cardEl.dataset.sessionId);
+      pushActivity('warning', '<strong>Guardrail</strong> fix rejected');
+      // Nothing was actually fixed — the card stays, Fix is retryable.
+      approveBtn.style.display = 'none';
+      rejectBtn.style.display = 'none';
+      fixBtn.style.display = 'inline-flex';
+      delete cardEl.dataset.guardrailItemId;
     } else if (body.executed) {
-      resultEl.className = 'banner guardrail-result shown allowed';
-      resultEl.innerHTML =
-        '<div class="banner-title">Allowed — executed</div>Monitoring collector restarted at ' +
-        new Date(body.executedAt).toLocaleTimeString() +
-        ' (task ' + escapeHtml(body.taskId.slice(0, 8)) + ').';
-      pushActivity('success', '<strong>Guardrail</strong> approved — fix executed for session ' + cardEl.dataset.sessionId);
+      pushActivity('success', '<strong>Guardrail</strong> approved — fix executed');
       loadMonitorStatus();
+      delete cardEl.dataset.guardrailItemId;
+      await resolveIncident(incidentId, cardEl, currentUsername || 'unknown');
     } else {
       resultEl.className = 'banner guardrail-result shown blocked';
       let html = '<div class="banner-title">Approved but not executed</div>';
       for (const v of body.result.violations) html += '<div class="violation">' + escapeHtml(v) + '</div>';
       resultEl.innerHTML = html;
+      approveBtn.style.display = 'none';
+      rejectBtn.style.display = 'none';
+      fixBtn.style.display = 'inline-flex';
+      delete cardEl.dataset.guardrailItemId;
     }
-    approveBtn.style.display = 'none';
-    rejectBtn.style.display = 'none';
-    delete cardEl.dataset.guardrailItemId;
   } finally {
     approveBtn.disabled = false;
     rejectBtn.disabled = false;
@@ -1240,13 +1409,12 @@ async function waitForServerRestart(statusEl) {
   $('restart-server-btn').disabled = false;
 }
 
-/* ---------- notifications (real alerts, repurposed) ---------- */
-async function refreshNotifBadge() {
-  try {
-    const res = await apiFetch('/api/monitoring/status');
-    const body = await res.json();
-    $('notif-badge').style.display = (body.recentAlerts || []).length > 0 ? 'block' : 'none';
-  } catch (e) { /* silent — badge just stays hidden */ }
+/* ---------- notifications ---------- */
+// Reflects the same unified incident count loadIncidents() already tracks —
+// one real signal, not a second, possibly-disagreeing one from the legacy
+// SQL-only monitor.
+function refreshNotifBadge() {
+  $('notif-badge').style.display = activeIncidentCount > 0 ? 'block' : 'none';
 }
 
 /* ---------- command palette ---------- */
@@ -1258,6 +1426,7 @@ const commands = [
   { label: 'Jump to Overview', hint: '#overview', run: () => location.hash = '#overview' },
   { label: 'Jump to Monitoring', hint: '#monitoring', run: () => location.hash = '#monitoring' },
   { label: 'Jump to Incidents', hint: '#incidents', run: () => location.hash = '#incidents' },
+  { label: 'Jump to Resolved', hint: '#resolved', run: () => location.hash = '#resolved' },
   { label: 'Refresh all data', hint: 'reload live data', run: () => { loadHealth(); loadIncidents(); loadMonitorStatus(); } },
 ];
 let cmdkActiveIndex = 0;
@@ -1322,11 +1491,14 @@ $('notif-btn').addEventListener('click', () => {
 });
 
 /* ---------- session ---------- */
+let currentUsername = null;
+
 async function loadSession() {
   // Doubles as the page's initial auth check — apiFetch redirects to /login on a
   // 401 before any other panel gets a chance to render with no data.
   const res = await apiFetch('/api/session');
   const body = await res.json();
+  currentUsername = body.username;
   $('user-chip').title = body.username;
   $('user-avatar').textContent = body.username.slice(0, 2).toUpperCase();
 }
@@ -1340,12 +1512,17 @@ $('logout-btn').addEventListener('click', async () => {
 $('footer-year').textContent = new Date().getFullYear();
 loadSession();
 loadHealth();
+renderEscalationCount();
+renderResolvedList();
 // Correlation IDs are restored after the cards exist, not before — each
-// stored id needs a matching [data-session-id] card to attach itself to.
+// stored id needs a matching [data-incident-id] card to attach itself to.
 loadIncidents().then(restoreCorrelationIdsFromStorage);
 loadMonitorStatus();
 refreshNotifBadge();
-setInterval(() => { loadMonitorStatus(); refreshNotifBadge(); }, 5000);
+// Polls the unified incident feed on the same cadence as everything else —
+// the server (incidentFeedService.ts) owns reveal timing entirely, so this is
+// just "what's revealed so far," never client-side randomization.
+setInterval(() => { loadMonitorStatus(); loadIncidents(); refreshNotifBadge(); }, 5000);
 </script>
 </body>
 </html>

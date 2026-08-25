@@ -115,6 +115,10 @@ export function evaluateEscalation(
       actionType: "escalation",
       incidentId,
       summary: rootCause,
+      // Yellow-flavored: a step down from a fresh incident's urgent/red, still
+      // visibly elevated (unlike the green, no-accent auth-code notification).
+      priority: "high",
+      tags: "warning",
     },
     { auditLog: options.auditLog }
   ).catch((error) => {
