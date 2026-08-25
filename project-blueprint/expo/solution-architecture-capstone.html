@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CoreOps — Solution Architecture Capstone</title>
+<title>CoreOps Capstone</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -223,6 +223,13 @@
   .footer-note { margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--text-tertiary); }
   .footer-links a { margin-right: 16px; }
   ::selection { background: var(--accent-dim); }
+
+  .print-clone { display: none; }
+  @media print {
+    body.printing > *:not(.print-clone) { display: none !important; }
+    .print-clone { display: block !important; position: static; margin: 0; box-shadow: none; }
+    .ask-fab, .ask-panel { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -719,35 +726,53 @@
     return rows.map(r => Array.from(r.querySelectorAll('th,td'))
       .map(c => '"' + c.textContent.trim().replace(/"/g,'""') + '"').join(',')).join('\n');
   }
-  function downloadCSV(tableId, filename) {
-    const table = document.getElementById(tableId);
-    const csv = tableToCSV(table);
-    const blob = new Blob([csv], {type:'text/csv'});
+  // Prefer the hosted viewer's downloads capability (a real save prompt);
+  // fall back to a plain blob/anchor when opened directly as a local file,
+  // where no such capability exists at all.
+  let downloadsCap = null;
+  if (window.claude && typeof window.claude.use === 'function') {
+    window.claude.use('downloads').then(d => { downloadsCap = d; }).catch(() => {});
+  }
+  async function saveFile(filename, data, mime) {
+    if (downloadsCap) {
+      try { await downloadsCap.save({filename, data}); return; }
+      catch (e) { /* declined, unsupported extension, etc — fall through */ }
+    }
+    const blob = new Blob([data], {type: mime});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = filename + '.csv';
+    a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+  function downloadCSV(tableId, filename) {
+    const csv = tableToCSV(document.getElementById(tableId));
+    saveFile(filename + '.csv', csv, 'text/csv');
   }
   function downloadDocHTML(docId, filename) {
     const el = document.getElementById(docId);
     const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + filename +
       '</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 20px;} table{border-collapse:collapse;width:100%;} td,th{border:1px solid #ccc;padding:6px 10px;text-align:left;}</style></head><body>' +
       el.outerHTML + '</body></html>';
-    const blob = new Blob([html], {type:'text/html'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename + '.html';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    saveFile(filename + '.html', html, 'text/html');
   }
+  // In-page print isolation — no new window (blocked in a hosted sandbox
+  // and unnecessary locally): clone the target doc, hide everything else
+  // for the duration of the print, then restore.
   function printDoc(id) {
     const el = document.getElementById(id);
-    const w = window.open('', '_blank');
-    w.document.write('<html><head><title>Print</title><style>body{font-family:sans-serif;max-width:800px;margin:30px auto;} table{border-collapse:collapse;width:100%;} td,th{border:1px solid #ccc;padding:6px 10px;text-align:left;}</style></head><body>' + el.outerHTML + '</body></html>');
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 300);
+    const clone = el.cloneNode(true);
+    clone.classList.add('print-clone');
+    document.body.appendChild(clone);
+    document.body.classList.add('printing');
+    const cleanup = () => {
+      document.body.classList.remove('printing');
+      clone.remove();
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+    setTimeout(cleanup, 5000);
   }
   function cloneReqTable() {
     const src = document.getElementById('req-table').querySelectorAll('tbody tr');
