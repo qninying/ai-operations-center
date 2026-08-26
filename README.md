@@ -50,7 +50,7 @@ Then open `http://localhost:8787/console?role=it-manager`.
 ## What's real
 
 Every claim below has a test behind it and was verified against a real running
-server, not just unit-tested. Current counts: **301 tests passing** — 231 in
+server, not just unit-tested. Current counts: **318 tests passing** — 248 in
 `mcp-server/`, 64 in `guardrails/`, 6 in `frontend/`.
 
 **Governance & security**

@@ -37,9 +37,9 @@ async function fetchJson(path) {
 
 async function loadData() {
   const [plan, progress, manifest] = await Promise.all([
-    fetchJson(".colaberry/plan.json").catch(() => null),
-    fetchJson(".colaberry/progress.json").catch(() => null),
-    fetchJson(".colaberry/manifest.json").catch(() => null),
+    fetchJson("../.colaberry/plan.json").catch(() => null),
+    fetchJson("../.colaberry/progress.json").catch(() => null),
+    fetchJson("../.colaberry/manifest.json").catch(() => null),
   ]);
   return { plan, progress, manifest };
 }
