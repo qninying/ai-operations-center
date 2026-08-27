@@ -32,6 +32,7 @@ import {
 } from "./rollbackService.js";
 import type { TaskRegistration } from "./rollbackService.js";
 import { logEvent } from "./observability/logger.js";
+import { recordSystemEvent } from "./observability/auditWrite.js";
 import { checkRemediationGuardrail } from "../../guardrails/remediationGuardrail.js";
 import type { RemediationAction, ApprovalDecision } from "../../guardrails/remediationGuardrail.js";
 import { AuditLog } from "../../guardrails/auditLog.js";
@@ -881,6 +882,62 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       }
       throw error;
     }
+  }
+
+  // Pure record-keeping, not a confidence mechanism: whether an approved fix
+  // actually resolved the incident is recorded to the durable audit trail so
+  // it exists if this system ever accumulates enough real history to
+  // honestly calibrate confidence thresholds against outcomes — see the
+  // confidence-calibration discussion this route exists to answer. Does NOT
+  // feed back into any prompt, threshold, or future confidence score; each
+  // call to analyzeIncidentRootCause() remains a stateless, evidence-only
+  // analysis with no memory of past outcomes. Human-attested, not inferred —
+  // nothing here automatically checks whether an incident's condition
+  // actually cleared. Append-only like the rest of the audit trail
+  // (ADR-005): a later correction (marked resolved, later found to have
+  // recurred) adds a new entry rather than overwriting the old one; readers
+  // take the most recent entry for a correlationId as current.
+  if (req.method === "POST" && url.pathname === "/api/guardrail/outcome") {
+    const session = requireSession(req, res);
+    if (!session) return;
+
+    let body: { correlationId?: unknown; outcome?: unknown };
+    try {
+      body = (await readJsonBody(req)) as typeof body;
+    } catch (error) {
+      sendJson(res, 400, {
+        error: "INVALID_JSON_BODY",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+
+    const { correlationId, outcome } = body;
+    if (typeof correlationId !== "string" || !correlationId || (outcome !== "resolved" && outcome !== "recurred")) {
+      sendJson(res, 400, {
+        error: "MISSING_FIELDS",
+        message: "correlationId (string) and outcome ('resolved' | 'recurred') are required.",
+      });
+      return;
+    }
+
+    const confirmedAt = new Date().toISOString();
+    recordSystemEvent(
+      auditLog,
+      session.username,
+      "outcome_confirmed",
+      outcome === "resolved" ? "success" : "failure",
+      { outcome, confirmedBy: session.username },
+      correlationId
+    );
+    logEvent({
+      level: "info",
+      event: "outcome_confirmed",
+      context: { correlationId, outcome, confirmedBy: session.username },
+    });
+
+    sendJson(res, 200, { correlationId, outcome, confirmedBy: session.username, confirmedAt });
+    return;
   }
 
   if (req.method === "GET" && url.pathname === "/api/audit") {

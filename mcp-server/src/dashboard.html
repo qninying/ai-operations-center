@@ -432,6 +432,15 @@
   .activity-dot.neutral { background: var(--text-tertiary); }
   .activity-text { color: var(--text-secondary); }
   .activity-text strong { color: var(--text); font-weight: 500; }
+  .outcome-actions { color: var(--text-tertiary); font-size: 12px; }
+  .btn-link {
+    background: none; border: none; padding: 0; font: inherit; cursor: pointer;
+    color: var(--accent); text-decoration: underline; text-underline-offset: 2px;
+  }
+  .btn-link:hover { color: var(--text); }
+  .outcome-confirmed { font-size: 12px; font-weight: 500; }
+  .outcome-confirmed.resolved { color: var(--success); }
+  .outcome-confirmed.recurred { color: var(--danger); }
   .activity-time { color: var(--text-tertiary); font-size: 11px; margin-top: 2px; }
   .empty-state { color: var(--text-tertiary); font-size: 13px; padding: 8px 0; }
 
@@ -1324,18 +1333,54 @@ async function renderResolvedList() {
     try {
       const res = await apiFetch('/api/audit?correlationId=' + encodeURIComponent(entry.correlationId));
       const body = await res.json();
-      const decision = (body.entries || []).find((e) => e.hitlEventType === 'hitl_decision' || e.entryType === 'action');
+      const auditEntries = body.entries || [];
+      const decision = auditEntries.find((e) => e.hitlEventType === 'hitl_decision' || e.entryType === 'action');
       const actor = decision ? decision.actor : (entry.approver || 'unknown');
       const at = decision ? new Date(decision.loggedAt).toLocaleTimeString() : '';
+
+      // Pure record-keeping — see /api/guardrail/outcome's own comment.
+      // Human-attested only, never inferred; the most recent entry for this
+      // correlationId is treated as current, since this is append-only like
+      // the rest of the audit trail (a later correction adds a new entry
+      // rather than overwriting the old one).
+      const outcomeEntries = auditEntries
+        .filter((e) => e.entryType === 'system_event' && e.event === 'outcome_confirmed')
+        .sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt));
+      const latestOutcome = outcomeEntries[0];
+
+      let outcomeHtml;
+      if (latestOutcome) {
+        const confirmedBy = (latestOutcome.context && latestOutcome.context.confirmedBy) || latestOutcome.actor;
+        outcomeHtml = latestOutcome.outcome === 'success'
+          ? '<span class="outcome-confirmed resolved">Confirmed resolved by ' + escapeHtml(confirmedBy) + '</span>'
+          : '<span class="outcome-confirmed recurred">Recurred — flagged by ' + escapeHtml(confirmedBy) + '</span>';
+      } else {
+        outcomeHtml = '<span class="outcome-actions">Did this actually fix it? ' +
+          '<button class="btn-link outcome-btn" data-correlation-id="' + escapeHtml(entry.correlationId) + '" data-outcome="resolved">Confirm resolved</button> · ' +
+          '<button class="btn-link outcome-btn" data-correlation-id="' + escapeHtml(entry.correlationId) + '" data-outcome="recurred">Recurred</button></span>';
+      }
+
       return '<div class="activity-item"><span class="activity-dot success"></span>' +
         '<span class="activity-text"><strong>' + escapeHtml(entry.title) + '</strong><br>' +
-        'Fixed by ' + escapeHtml(actor) + (at ? ' at ' + at : '') + '</span></div>';
+        'Fixed by ' + escapeHtml(actor) + (at ? ' at ' + at : '') + '<br>' + outcomeHtml + '</span></div>';
     } catch (e) {
       return '<div class="activity-item"><span class="activity-dot success"></span>' +
         '<span class="activity-text"><strong>' + escapeHtml(entry.title) + '</strong><br>Fixed (audit lookup failed)</span></div>';
     }
   }));
   listEl.innerHTML = rows.join('');
+  listEl.querySelectorAll('.outcome-btn').forEach((btn) => {
+    btn.addEventListener('click', () => confirmOutcome(btn.dataset.correlationId, btn.dataset.outcome));
+  });
+}
+
+async function confirmOutcome(correlationId, outcome) {
+  await apiFetch('/api/guardrail/outcome', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ correlationId, outcome }),
+  });
+  await renderResolvedList();
 }
 
 // Called once an incident is genuinely resolved (guardrail allowed it
