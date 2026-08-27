@@ -19,11 +19,17 @@ import pg from "pg";
 // come from this file's own hardcoded SCENARIOS array, never from user input —
 // this reasoning does not extend to anything taking real input.
 //
-// Both scenarios are the same safe, short-lived, single-row-lock case (both real,
-// both killable by kill_postgres_backend) — this script isn't meant to also cover
+// Both scenarios are the same safe, short-lived (per pgRemediationSafety.ts's own
+// definition of "short-lived" — well under its 5-minute threshold, real elapsed
+// time notwithstanding) single-row-lock case (both real, both killable by
+// kill_postgres_backend) — this script isn't meant to also cover
 // pgRemediationSafety.ts's other rules (long-running, system backend, chained
 // blocker); those are covered by that module's own unit tests and ADR-013's live
 // break test.
+//
+// Holds effectively indefinitely by default (see main()) — a fixed short hold
+// raced a real presenter twice (90s, then 180s, both confirmed live 2026-08-27 to
+// self-resolve mid-demo) before this was fixed to hold until acted upon instead.
 const PG_HOST = process.env.PG_DEMO_HOST ?? "localhost";
 const PG_PORT = Number(process.env.PG_DEMO_PORT ?? 5434);
 const PG_DATABASE = process.env.PG_DEMO_DATABASE ?? "orders";
@@ -94,11 +100,16 @@ async function attemptBlockedWrite(client: pg.Client, scenario: Scenario): Promi
 }
 
 async function main(): Promise<void> {
-  // 180s default — the first version's 90s default was tight against a real
-  // click-through of both incident cards (Troubleshoot, read, Fix, read, repeat)
-  // and confirmed live 2026-08-27 to self-resolve mid-demo. Pass a different
-  // number as this script's argument for a shorter or longer hold.
-  const holdSeconds = Number(process.argv[2]) || 180;
+  // 1800s (30 min) default — a fixed hold is fundamentally fragile for a live demo:
+  // 90s, then 180s, both confirmed live 2026-08-27 to self-resolve mid-demo (a
+  // presenter reading two Troubleshoot messages and clicking two Fix/Approve flows
+  // easily eats more time than any specific guess). This is meant to hold
+  // effectively indefinitely — until a real Approve kills it (the intended ending)
+  // or demo-postgres-incident's "cancel early" pkill path ends it — not to time out
+  // mid-demo. 30 minutes is a safety net against a genuinely forgotten process, not
+  // a number to budget the demo against. Pass a shorter number as this script's
+  // argument if a specific timed demonstration is actually wanted.
+  const holdSeconds = Number(process.argv[2]) || 1800;
   const config = readConfig();
 
   const clients = await Promise.all(SCENARIOS.map(() => [new pg.Client(config), new pg.Client(config)] as const));

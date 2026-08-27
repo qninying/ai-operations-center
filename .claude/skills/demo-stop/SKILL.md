@@ -11,21 +11,30 @@ running — every step here is idempotent, matching this repo's own idempotency 
 ## Steps
 
 1. **Cancel any scheduled or running fault injection first**, before it can fire
-   after the demo has already ended — both the SQL blocking scenario (`demo-start`
-   step 6) and the cloud-diagnostics scenario (`demo-start` step 7):
+   after the demo has already ended — the SQL blocking scenario (`demo-start` step
+   6), the cloud-diagnostics scenario (`demo-start` step 7), and the Postgres
+   blocking scenario (`demo-start` step 8):
    ```
    pkill -f "coreops-fault-injector.sh" 2>/dev/null
    pkill -f "seedBlockingScenario.ts" 2>/dev/null
    pkill -f "coreops-cloud-fault-injector.sh" 2>/dev/null
    pkill -f "seedCloudDiagnostics.ts" 2>/dev/null
+   pkill -f "coreops-pg-fault-injector.sh" 2>/dev/null
+   pkill -f "coreops-pg-blocking-seed.sh" 2>/dev/null
+   pkill -f "seedPostgresBlockingScenario.ts" 2>/dev/null
    ```
    Matches on each wrapper script's distinctive path, not a captured PID — `demo-start`
    deliberately doesn't rely on `$!` for this (confirmed unreliable in this
-   environment: it captured the wrong process when tested directly). All four `pkill`s
+   environment: it captured the wrong process when tested directly). All these `pkill`s
    are safe to run even if nothing was scheduled — a no-op `pkill` just exits
    non-zero silently, which is the correct outcome here, not an error. This matters
-   even if `demo-start`'s step 6 or 7 already fired and resolved on its own: killing an
-   already-finished process's name match is harmless.
+   even if `demo-start`'s step 6, 7, or 8 already fired: killing an already-finished
+   process's name match is harmless, and for Postgres specifically it matters even
+   more than for SQL/cloud, since its scenario no longer expires on its own (see
+   `demo-postgres-incident`'s notes) — an unkilled seed process here would otherwise
+   keep a real lock held indefinitely after the demo has ended. Killing it releases
+   the lock the same real way a genuine termination does (a lost connection, not a
+   graceful commit).
 
 2. **Log in fresh**, from `mcp-server/` — don't assume `demo-start`'s cookie jar is
    still valid (a demo can run past the session's 60-minute TTL, and re-logging in is
@@ -90,10 +99,15 @@ running — every step here is idempotent, matching this repo's own idempotency 
 
 ## Related
 
-- `demo-start` — the matching setup skill. Step 8 there starts the Superset stack
-  this skill's step 5 tears down.
+- `demo-start` — the matching setup skill. Step 9 there starts the Superset stack
+  this skill's step 5 tears down; step 8 schedules the Postgres blocking scenario
+  this skill's step 1 cancels.
 - `mcp-server/dev-superset/` — its own README explains why this teardown matters:
   dev/verification tooling, explicitly not meant to be left running.
+- `mcp-server/dev-postgres/` — the Postgres container `demo-start` step 8 may start.
+  Not torn down by this skill (deliberately, same as `demo-postgres-incident`'s own
+  scope decision) — only the fault-injector process and any active block are
+  cancelled in step 1; the container itself is left running between demos.
 - `mcp-server/scripts/demoSupervisor.mjs` — the process step 4 stops. Also stops
   itself cleanly (kills its own child, no auto-restart) on SIGTERM, so a plain
   `pkill -f "demoSupervisor.mjs"` is enough — no separate step needed for the

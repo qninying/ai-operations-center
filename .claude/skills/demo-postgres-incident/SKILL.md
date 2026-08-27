@@ -18,16 +18,26 @@ server-side, dashboard refreshes every 5s), and the proposed fix
 (`kill_postgres_backend`) is gated by real DBA judgment (`pgRemediationSafety.ts`,
 ADR-013) before it's ever offered.
 
-**A real demo bug found live, fixed 2026-08-27**: the first version of this seed
+**Two real demo bugs found live, fixed 2026-08-27**: the first version of this seed
 script used one `orders` table with a parameterized `WHERE id = $1` for both
 scenarios — `pg_stat_activity`'s `query` column shows the literal SQL text sent
 over the wire, not the bound value, so both incident cards rendered
 byte-identical query text and looked like the same issue twice. Fixed with a
 second, distinct table and literal (not parameterized) ids in the seed script's own
 `UPDATE` text — safe there specifically because the ids come from a hardcoded
-internal array, never user input. The default hold was also too short (90s) against
-a real two-card click-through and was observed live to self-resolve mid-demo,
-producing a confusing "no evidence found" on Fix — raised to 180s.
+internal array, never user input.
+
+Separately, a fixed hold duration turned out to be fundamentally the wrong shape
+for a live demo: 90s, then a "generous" 180s, **both** confirmed live 2026-08-27 to
+self-resolve before a real presenter finished clicking through two incident cards
+(read Troubleshoot, click Fix, read the result, repeat) — producing a confusing but
+technically honest "no evidence found" on Fix once the block had already cleared
+itself. No fixed number reliably survives a real presenter's pace. **Fixed by
+removing the auto-expiry**: the script now holds effectively indefinitely by
+default (1800s / 30 min, a forgotten-process safety net, not a demo budget) — the
+scenario ends only when a real Approve kills it (the intended, natural ending) or
+the cancel step below is used. Don't suggest picking "a bigger number" if this
+class of bug resurfaces; the fix is no ticking clock at all, not a longer one.
 
 **Separate from `demo-docker-incident`.** Different container (`dev-postgres`, not
 `dev-superset`), different mechanism (a seeded lock, not a stopped container),
@@ -66,17 +76,19 @@ produces a fresh, real pid.
    cat > /tmp/coreops-pg-blocking-seed.sh <<'EOF'
    #!/bin/sh
    cd "<absolute path to mcp-server>"
-   npx tsx src/seedPostgresBlockingScenario.ts "${1:-180}"
+   npx tsx src/seedPostgresBlockingScenario.ts "${1:-1800}"
    EOF
    chmod +x /tmp/coreops-pg-blocking-seed.sh
-   nohup /tmp/coreops-pg-blocking-seed.sh 180 > /tmp/coreops-pg-blocking-seed.log 2>&1 &
+   nohup /tmp/coreops-pg-blocking-seed.sh 1800 > /tmp/coreops-pg-blocking-seed.log 2>&1 &
    disown
    ```
-   Substitute the real absolute path to this repo's `mcp-server/` directory. 180
-   seconds (3 minutes) is the script's own default — confirmed live 2026-08-27 that
-   the original 90s default was too tight for a real two-card Troubleshoot/Fix
-   click-through and self-resolved mid-demo; pass a different number as the script's
-   argument if the user asks for more or less time ("give me five minutes" → 300).
+   Substitute the real absolute path to this repo's `mcp-server/` directory. 1800
+   seconds (30 min) is the script's own default and is meant as a forgotten-process
+   safety net, not a demo timer — two shorter fixed defaults (90s, then 180s) were
+   both confirmed live to race a real presenter and self-resolve mid-demo. The
+   scenario is meant to hold until Approve kills it or the cancel step below is used,
+   not to time out. Only pass a shorter number if the user explicitly wants a
+   specific timed demonstration instead.
 
 3. Tell the user plainly: the incident should appear on **their own** dashboard soon
    — timing depends on demo mode, same as `demo-docker-incident` (immediate outside
@@ -93,13 +105,13 @@ produces a fresh, real pid.
    incidents** — every approval runs a real `pg_terminate_backend()` on that
    blocker, which kills that specific Session A connection out from under it.
    Approving just one still leaves the seed script's other Session A/B pair running
-   normally on its own row — the two scenarios are fully independent. Once both are
-   approved (or their hold time elapses on its own), the script's process exits
-   cleanly; if the script's remaining connections get killed by real terminations, it
-   exits instead with an uncaught `FATAL: terminating connection due to
-   administrator command` error per killed connection — expected, not a bug, and
-   further proof each kill was real (confirmed live 2026-08-27). Nothing to clean up
-   afterward either way; any killed connection is already gone.
+   normally on its own row — the two scenarios are fully independent. Each real
+   termination makes the script exit with an uncaught `FATAL: terminating
+   connection due to administrator command` error for that connection — expected,
+   not a bug, and further proof the kill was real (confirmed live 2026-08-27).
+   Nothing to clean up afterward; the killed connection is already gone. If neither
+   incident is approved, the scenario just keeps holding (see the 1800s note above)
+   until the cancel step below is used — it will not silently expire mid-demo.
 
 ## Cancel early ("stop the postgres demo", "cancel the blocking query", never reached Approve)
 

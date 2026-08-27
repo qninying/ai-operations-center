@@ -126,7 +126,42 @@ the blocking scenario, not waiting on a cold start.
    `/api/cloud-recommendation` on its own — the presenter (or a curl in the demo
    script) still triggers that live, same as any other route.
 
-8. **Start the Superset stack**, for the reporting-service integration demo
+8. **Bring up `dev-postgres` and schedule a real Postgres blocking scenario**, so a
+   genuine two-incident Postgres block (a stuck order update, a stuck payment
+   update — see ADR-013 and `demo-postgres-incident`) appears on its own shortly
+   after the presenter logs in, same "never trigger anything on camera" reasoning as
+   steps 6-7. Idempotent container check first, same pattern as step 1:
+   ```
+   docker ps --filter "name=coreops-dev-postgres" --format "{{.Names}}"
+   ```
+   If that returns nothing, start it, from `mcp-server/dev-postgres/`:
+   ```
+   docker compose up -d
+   ```
+   Then schedule the seed script via the same named-wrapper-script pattern as steps
+   6-7 (a distinct wrapper path, so `demo-stop` can cancel this independently):
+   ```
+   cat > /tmp/coreops-pg-fault-injector.sh <<'EOF'
+   #!/bin/sh
+   cd "<absolute path to mcp-server>"
+   sleep "${1:-65}"
+   npx tsx src/seedPostgresBlockingScenario.ts
+   EOF
+   chmod +x /tmp/coreops-pg-fault-injector.sh
+   nohup /tmp/coreops-pg-fault-injector.sh 65 > /tmp/coreops-pg-fault.log 2>&1 &
+   disown
+   ```
+   65s is the requested default — the fault lands 65s after this step runs (roughly
+   "server up and the presenter has had time to log in," confirmed 2026-08-27 as the
+   intended anchor). **No second argument, unlike step 6's SQL injector** —
+   `seedPostgresBlockingScenario.ts` defaults to an effectively indefinite hold
+   (1800s) by design, not a short one: two shorter fixed holds (90s, then 180s) were
+   both confirmed live to self-resolve before a real presenter finished clicking
+   through both incident cards. Don't pass a hold-seconds argument here unless the
+   user explicitly wants a specific timed demonstration instead of "holds until
+   Approve or cancel."
+
+9. **Start the Superset stack**, for the reporting-service integration demo
    (`mcp-server/src/demoSsrsExecutionLog.ts` and
    `mcp-server/dev-superset/verify-live-pattern.ts` — see
    `project-blueprint/demo-script.md`'s Acts 4-5). Check first whether it's already
@@ -135,7 +170,7 @@ the blocking scenario, not waiting on a cold start.
    docker ps --filter "name=coreops-dev-superset" --format "{{.Names}}"
    ```
    If that returns `coreops-dev-superset` and `coreops-dev-superset-db`, skip to
-   step 9 — don't re-run setup against an already-running stack. Otherwise, from
+   step 10 — don't re-run setup against an already-running stack. Otherwise, from
    `mcp-server/dev-superset/`:
    ```
    ./setup.sh
@@ -148,21 +183,23 @@ the blocking scenario, not waiting on a cold start.
    running at http://localhost:8088" on success — if it doesn't, stop here and
    report the actual failure, same as step 2's warmup.
 
-9. **Report readiness, don't open a browser tab yourself.** Tell the user the
+10. **Report readiness, don't open a browser tab yourself.** Tell the user the
    dashboard is ready at `http://localhost:8787/` and that they should open it in
    their own browser (the one they'll actually be screen-sharing) — the Claude Code
    Browser pane isn't what an audience sees. Mention that SQL Server may still take
    a little longer to fully warm on its very first real query even after step 2's
    direct check succeeds, since the app's own connection pool is separate from the
-   warmup script's. Also state plainly when the scheduled faults (SQL blocking scenario
-   and cloud-diagnostics scenario, step 6 and step 7) will land and how long the SQL
-   one holds, so the presenter can pace their narration against both. Confirm Superset
-   is up at `http://localhost:8088` (admin/admin, dev-only) and that Acts 4-5 are
-   ready to run live, per step 8. Also mention that Beat 6 (proving the audit
-   trail survives a real restart) now runs entirely from the dashboard's "Demo
-   Evidence" panel — propose/approve a remediation first so it has a real
-   correlation ID to show, then the "Restart server (demo)" button there does a
-   genuine kill-and-relaunch live, no terminal needed.
+   warmup script's. Also state plainly when the scheduled faults (SQL blocking
+   scenario, cloud-diagnostics scenario, and the Postgres blocking scenario — steps
+   6, 7, and 8) will land, how long the SQL one holds, and that the Postgres one
+   holds until Approved or cancelled (not on a timer), so the presenter can pace
+   their narration against all three. Confirm Superset is up at
+   `http://localhost:8088` (admin/admin, dev-only) and that Acts 4-5 are ready to
+   run live, per step 9. Also mention that Beat 6 (proving the audit trail survives
+   a real restart) now runs entirely from the dashboard's "Demo Evidence" panel —
+   propose/approve a remediation first so it has a real correlation ID to show,
+   then the "Restart server (demo)" button there does a genuine kill-and-relaunch
+   live, no terminal needed.
 
 ## If something fails
 
@@ -173,9 +210,9 @@ or a server that never returns healthy means the demo isn't ready yet; say so pl
 ## Related
 
 - `demo-stop` — the matching teardown skill. It also cancels any fault injection
-  step 6 or step 7 scheduled but hasn't fired yet, and kills it if it has — don't
-  leave a scheduled or running blocking scenario, or a pending cloud-diagnostics
-  seed, behind after the demo ends.
+  step 6, step 7, or step 8 scheduled but hasn't fired yet, and kills it if it has
+  (including an active Postgres block) — don't leave a scheduled or running
+  blocking scenario, or a pending cloud-diagnostics seed, behind after the demo ends.
 - `mcp-server/src/warmup.ts` — the actual warmup script this drives.
 - `mcp-server/src/seedBlockingScenario.ts` — the real blocking-scenario script step 6
   schedules. Can still be run by hand instead, with different timing, if the
@@ -183,6 +220,15 @@ or a server that never returns healthy means the demo isn't ready yet; say so pl
 - `mcp-server/src/seedCloudDiagnostics.ts` — the real cloud-diagnostics scenario
   script step 7 schedules. Can also be run by hand with a specific scenario name
   instead of a random one, same reasoning as `seedBlockingScenario.ts` above.
+- `mcp-server/src/seedPostgresBlockingScenario.ts` — the real Postgres
+  blocking-scenario script step 8 schedules (two scenarios, `orders` and
+  `payments`). Holds effectively indefinitely by default — see its own file
+  comment and `demo-postgres-incident`'s notes on why a fixed hold doesn't survive
+  a real presenter's pace.
+- `demo-postgres-incident` — the on-command sibling skill for triggering (and
+  cancelling) this same scenario mid-demo instead of on a schedule. Its own notes
+  on the identical-query-text bug and the fixed-hold-races-the-presenter bug apply
+  here too, since step 8 schedules the same script.
 - `mcp-server/src/auth/` — session auth. `demo-stop` re-logs in rather than assuming
   step 4's cookie jar is still valid (a demo can run past the 60-minute session TTL).
 - `mcp-server/scripts/demoSupervisor.mjs` — the process supervisor step 3 launches
