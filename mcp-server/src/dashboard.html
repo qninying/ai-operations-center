@@ -1338,7 +1338,14 @@ async function viewAuditTrail(sessionId, cardEl) {
     }).join('') + '</div>';
   } finally {
     btn.disabled = false;
-    btn.textContent = 'View audit trail';
+    // Once real entries are showing (including from an auto-load on page
+    // restore, before this button was ever clicked), a further click just
+    // re-fetches identical data — the label should say so, not repeat
+    // "View" for an action that already happened and has nothing new to
+    // reveal. Found live: clicking "View audit trail" a second time looked
+    // completely inert, since the re-fetched content was byte-identical to
+    // what was already on screen.
+    btn.textContent = resultEl.querySelector('.activity-list') ? 'Refresh audit trail' : 'View audit trail';
   }
 }
 
