@@ -408,6 +408,8 @@
   .banner.blocked { border-color: #4d2129; background: var(--danger-dim); }
   .banner.blocked .banner-title { color: var(--danger); font-weight: 600; margin-bottom: 4px; }
   .violation { font-family: var(--mono); font-size: 12px; color: #ffb3bd; margin: 2px 0; }
+  .proposed-action { font-size: 13px; margin-bottom: 6px; }
+  .proposed-action strong { font-family: var(--mono); font-weight: 600; }
 
   .field-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .field-group select {
@@ -1259,7 +1261,12 @@ async function fixIncident(incidentId, cardEl) {
     setCorrelationId(incidentId, body.correlationId, cardEl);
     const allowed = body.result.allowed;
     resultEl.className = 'banner guardrail-result shown ' + (allowed ? 'allowed' : 'blocked');
+    const action = body.proposedAction;
     let html = '<div class="banner-title">' + (allowed ? 'Allowed' : 'Blocked') + '</div>';
+    if (action) {
+      html += '<div class="proposed-action"><strong>' + escapeHtml(action.actionType) + '</strong> on ' +
+        '<strong>' + escapeHtml(action.targetSystem.name) + '</strong></div>';
+    }
     if (!allowed) {
       for (const v of body.result.violations) html += '<div class="violation">' + escapeHtml(v) + '</div>';
     }
