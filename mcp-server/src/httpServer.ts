@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { readDmv } from "./dmvReader.js";
+import { assessBlockingSessionRemediation } from "./sqlRemediationSafety.js";
 import { buildDashboardSummary, UnknownRoleError } from "./dashboardSummary.js";
 import {
   generateRecommendation,
@@ -753,29 +754,92 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
 
   if (req.method === "POST" && url.pathname === "/api/guardrail/propose") {
     if (!requireSession(req, res)) return;
-    // Same real scenario as guardrails/demoUnsafeAction.ts: a recommendation that's
-    // evidence-linked and of a valid, reversible type, missing only human approval.
-    // Enqueues into the real HITL queue (guardrails/hitlQueue.ts) rather than doing a
-    // single stateless check — a human can now actually act on this specific item.
-    const action: RemediationAction = {
-      actionType: "restart_service",
-      evidenceIds: ["evt-4471"],
-      approval: null,
-      targetSystem: { name: "monitoring-collector", productionWriteProtected: true },
+
+    // Optional and best-effort: an absent or malformed body, or an
+    // unrecognized source, falls back to the original generic action below
+    // rather than erroring — this route predates incident context and
+    // stays backward compatible for any caller that doesn't send it.
+    let body: { incidentId?: unknown; source?: unknown } = {};
+    try {
+      body = (await readJsonBody(req)) as typeof body;
+    } catch {
+      // no body sent — fine, falls through to the generic default
+    }
+    const incidentId = typeof body.incidentId === "string" ? body.incidentId : undefined;
+    const source = typeof body.source === "string" ? body.source : undefined;
+    const evidenceIds = incidentId ? [incidentId] : ["evt-4471"];
+
+    // ADR-010: SQL blocking-chain incidents get real DBA judgment, not a
+    // static mapping — assessBlockingSessionRemediation() is the actual
+    // gate on whether kill_blocking_session is even offered.
+    if (source === "sql" && incidentId) {
+      // incidentId's session id is the BLOCKED session (what the incident is
+      // named for) — the actual remediation target is whichever session is
+      // blocking it, found by looking that row up first.
+      const blockedSessionId = Number(incidentId.split(":")[2]);
+      const dmvResult = await readDmv({ dmvName: "sys.dm_exec_requests" });
+      const blockedRow = dmvResult.rows.find((row) => row.session_id === blockedSessionId);
+      const blockerSessionId = blockedRow?.blocking_session_id;
+
+      if (blockerSessionId === undefined) {
+        sendJson(res, 200, { noSafeAction: true, reason: `No evidence found for session ${blockedSessionId} — cannot assess a remediation.` });
+        return;
+      }
+
+      const assessment = assessBlockingSessionRemediation(blockerSessionId, dmvResult.rows);
+
+      if (!assessment.safe) {
+        logEvent({ level: "info", event: "guardrail_no_safe_action", context: { incidentId, blockerSessionId, reason: assessment.reason } });
+        sendJson(res, 200, { noSafeAction: true, reason: assessment.reason });
+        return;
+      }
+
+      const blocker = dmvResult.rows.find((row) => row.session_id === blockerSessionId);
+      const action: RemediationAction = {
+        actionType: "kill_blocking_session",
+        evidenceIds,
+        approval: null,
+        targetSystem: { name: `session ${blockerSessionId} on ${blocker?.database_name ?? "unknown"}`, productionWriteProtected: true },
+      };
+      return proposeAction(res, action, `Kill blocking session ${blockerSessionId}, evidence-linked, awaiting approval.`);
+    }
+
+    // SSRS/Cloud/Docker: a real, source-correct action type and target —
+    // textbook-correct for SSRS specifically, since Report Server genuinely
+    // runs under IIS in a real deployment.
+    const SOURCE_ACTIONS: Record<string, { actionType: string; targetSystem: { name: string; productionWriteProtected: boolean } }> = {
+      ssrs: { actionType: "recycle_app_pool", targetSystem: { name: "ssrs-report-server", productionWriteProtected: true } },
+      cloud: { actionType: "restart_service", targetSystem: { name: "ssis-agent", productionWriteProtected: true } },
+      docker: { actionType: "restart_service", targetSystem: { name: "dev-superset", productionWriteProtected: true } },
     };
-    const correlationId = crypto.randomUUID();
-    const item = hitlQueue.enqueue({
-      request: { ...action },
-      correlationId,
-      contextPackage: "Monitoring collector restart, evidence-linked, awaiting approval.",
-      primaryApprover: GUARDRAIL_PRIMARY_APPROVER,
-      backupApprover: GUARDRAIL_BACKUP_APPROVER,
-    });
-    pendingRemediations.set(item.itemId, { action, executedAt: null });
-    const result = checkRemediationGuardrail(action);
-    logEvent({ level: "info", event: "guardrail_proposed", context: { itemId: item.itemId, correlationId } });
-    sendJson(res, 200, { itemId: item.itemId, correlationId, proposedAction: action, result, approver: GUARDRAIL_PRIMARY_APPROVER });
-    return;
+    const mapped = source ? SOURCE_ACTIONS[source] : undefined;
+
+    const action: RemediationAction = mapped
+      ? { actionType: mapped.actionType, evidenceIds, approval: null, targetSystem: mapped.targetSystem }
+      : {
+          // No source provided or unrecognized — the original generic
+          // action, unchanged, for backward compatibility.
+          actionType: "restart_service",
+          evidenceIds,
+          approval: null,
+          targetSystem: { name: "monitoring-collector", productionWriteProtected: true },
+        };
+    return proposeAction(res, action, `${action.actionType} on ${action.targetSystem.name}, evidence-linked, awaiting approval.`);
+
+    function proposeAction(res: ServerResponse, action: RemediationAction, contextPackage: string) {
+      const correlationId = crypto.randomUUID();
+      const item = hitlQueue.enqueue({
+        request: { ...action },
+        correlationId,
+        contextPackage,
+        primaryApprover: GUARDRAIL_PRIMARY_APPROVER,
+        backupApprover: GUARDRAIL_BACKUP_APPROVER,
+      });
+      pendingRemediations.set(item.itemId, { action, executedAt: null });
+      const result = checkRemediationGuardrail(action);
+      logEvent({ level: "info", event: "guardrail_proposed", context: { itemId: item.itemId, correlationId, actionType: action.actionType } });
+      sendJson(res, 200, { itemId: item.itemId, correlationId, proposedAction: action, result, approver: GUARDRAIL_PRIMARY_APPROVER });
+    }
   }
 
   if (req.method === "POST" && url.pathname === "/api/guardrail/decide") {
@@ -844,15 +908,30 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         return;
       }
 
-      // Real execution: restart the one real, reversible service this process has.
+      // Real execution: restart the one real, reversible service this process
+      // has. This never varies by actionType — the recommendation (what
+      // approvedAction says should happen) is real and source-specific per
+      // ADR-010; execution stays this one honest stand-in, since no real
+      // write access to SQL Server/IIS/Docker exists in this environment.
+      // standInFor makes that explicit in the response rather than letting
+      // "executed: true" imply the real target system was actually touched.
       stopMonitoringInternal();
       const taskId = startMonitoringInternal();
       pending.executedAt = new Date().toISOString();
+      const standInFor = `${approvedAction.actionType} on ${approvedAction.targetSystem.name}`;
       logEvent({
         level: "info",
         event: "guardrail_executed",
-        context: { itemId, actionType: approvedAction.actionType, taskId },
+        context: { itemId, actionType: approvedAction.actionType, taskId, standInFor },
       });
+      recordSystemEvent(
+        auditLog,
+        session.username,
+        "guardrail_executed",
+        "success",
+        { actionType: approvedAction.actionType, targetSystem: approvedAction.targetSystem.name, taskId, standInFor },
+        item.correlationId
+      );
 
       sendJson(res, 200, {
         itemId,
@@ -861,6 +940,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         executed: true,
         executedAt: pending.executedAt,
         taskId,
+        standInFor,
       });
       return;
     } catch (error) {

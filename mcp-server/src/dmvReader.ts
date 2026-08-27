@@ -21,7 +21,10 @@ import { logEvent } from "./observability/logger.js";
 export { SUPPORTED_DMVS };
 export type { ReadDmvInput };
 
-const MAX_RESULTS = 3;
+// Raised from 3 alongside the fixture expansion (ADR-010) so the fallback
+// path's now-10 realistic blocking scenarios all survive shaping — still a
+// reasonable cap for a real live query on a busy server.
+const MAX_RESULTS = 15;
 
 export class UnsupportedDmvError extends Error {
   readonly errorClass = "UnsupportedDmvError" as const;

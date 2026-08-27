@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkRemediationGuardrail, RemediationAction } from "./remediationGuardrail.js";
+import { checkRemediationGuardrail, RemediationAction, ALLOWED_ACTION_TYPES } from "./remediationGuardrail.js";
 
 function baseAction(overrides: Partial<RemediationAction> = {}): RemediationAction {
   return {
@@ -54,6 +54,18 @@ describe("checkRemediationGuardrail", () => {
     const result = checkRemediationGuardrail(baseAction({ actionType: "drop_database" }));
     expect(result.allowed).toBe(false);
     expect(result.violations).toContain("ACTION_TYPE_NOT_ALLOWED");
+  });
+
+  it("ADR-010: allows kill_blocking_session — same reversibility class as the original four, deliberately added", () => {
+    const result = checkRemediationGuardrail(baseAction({ actionType: "kill_blocking_session" }));
+    expect(result).toEqual({ allowed: true, violations: [] });
+  });
+
+  it("the original four action types are still allowed, unaffected by the ADR-010 addition", () => {
+    for (const actionType of ["restart_service", "clear_queue", "recycle_app_pool", "failover_to_replica"]) {
+      expect(ALLOWED_ACTION_TYPES.has(actionType)).toBe(true);
+    }
+    expect(ALLOWED_ACTION_TYPES.size).toBe(5);
   });
 
   it("rejects an unapproved action against a production-write-protected system with both violations", () => {

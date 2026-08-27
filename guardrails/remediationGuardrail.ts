@@ -27,11 +27,18 @@ export interface RemediationAction {
   targetSystem: { name: string; productionWriteProtected: boolean };
 }
 
+// kill_blocking_session added per docs/ADR-010-sql-remediation-safety.md —
+// same reversibility class as the other four: it only rolls back the killed
+// session's own uncommitted transaction, touches no committed data, and
+// affects no other session. Never offered unconditionally — see
+// mcp-server/src/sqlRemediationSafety.ts, which is the actual gate on
+// whether killing a given session is safe to propose at all.
 export const ALLOWED_ACTION_TYPES = new Set([
   "restart_service",
   "clear_queue",
   "recycle_app_pool",
   "failover_to_replica",
+  "kill_blocking_session",
 ]);
 
 export type GuardrailViolation =

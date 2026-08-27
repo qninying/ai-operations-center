@@ -32,18 +32,18 @@ describe("readDmv", () => {
     expect(liveSource).toHaveBeenCalledOnce();
   });
 
-  it("caps live results to 3 rows even if the source returns more (shaping)", async () => {
-    const liveSource = vi.fn().mockResolvedValue(makeRows(7));
+  it("caps live results to 15 rows even if the source returns more (shaping)", async () => {
+    const liveSource = vi.fn().mockResolvedValue(makeRows(20));
     const result = await readDmv({ dmvName: "sys.dm_exec_requests" }, liveSource);
     expect(result.source).toBe("live");
-    expect(result.rows).toHaveLength(3);
+    expect(result.rows).toHaveLength(15);
   });
 
   it("falls back to fixture data when the live source is unavailable", async () => {
     const liveSource = vi.fn().mockRejectedValue(new LiveSourceUnavailableError(["SQLSERVER_HOST"]));
     const result = await readDmv({ dmvName: "sys.dm_exec_requests" }, liveSource);
     expect(result.source).toBe("fallback");
-    expect(result.rows).toEqual(dmExecRequestsFixture.slice(0, 3));
+    expect(result.rows).toEqual(dmExecRequestsFixture.slice(0, 15));
   });
 
   it("falls back to fixture data when the live query fails after retries are exhausted", async () => {
