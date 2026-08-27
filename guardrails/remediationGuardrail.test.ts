@@ -61,11 +61,16 @@ describe("checkRemediationGuardrail", () => {
     expect(result).toEqual({ allowed: true, violations: [] });
   });
 
-  it("the original four action types are still allowed, unaffected by the ADR-010 addition", () => {
+  it("ADR-013: allows kill_postgres_backend — same reversibility argument, translated to Postgres", () => {
+    const result = checkRemediationGuardrail(baseAction({ actionType: "kill_postgres_backend" }));
+    expect(result).toEqual({ allowed: true, violations: [] });
+  });
+
+  it("the original four action types are still allowed, unaffected by the ADR-010/ADR-013 additions", () => {
     for (const actionType of ["restart_service", "clear_queue", "recycle_app_pool", "failover_to_replica"]) {
       expect(ALLOWED_ACTION_TYPES.has(actionType)).toBe(true);
     }
-    expect(ALLOWED_ACTION_TYPES.size).toBe(5);
+    expect(ALLOWED_ACTION_TYPES.size).toBe(6);
   });
 
   it("rejects an unapproved action against a production-write-protected system with both violations", () => {

@@ -33,12 +33,18 @@ export interface RemediationAction {
 // affects no other session. Never offered unconditionally — see
 // mcp-server/src/sqlRemediationSafety.ts, which is the actual gate on
 // whether killing a given session is safe to propose at all.
+//
+// kill_postgres_backend added per docs/ADR-013-real-postgres-remediation.md —
+// same reversibility argument, translated to Postgres: only rolls back the
+// terminated backend's own uncommitted transaction. Gated the same way, by
+// mcp-server/src/pgRemediationSafety.ts.
 export const ALLOWED_ACTION_TYPES = new Set([
   "restart_service",
   "clear_queue",
   "recycle_app_pool",
   "failover_to_replica",
   "kill_blocking_session",
+  "kill_postgres_backend",
 ]);
 
 export type GuardrailViolation =

@@ -1,0 +1,15 @@
+# A dedicated, real Postgres instance for the real-blocking-query remediation
+# scenario (ADR-013) — deliberately separate from dev-superset/'s verify-db,
+# which already has its own real job (Superset's SQL Lab query target, Act 5
+# of the demo). Sharing one container between two demo purposes would let
+# this scenario's stop/lock actions silently break the other.
+services:
+  orders-db:
+    image: postgres:16-alpine
+    container_name: coreops-dev-postgres
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: orders
+    ports:
+      - "5434:5432"

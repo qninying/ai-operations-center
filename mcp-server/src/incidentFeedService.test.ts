@@ -23,6 +23,7 @@ function mockAllSources(overrides: {
   ssrsSource?: "live" | "fallback";
   cloudRecords?: unknown[];
   supersetHealthy?: boolean;
+  pgRows?: unknown[];
 }) {
   vi.doMock("./dmvReader.js", () => ({
     readDmv: vi.fn().mockResolvedValue({ source: overrides.dmvSource ?? "fallback", rows: overrides.dmvRows ?? [] }),
@@ -39,6 +40,9 @@ function mockAllSources(overrides: {
     checkSupersetHealth: overrides.supersetHealthy === false
       ? vi.fn().mockRejectedValue(new Error("unreachable"))
       : vi.fn().mockResolvedValue(undefined),
+  }));
+  vi.doMock("./pgActivitySource.js", () => ({
+    queryPgActivity: vi.fn().mockResolvedValue(overrides.pgRows ?? []),
   }));
   const notifyOperators = vi.fn().mockResolvedValue(undefined);
   vi.doMock("./notificationService.js", () => ({ notifyOperators }));
@@ -155,6 +159,34 @@ describe("incidentFeedService", () => {
     const incidents = getRevealedIncidents();
     expect(incidents).toHaveLength(1);
     expect(incidents[0].source).toBe("sql");
+    handle.stop();
+  });
+
+  it("a real blocked Postgres backend surfaces as an incident (ADR-013)", async () => {
+    mockAllSources({
+      pgRows: [
+        {
+          pid: 4821,
+          state: "active",
+          query: "UPDATE orders SET status = 'shipped' WHERE id = 1;",
+          query_start: "2026-08-27T22:00:00Z",
+          wait_event_type: "Lock",
+          datname: "orders",
+          backend_type: "client backend",
+          blocked_by: [4790],
+        },
+      ],
+    });
+    const { startIncidentFeed, getRevealedIncidents } = await import("./incidentFeedService.js");
+
+    const handle = startIncidentFeed();
+    await vi.advanceTimersByTimeAsync(0);
+
+    const incidents = getRevealedIncidents();
+    expect(incidents).toHaveLength(1);
+    expect(incidents[0]).toMatchObject({ id: "postgres:pid:4821", source: "postgres", severity: "error" });
+    expect(incidents[0].title).toContain("4821");
+    expect(incidents[0].title).toContain("4790");
     handle.stop();
   });
 

@@ -5,7 +5,10 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { readDmv } from "./dmvReader.js";
 import { assessBlockingSessionRemediation } from "./sqlRemediationSafety.js";
-import { restartSupersetContainer, DockerRestartFailedError } from "./dockerExecutor.js";
+import { restartSupersetContainer } from "./dockerExecutor.js";
+import { queryPgActivity } from "./pgActivitySource.js";
+import { assessPostgresRemediation } from "./pgRemediationSafety.js";
+import { terminatePostgresBackend } from "./pgRemediationExecutor.js";
 import { buildDashboardSummary, UnknownRoleError } from "./dashboardSummary.js";
 import {
   generateRecommendation,
@@ -805,6 +808,41 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       return proposeAction(res, action, `Kill blocking session ${blockerSessionId}, evidence-linked, awaiting approval.`);
     }
 
+    // ADR-013: same real-DBA-judgment shape as SQL above, translated to
+    // Postgres — assessPostgresRemediation() is the actual gate on whether
+    // kill_postgres_backend is even offered.
+    if (source === "postgres" && incidentId) {
+      // incidentId's pid is the BLOCKED backend — the actual remediation
+      // target is whichever backend is blocking it, found by looking that
+      // row up first, same split as the SQL branch above.
+      const blockedPid = Number(incidentId.split(":")[2]);
+      const pgRows = await queryPgActivity();
+      const blockedRow = pgRows.find((row) => row.pid === blockedPid);
+      const blockerPid = blockedRow?.blocked_by[0];
+
+      if (blockerPid === undefined) {
+        sendJson(res, 200, { noSafeAction: true, reason: `No evidence found for backend ${blockedPid} — cannot assess a remediation.` });
+        return;
+      }
+
+      const assessment = assessPostgresRemediation(blockerPid, pgRows);
+
+      if (!assessment.safe) {
+        logEvent({ level: "info", event: "guardrail_no_safe_action", context: { incidentId, blockerPid, reason: assessment.reason } });
+        sendJson(res, 200, { noSafeAction: true, reason: assessment.reason });
+        return;
+      }
+
+      const blocker = pgRows.find((row) => row.pid === blockerPid);
+      const action: RemediationAction = {
+        actionType: "kill_postgres_backend",
+        evidenceIds,
+        approval: null,
+        targetSystem: { name: `backend ${blockerPid} on ${blocker?.datname ?? "unknown"}`, productionWriteProtected: true },
+      };
+      return proposeAction(res, action, `Terminate backend ${blockerPid}, evidence-linked, awaiting approval.`);
+    }
+
     // SSRS/Cloud/Docker: a real, source-correct action type and target —
     // textbook-correct for SSRS specifically, since Report Server genuinely
     // runs under IIS in a real deployment.
@@ -909,37 +947,37 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         return;
       }
 
-      // One narrow real-execution exception (ADR-012): Docker/dev-superset is
-      // the single target this environment has direct, unprivileged control
-      // over — a local dev container, no new credential, no production
-      // system touched. Every other action/source falls through unchanged to
-      // the honest stand-in below (ADR-010).
-      if (approvedAction.actionType === "restart_service" && approvedAction.targetSystem.name === "dev-superset") {
+      // Shared by every real-execution branch below (ADR-012 Docker, ADR-013
+      // Postgres) — one code path for the "run it, then honestly report
+      // confirmed-vs-unconfirmed-vs-failed" shape, so the two real actions
+      // can't quietly drift into different response shapes over time.
+      // pending/decidedBy captured as const aliases — TS's narrowing of the
+      // outer `pending`/`session` doesn't carry into a nested function
+      // declaration, since it can't prove they're unchanged by call time.
+      const pendingItem = pending;
+      const decidedBy = session.username;
+      async function executeReal(
+        run: () => Promise<{ confirmed: boolean; detail: string }>,
+        errorCode: string
+      ): Promise<void> {
         try {
-          const outcome = await restartSupersetContainer();
-          pending.executedAt = new Date().toISOString();
+          const outcome = await run();
+          pendingItem.executedAt = new Date().toISOString();
           logEvent({
             level: "info",
             event: "guardrail_executed",
-            context: {
-              itemId,
-              actionType: approvedAction.actionType,
-              realExecution: true,
-              confirmedHealthy: outcome.confirmedHealthy,
-              waitedMs: outcome.waitedMs,
-            },
+            context: { itemId, actionType: approvedAction.actionType, realExecution: true, ...outcome },
           });
           recordSystemEvent(
             auditLog,
-            session.username,
+            decidedBy,
             "guardrail_executed",
             "success",
             {
               actionType: approvedAction.actionType,
               targetSystem: approvedAction.targetSystem.name,
               realExecution: true,
-              confirmedHealthy: outcome.confirmedHealthy,
-              waitedMs: outcome.waitedMs,
+              ...outcome,
             },
             item.correlationId
           );
@@ -948,13 +986,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
             status: item.status,
             result,
             executed: true,
-            executedAt: pending.executedAt,
+            executedAt: pendingItem.executedAt,
             realExecution: true,
-            confirmedHealthy: outcome.confirmedHealthy,
-            waitedMs: outcome.waitedMs,
+            realOutcome: outcome,
           });
         } catch (error) {
-          const errorClass = error instanceof DockerRestartFailedError ? error.errorClass : "Error";
+          const errorClass = error instanceof Error ? error.name : "Error";
           const message = error instanceof Error ? error.message : String(error);
           logEvent({
             level: "error",
@@ -963,22 +1000,42 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
           });
           recordSystemEvent(
             auditLog,
-            session.username,
+            decidedBy,
             "guardrail_executed",
             "failure",
             { actionType: approvedAction.actionType, targetSystem: approvedAction.targetSystem.name, realExecution: true, errorClass },
             item.correlationId
           );
-          sendJson(res, 200, {
-            itemId,
-            status: item.status,
-            result,
-            executed: false,
-            realExecution: true,
-            error: "DOCKER_RESTART_FAILED",
-            message,
-          });
+          sendJson(res, 200, { itemId, status: item.status, result, executed: false, realExecution: true, error: errorCode, message });
         }
+      }
+
+      // ADR-012: Docker/dev-superset is the one target this environment has
+      // direct, unprivileged control over — a local dev container, no new
+      // credential, no production system touched.
+      if (approvedAction.actionType === "restart_service" && approvedAction.targetSystem.name === "dev-superset") {
+        await executeReal(async () => {
+          const outcome = await restartSupersetContainer();
+          const seconds = Math.round(outcome.waitedMs / 1000);
+          return outcome.confirmedHealthy
+            ? { confirmed: true, detail: `confirmed healthy in ${seconds}s` }
+            : { confirmed: false, detail: `not confirmed healthy after ${seconds}s — check Docker directly` };
+        }, "DOCKER_RESTART_FAILED");
+        return;
+      }
+
+      // ADR-013: Postgres backend termination on orders-db — the second real
+      // execution exception, same confined-blast-radius reasoning: only
+      // rolls back the terminated backend's own uncommitted transaction.
+      if (approvedAction.actionType === "kill_postgres_backend") {
+        const pidMatch = approvedAction.targetSystem.name.match(/^backend (\d+)/);
+        const pid = pidMatch ? Number(pidMatch[1]) : NaN;
+        await executeReal(async () => {
+          const outcome = await terminatePostgresBackend(pid);
+          return outcome.confirmedTerminated
+            ? { confirmed: true, detail: `confirmed backend ${pid} terminated` }
+            : { confirmed: false, detail: `backend ${pid} still active after ${Math.round(outcome.waitedMs / 1000)}s — investigate manually` };
+        }, "PG_TERMINATE_FAILED");
         return;
       }
 
@@ -986,8 +1043,8 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       // has. This never varies by actionType — the recommendation (what
       // approvedAction says should happen) is real and source-specific per
       // ADR-010; execution stays this one honest stand-in, since no real
-      // write access to SQL Server/IIS/Docker exists in this environment,
-      // except the ADR-012 exception handled above.
+      // write access to SQL Server/IIS exists in this environment, except
+      // the ADR-012/ADR-013 exceptions handled above.
       // standInFor makes that explicit in the response rather than letting
       // "executed: true" imply the real target system was actually touched.
       stopMonitoringInternal();

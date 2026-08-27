@@ -919,7 +919,7 @@ function formatDuration(ms) {
   return h + 'h ' + (m % 60) + 'm';
 }
 
-const SOURCE_LABELS = { sql: 'SQL Server', cloud: 'Cloud', ssrs: 'SSRS', docker: 'Docker' };
+const SOURCE_LABELS = { sql: 'SQL Server', cloud: 'Cloud', ssrs: 'SSRS', docker: 'Docker', postgres: 'Postgres' };
 
 // One card per incident: identity + evidence at the top, then a collapsed
 // detail region that Troubleshoot fills in and Fix acts on — everything for
@@ -1194,6 +1194,23 @@ async function troubleshootIncident(incidentId, cardEl) {
     actionsRow.style.display = 'flex';
     setCorrelationId(incidentId, 'demo-docker-' + Date.now(), cardEl);
     pushActivity('warning', '<strong>Troubleshoot</strong> — Docker/Superset unreachable');
+    btn.disabled = false;
+    btn.textContent = 'Troubleshoot';
+    return;
+  }
+
+  if (source === 'postgres') {
+    // ADR-013: no AI recommendation call here — /api/recommendation and
+    // /api/correlated-recommendation are SQL Server/SSRS-specific evidence
+    // gatherers, unrelated to this incident's real source. The real,
+    // deterministic diagnosis for a Postgres blocking chain is DBA judgment
+    // (pgRemediationSafety.ts), applied when Fix is clicked, not an AI call
+    // here — same honesty pattern as the Docker branch above.
+    rootCauseEl.style.display = 'block';
+    rootCauseEl.textContent = 'Real blocking query detected via pg_stat_activity/pg_blocking_pids() on orders-db — see the query and blocking chain above. No AI analysis applies here; whether it is safe to terminate is decided by deterministic DBA judgment when you click Fix, not by this step.';
+    actionsRow.style.display = 'flex';
+    setCorrelationId(incidentId, 'demo-postgres-' + Date.now(), cardEl);
+    pushActivity('warning', '<strong>Troubleshoot</strong> — Postgres blocking query detected');
     btn.disabled = false;
     btn.textContent = 'Troubleshoot';
     return;
@@ -1584,25 +1601,21 @@ async function decideRemediation(decision, cardEl) {
       fixBtn.style.display = 'inline-flex';
       delete cardEl.dataset.guardrailItemId;
     } else if (body.executed && body.realExecution) {
-      // ADR-012: the one real execution path — Docker/dev-superset. A real
-      // restart that isn't independently confirmed healthy must not be
-      // reported as resolved, same reasoning as the Resolved panel's own
-      // "Did this actually fix it?" check — only a confirmed recovery
-      // resolves the incident.
-      if (body.confirmedHealthy) {
-        pushActivity(
-          'success',
-          '<strong>Guardrail</strong> approved — restarted <code>dev-superset</code> for real, confirmed healthy in ' +
-            Math.round(body.waitedMs / 1000) + 's'
-        );
+      // ADR-012/ADR-013: real execution paths (Docker/dev-superset,
+      // Postgres/orders-db). A real action that isn't independently
+      // confirmed to have worked must not be reported as resolved, same
+      // reasoning as the Resolved panel's own "Did this actually fix it?"
+      // check — only a confirmed outcome resolves the incident.
+      if (body.realOutcome && body.realOutcome.confirmed) {
+        pushActivity('success', '<strong>Guardrail</strong> approved — ' + escapeHtml(body.realOutcome.detail));
         delete cardEl.dataset.guardrailItemId;
         await resolveIncident(incidentId, cardEl, currentUsername || 'unknown');
       } else {
         resultEl.className = 'banner guardrail-result shown awaiting';
         resultEl.innerHTML =
-          '<div class="banner-title">Restarted, but not confirmed healthy</div>The restart command ran for real, ' +
-          'but Superset did not report healthy within 45 seconds. Check Docker directly, then try Fix again once it recovers.';
-        pushActivity('warning', '<strong>Guardrail</strong> approved — real restart ran, but Superset has not confirmed healthy yet');
+          '<div class="banner-title">Ran, but not confirmed</div>The action ran for real, but ' +
+          escapeHtml(body.realOutcome ? body.realOutcome.detail : 'the outcome could not be confirmed') + '.';
+        pushActivity('warning', '<strong>Guardrail</strong> approved — real action ran, but not yet confirmed');
         approveBtn.style.display = 'none';
         rejectBtn.style.display = 'none';
         fixBtn.style.display = 'inline-flex';
@@ -1617,11 +1630,12 @@ async function decideRemediation(decision, cardEl) {
       delete cardEl.dataset.guardrailItemId;
       await resolveIncident(incidentId, cardEl, currentUsername || 'unknown');
     } else if (body.realExecution) {
-      // The real docker restart command itself failed (daemon unreachable,
-      // container missing) — a genuine anomaly, not a normal waiting state.
+      // The real action itself failed (Docker daemon unreachable/container
+      // missing, or the Postgres terminate command failed) — a genuine
+      // anomaly, not a normal waiting state.
       resultEl.className = 'banner guardrail-result shown blocked';
-      resultEl.innerHTML = '<div class="banner-title">Restart failed</div>' + escapeHtml(body.message || 'The real docker restart command failed.');
-      pushActivity('error', '<strong>Guardrail</strong> approved, but the real restart failed — ' + escapeHtml(body.message || ''));
+      resultEl.innerHTML = '<div class="banner-title">Action failed</div>' + escapeHtml(body.message || 'The real action failed.');
+      pushActivity('error', '<strong>Guardrail</strong> approved, but the real action failed — ' + escapeHtml(body.message || ''));
       approveBtn.style.display = 'none';
       rejectBtn.style.display = 'none';
       fixBtn.style.display = 'inline-flex';

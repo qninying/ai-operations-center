@@ -2,6 +2,7 @@ import { readDmv } from "./dmvReader.js";
 import { readSsrsExecutionLog } from "./ssrsReader.js";
 import { queryLiveCloudBlob } from "./cloudBlobSource.js";
 import { checkSupersetHealth } from "./supersetHealthSource.js";
+import { queryPgActivity } from "./pgActivitySource.js";
 import { notifyOperators } from "./notificationService.js";
 import { isDemoModeEnabled } from "./demoModeGate.js";
 import { logEvent } from "./observability/logger.js";
@@ -24,7 +25,7 @@ import { safeLogEvent } from "./observability/safeLogEvent.js";
 // revealed/not-yet-revealed state, and the push for a given incident fires
 // exactly once, from here, regardless of how many times a client reloads.
 
-export type IncidentSource = "sql" | "cloud" | "ssrs" | "docker";
+export type IncidentSource = "sql" | "cloud" | "ssrs" | "docker" | "postgres";
 export type IncidentSeverity = "warning" | "error" | "critical";
 
 export interface DashboardIncident {
@@ -177,6 +178,35 @@ async function discoverDockerIncidents(): Promise<DashboardIncident[]> {
   }
 }
 
+async function discoverPostgresIncidents(): Promise<DashboardIncident[]> {
+  try {
+    const rows = await queryPgActivity();
+    logEvent({
+      level: "info",
+      event: "incident_feed_source_check",
+      context: { source: "postgres", outcome: "success", rowCount: rows.length },
+    });
+    return rows
+      .filter((row) => row.blocked_by.length > 0)
+      .map((row) => ({
+        id: `postgres:pid:${row.pid}`,
+        source: "postgres" as const,
+        title: `Backend ${row.pid} blocked by ${row.blocked_by[0]}`,
+        detail: `${row.query} on ${row.datname} — ${row.state}${row.wait_event_type ? " · " + row.wait_event_type : ""}`,
+        severity: "error" as const,
+        occurredAt: new Date().toISOString(),
+        sourceMode: "live" as const,
+      }));
+  } catch (error) {
+    logEvent({
+      level: "error",
+      event: "incident_feed_source_check",
+      context: { source: "postgres", outcome: "failure", errorClass: error instanceof Error ? error.name : "Error" },
+    });
+    return [];
+  }
+}
+
 async function pushIncidentNotification(incident: DashboardIncident): Promise<void> {
   try {
     await notifyOperators({
@@ -198,13 +228,14 @@ async function pushIncidentNotification(incident: DashboardIncident): Promise<vo
 }
 
 async function tick(): Promise<void> {
-  const [sql, ssrs, cloud, docker] = await Promise.allSettled([
+  const [sql, ssrs, cloud, docker, postgres] = await Promise.allSettled([
     discoverSqlIncidents(),
     discoverSsrsIncidents(),
     discoverCloudIncidents(),
     discoverDockerIncidents(),
+    discoverPostgresIncidents(),
   ]);
-  const discovered = [sql, ssrs, cloud, docker]
+  const discovered = [sql, ssrs, cloud, docker, postgres]
     .filter((r): r is PromiseFulfilledResult<DashboardIncident[]> => r.status === "fulfilled")
     .flatMap((r) => r.value);
   const discoveredIds = new Set(discovered.map((incident) => incident.id));
