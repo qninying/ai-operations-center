@@ -491,7 +491,14 @@
   .banner.allowed .banner-title { color: var(--success); font-weight: 600; margin-bottom: 4px; }
   .banner.blocked { border-color: var(--danger); background: var(--danger-dim); }
   .banner.blocked .banner-title { color: var(--danger); font-weight: 600; margin-bottom: 4px; }
+  /* Same amber language as .banner.escalation, deliberately — both say "this
+     needs a human," which is expected, working-as-designed behavior, not a
+     failure. Reserve .banner.blocked's red for a violation that would
+     actually be alarming if it ever fired. */
+  .banner.awaiting { border-color: var(--warning-dim); background: var(--warning-dim); }
+  .banner.awaiting .banner-title { color: var(--warning); font-weight: 600; margin-bottom: 4px; }
   .violation { font-family: var(--mono); font-size: 12px; color: var(--danger); margin: 2px 0; }
+  .violation-plain { font-size: 13px; color: var(--text-secondary); margin: 2px 0; }
   .proposed-action { font-size: 13px; margin-bottom: 6px; }
   .proposed-action strong { font-family: var(--mono); font-weight: 600; }
 
@@ -1372,7 +1379,10 @@ async function fixIncident(incidentId, cardEl) {
     // for a long-running transaction, a system session, or a chained
     // blocker. Nothing was proposed, so there's nothing to Approve/Reject.
     if (body.noSafeAction) {
-      resultEl.className = 'banner guardrail-result shown blocked';
+      // A real DBA correctly declining to automate this is a good, honest
+      // outcome, not a failure — same amber language as "awaiting approval"
+      // below, not the red reserved for a genuine anomaly.
+      resultEl.className = 'banner guardrail-result shown awaiting';
       resultEl.innerHTML = '<div class="banner-title">No safe automated remediation</div>' +
         '<div class="proposed-action">' + escapeHtml(body.reason) + '</div>';
       pushActivity('warning', '<strong>Guardrail</strong> found no safe automated action — ' + escapeHtml(body.reason));
@@ -1382,20 +1392,39 @@ async function fixIncident(incidentId, cardEl) {
     cardEl.dataset.guardrailItemId = body.itemId;
     setCorrelationId(incidentId, body.correlationId, cardEl);
     const allowed = body.result.allowed;
-    resultEl.className = 'banner guardrail-result shown ' + (allowed ? 'allowed' : 'blocked');
+    const violations = body.result.violations || [];
+    // NOT_HUMAN_APPROVED and PRODUCTION_WRITE_REQUIRES_APPROVAL are true on
+    // every single Fix click, by design — that's the system correctly
+    // waiting for a person, not a problem it found. Red "Blocked" is
+    // reserved for a violation that would actually be alarming if it ever
+    // fired (ACTION_TYPE_NOT_ALLOWED, NOT_EVIDENCE_LINKED) — which
+    // shouldn't happen given how this app constructs every proposed action,
+    // but is still handled honestly rather than assumed impossible.
+    const AWAITING_APPROVAL_VIOLATIONS = new Set(['NOT_HUMAN_APPROVED', 'PRODUCTION_WRITE_REQUIRES_APPROVAL']);
+    const onlyAwaitingApproval = !allowed && violations.every((v) => AWAITING_APPROVAL_VIOLATIONS.has(v));
+    const stateClass = allowed ? 'allowed' : onlyAwaitingApproval ? 'awaiting' : 'blocked';
+    const title = allowed ? 'Allowed' : onlyAwaitingApproval ? 'Awaiting your approval' : 'Blocked';
+    resultEl.className = 'banner guardrail-result shown ' + stateClass;
     const action = body.proposedAction;
-    let html = '<div class="banner-title">' + (allowed ? 'Allowed' : 'Blocked') + '</div>';
+    let html = '<div class="banner-title">' + title + '</div>';
     if (action) {
       html += '<div class="proposed-action"><strong>' + escapeHtml(action.actionType) + '</strong> on ' +
         '<strong>' + escapeHtml(action.targetSystem.name) + '</strong></div>';
     }
     if (!allowed) {
-      for (const v of body.result.violations) html += '<div class="violation">' + escapeHtml(v) + '</div>';
+      if (onlyAwaitingApproval) {
+        const isProdWrite = violations.includes('PRODUCTION_WRITE_REQUIRES_APPROVAL');
+        html += '<div class="violation-plain">' + (isProdWrite
+          ? 'This is a production write, so it needs your explicit approval before it can run.'
+          : 'This needs your explicit approval before it can run.') + '</div>';
+      } else {
+        for (const v of violations) html += '<div class="violation">' + escapeHtml(v) + '</div>';
+      }
     }
     resultEl.innerHTML = html;
     pushActivity(
-      allowed ? 'success' : 'danger',
-      '<strong>Guardrail</strong> ' + (allowed ? 'allowed' : 'blocked') + ' a fix — awaiting ' + escapeHtml(body.approver)
+      allowed ? 'success' : onlyAwaitingApproval ? 'warning' : 'danger',
+      '<strong>Guardrail</strong> ' + (allowed ? 'allowed' : onlyAwaitingApproval ? 'awaiting approval for' : 'blocked') + ' a fix — awaiting ' + escapeHtml(body.approver)
     );
     // Real bug, not just UX: Fix must not stay clickable once a decision is
     // pending — clicking it again would silently orphan this guardrailItemId
