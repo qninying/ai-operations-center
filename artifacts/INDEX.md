@@ -16,5 +16,6 @@ week by week. Each row links to the artifact in this repo.
 | Week 9 | Reliability Implementation Task — reliability-layer-design.csv | [`reliability-layer-design.csv`](./week-09/reliability-layer-design.csv) | Own project | 8 KB |
 | Week 10 | Implementation Task: Governance Engine — hitl-escalation-path.csv | [`hitl-escalation-path.csv`](./week-10/hitl-escalation-path.csv) | Own project | 5 KB |
 | Week 11 | Build Your Architecture Package — 7-layer-architecture-mapping.csv | [`7-layer-architecture-mapping.csv`](./week-11/7-layer-architecture-mapping.csv) | CoreOps | 6 KB |
+| Week 12 | Build — Your Expo Presentation — coreops_program_inventory.csv | [`coreops-program-inventory.csv`](./week-12/coreops-program-inventory.csv) | CoreOps | 4 KB |
 
-11 artifacts.
+12 artifacts.
