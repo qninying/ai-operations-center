@@ -443,7 +443,19 @@
   }
   .incident-card.error, .incident-card.critical { border-color: var(--danger); background: var(--danger-dim); }
   .incident-card.warning { border-color: var(--warning-dim); background: var(--warning-dim); }
-  .incident-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+  .incident-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); cursor: pointer; }
+  .collapse-toggle {
+    background: none; border: none; cursor: pointer; color: var(--text-tertiary);
+    font-size: 12px; line-height: 1; padding: 2px 6px; border-radius: var(--radius-sm);
+    flex-shrink: 0; transition: transform 0.15s ease;
+  }
+  .collapse-toggle:hover { color: var(--text); background: var(--bg-elevated-2); }
+  .incident-card.collapsed .collapse-toggle { transform: rotate(-90deg); }
+  /* .incident-body wraps everything below the head so it can be hidden as one
+     unit when collapsed — needs its own flex/gap to preserve the spacing
+     .incident-card's own gap used to provide when these were direct children. */
+  .incident-body { display: flex; flex-direction: column; gap: var(--space-2); }
+  .incident-card.collapsed .incident-body { display: none; }
   .incident-id { font-family: var(--mono); font-size: 13px; font-weight: 600; }
   .incident-source {
     display: inline-flex; align-items: center;
@@ -935,38 +947,41 @@ function renderIncidentCard(incident) {
   cell.innerHTML = `
     <div class="incident-head">
       <div><span class="incident-id">${escapeHtml(incident.title)}</span><span class="incident-source">${SOURCE_LABELS[incident.source] || incident.source}</span></div>
+      <button class="collapse-toggle" type="button" aria-expanded="true" title="Collapse this card">▾</button>
     </div>
-    <div class="v-secondary">${escapeHtml(incident.detail)}</div>
-    <div class="incident-actions">
-      <button class="btn btn-secondary troubleshoot-btn">Troubleshoot</button>
-    </div>
-    <div class="incident-detail">
-      <div class="banner error"></div>
-      <div class="confidence-row" style="display:none;">
-        <div class="confidence-number">—</div>
-        <div class="confidence-caption">confidence</div>
+    <div class="incident-body">
+      <div class="v-secondary">${escapeHtml(incident.detail)}</div>
+      <div class="incident-actions">
+        <button class="btn btn-secondary troubleshoot-btn">Troubleshoot</button>
       </div>
-      <div class="root-cause" style="display:none;"></div>
-      <div class="claims-list" style="display:none;"></div>
-      <div class="banner escalation">
-        <div class="banner-title">Escalated to a human operator</div>
-        <div class="escalation-detail"></div>
+      <div class="incident-detail">
+        <div class="banner error"></div>
+        <div class="confidence-row" style="display:none;">
+          <div class="confidence-number">—</div>
+          <div class="confidence-caption">confidence</div>
+        </div>
+        <div class="root-cause" style="display:none;"></div>
+        <div class="claims-list" style="display:none;"></div>
+        <div class="banner escalation">
+          <div class="banner-title">Escalated to a human operator</div>
+          <div class="escalation-detail"></div>
+        </div>
+        <div class="banner ungrounded">
+          <div class="banner-title">Unverified citation — check manually before approving</div>
+          <div class="ungrounded-detail"></div>
+        </div>
+        <div class="incident-actions incident-fix-actions" style="display:none;">
+          <button class="btn btn-primary fix-btn">Fix</button>
+          <button class="btn btn-primary approve-btn" style="display:none;">Approve</button>
+          <button class="btn btn-danger reject-btn" style="display:none;">Reject</button>
+        </div>
+        <div class="banner guardrail-result"></div>
+        <div class="incident-correlation" style="display:none;"></div>
+        <div class="btn-row audit-trail-row" style="display:none; margin-top:var(--space-2);">
+          <button class="btn btn-secondary view-audit-btn">View audit trail</button>
+        </div>
+        <div class="audit-trail-result"></div>
       </div>
-      <div class="banner ungrounded">
-        <div class="banner-title">Unverified citation — check manually before approving</div>
-        <div class="ungrounded-detail"></div>
-      </div>
-      <div class="incident-actions incident-fix-actions" style="display:none;">
-        <button class="btn btn-primary fix-btn">Fix</button>
-        <button class="btn btn-primary approve-btn" style="display:none;">Approve</button>
-        <button class="btn btn-danger reject-btn" style="display:none;">Reject</button>
-      </div>
-      <div class="banner guardrail-result"></div>
-      <div class="incident-correlation" style="display:none;"></div>
-      <div class="btn-row audit-trail-row" style="display:none; margin-top:var(--space-2);">
-        <button class="btn btn-secondary view-audit-btn">View audit trail</button>
-      </div>
-      <div class="audit-trail-result"></div>
     </div>
   `;
   cell.querySelector('.troubleshoot-btn').addEventListener('click', () => troubleshootIncident(incident.id, cell));
@@ -974,7 +989,15 @@ function renderIncidentCard(incident) {
   cell.querySelector('.approve-btn').addEventListener('click', () => decideRemediation('approve', cell));
   cell.querySelector('.reject-btn').addEventListener('click', () => decideRemediation('reject', cell));
   cell.querySelector('.view-audit-btn').addEventListener('click', () => viewAuditTrail(incident.id, cell));
+  cell.querySelector('.incident-head').addEventListener('click', () => toggleIncidentCollapse(cell));
   return cell;
+}
+
+function toggleIncidentCollapse(cell) {
+  const collapsed = cell.classList.toggle('collapsed');
+  const toggleBtn = cell.querySelector('.collapse-toggle');
+  toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+  toggleBtn.title = collapsed ? 'Expand this card' : 'Collapse this card';
 }
 
 // Polls the unified feed and diffs against what's currently rendered — new
