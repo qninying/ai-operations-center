@@ -35,7 +35,7 @@ import { logEvent } from "./observability/logger.js";
 import { checkRemediationGuardrail } from "../../guardrails/remediationGuardrail.js";
 import type { RemediationAction, ApprovalDecision } from "../../guardrails/remediationGuardrail.js";
 import { AuditLog } from "../../guardrails/auditLog.js";
-import { HitlQueue, HitlItemNotFoundError, UnauthorizedDeciderError, MfaRequiredError } from "../../guardrails/hitlQueue.js";
+import { HitlQueue, HitlItemNotFoundError, UnauthorizedDeciderError, MfaRequiredError, AlreadyDecidedError } from "../../guardrails/hitlQueue.js";
 import { TotpVerifier } from "./auth/totp.js";
 import { findAuthenticatedUser, DirectoryUser } from "./auth/userDirectory.js";
 import { SessionStore } from "./auth/sessionStore.js";
@@ -873,6 +873,10 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       }
       if (error instanceof MfaRequiredError) {
         sendJson(res, 403, { error: "MFA_REQUIRED", message: error.message });
+        return;
+      }
+      if (error instanceof AlreadyDecidedError) {
+        sendJson(res, 409, { error: "ALREADY_DECIDED", message: error.message, executed: false });
         return;
       }
       throw error;

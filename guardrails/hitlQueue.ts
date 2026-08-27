@@ -54,6 +54,22 @@ export class MfaRequiredError extends Error {
   }
 }
 
+// Idempotency guard: a repeated decide() call on an already-decided item (a
+// network retry, a double-click, a resubmitted request) must not re-run
+// approval logic or let a caller re-trigger execution — see the root
+// CLAUDE.md's non-negotiable "every side effect is idempotent" rule, and
+// httpServer.ts's POST /api/guardrail/decide, the only path that actually
+// executes a remediation.
+export class AlreadyDecidedError extends Error {
+  readonly errorClass = "AlreadyDecidedError" as const;
+  constructor(readonly itemId: string, readonly existingStatus: HitlItemStatus) {
+    super(`Item "${itemId}" was already decided (status: "${existingStatus}") and cannot be decided again.`);
+    this.name = "AlreadyDecidedError";
+  }
+}
+
+const DECIDED_STATUSES: readonly HitlItemStatus[] = ["approved", "rejected", "needs_info"];
+
 export interface HitlQueueOptions {
   decisionWindowMs?: number;
   now?: () => number;
@@ -152,6 +168,21 @@ export class HitlQueue {
   // rather than in abacEvaluator.ts.
   decide(itemId: string, decision: HitlDecision, decidedBy: string, mfa: boolean): QueueItem {
     const item = this.get(itemId);
+
+    if (DECIDED_STATUSES.includes(item.status)) {
+      this.auditLog.record(
+        buildHitlAuditEntry(
+          "hitl_decision_rejected",
+          item.itemId,
+          "rejected_already_decided",
+          decidedBy,
+          { attemptedDecision: decision, existingStatus: item.status, existingDecidedBy: item.decidedBy },
+          this.generateId(),
+          item.correlationId
+        )
+      );
+      throw new AlreadyDecidedError(item.itemId, item.status);
+    }
 
     if (decidedBy !== item.activeApprover) {
       this.auditLog.record(

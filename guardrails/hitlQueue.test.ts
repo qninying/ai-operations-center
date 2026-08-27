@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { AuditLog } from "./auditLog.js";
-import { HitlQueue, UnauthorizedDeciderError, MfaRequiredError } from "./hitlQueue.js";
+import { HitlQueue, UnauthorizedDeciderError, MfaRequiredError, AlreadyDecidedError } from "./hitlQueue.js";
 
 function makeClock(startAt = 0) {
   let time = startAt;
@@ -173,5 +173,66 @@ describe("HitlQueue", () => {
     clock.advance(10_000_000); // long past the window
 
     expect(queue.checkForTimeout(item.itemId).status).toBe("approved");
+  });
+
+  it("idempotency: a repeated decide() call on an already-approved item is rejected, not silently re-run — a network retry or double-click must not re-trigger execution", () => {
+    const auditLog = new AuditLog();
+    const queue = new HitlQueue(auditLog, { generateId: makeIdSequence("item") });
+    const item = queue.enqueue({
+      request: {},
+      correlationId: "corr-9",
+      contextPackage: "",
+      primaryApprover: "alex",
+      backupApprover: "jordan",
+    });
+
+    const first = queue.decide(item.itemId, "approve", "alex", true);
+    expect(first.status).toBe("approved");
+
+    expect(() => queue.decide(item.itemId, "approve", "alex", true)).toThrow(AlreadyDecidedError);
+
+    // The item's real state is untouched by the rejected repeat attempt.
+    const stillApproved = queue.checkForTimeout(item.itemId);
+    expect(stillApproved.status).toBe("approved");
+    expect(stillApproved.decidedBy).toBe("alex");
+  });
+
+  it("idempotency: applies to reject and needs_info too, not just approve", () => {
+    const auditLog = new AuditLog();
+    const queue = new HitlQueue(auditLog, { generateId: makeIdSequence("item") });
+    const item = queue.enqueue({
+      request: {},
+      correlationId: "corr-10",
+      contextPackage: "",
+      primaryApprover: "alex",
+      backupApprover: "jordan",
+    });
+
+    queue.decide(item.itemId, "reject", "alex", true);
+
+    expect(() => queue.decide(item.itemId, "approve", "alex", true)).toThrow(AlreadyDecidedError);
+  });
+
+  it("a repeated decide() attempt is itself audited, and does not produce a duplicate hitl_decision entry", () => {
+    const auditLog = new AuditLog();
+    const queue = new HitlQueue(auditLog, { generateId: makeIdSequence("item") });
+    const item = queue.enqueue({
+      request: {},
+      correlationId: "corr-11",
+      contextPackage: "",
+      primaryApprover: "alex",
+      backupApprover: "jordan",
+    });
+
+    queue.decide(item.itemId, "approve", "alex", true);
+    expect(() => queue.decide(item.itemId, "approve", "alex", true)).toThrow(AlreadyDecidedError);
+
+    const entries = auditLog.forCorrelationId("corr-11");
+    const decisions = entries.filter((e) => e.entryType === "hitl_event" && e.hitlEventType === "hitl_decision");
+    const rejections = entries.filter(
+      (e) => e.entryType === "hitl_event" && e.hitlEventType === "hitl_decision_rejected" && e.outcome === "rejected_already_decided"
+    );
+    expect(decisions.length).toBe(1); // the real approval, exactly once
+    expect(rejections.length).toBe(1); // the repeat attempt, logged as rejected, not silently dropped
   });
 });
