@@ -1583,6 +1583,31 @@ async function decideRemediation(decision, cardEl) {
       rejectBtn.style.display = 'none';
       fixBtn.style.display = 'inline-flex';
       delete cardEl.dataset.guardrailItemId;
+    } else if (body.executed && body.realExecution) {
+      // ADR-012: the one real execution path — Docker/dev-superset. A real
+      // restart that isn't independently confirmed healthy must not be
+      // reported as resolved, same reasoning as the Resolved panel's own
+      // "Did this actually fix it?" check — only a confirmed recovery
+      // resolves the incident.
+      if (body.confirmedHealthy) {
+        pushActivity(
+          'success',
+          '<strong>Guardrail</strong> approved — restarted <code>dev-superset</code> for real, confirmed healthy in ' +
+            Math.round(body.waitedMs / 1000) + 's'
+        );
+        delete cardEl.dataset.guardrailItemId;
+        await resolveIncident(incidentId, cardEl, currentUsername || 'unknown');
+      } else {
+        resultEl.className = 'banner guardrail-result shown awaiting';
+        resultEl.innerHTML =
+          '<div class="banner-title">Restarted, but not confirmed healthy</div>The restart command ran for real, ' +
+          'but Superset did not report healthy within 45 seconds. Check Docker directly, then try Fix again once it recovers.';
+        pushActivity('warning', '<strong>Guardrail</strong> approved — real restart ran, but Superset has not confirmed healthy yet');
+        approveBtn.style.display = 'none';
+        rejectBtn.style.display = 'none';
+        fixBtn.style.display = 'inline-flex';
+        delete cardEl.dataset.guardrailItemId;
+      }
     } else if (body.executed) {
       const standInNote = body.standInFor
         ? ' — demo execution restarted local monitoring, standing in for <strong>' + escapeHtml(body.standInFor) + '</strong> (no real write access to that system exists here)'
@@ -1591,6 +1616,16 @@ async function decideRemediation(decision, cardEl) {
       loadMonitorStatus();
       delete cardEl.dataset.guardrailItemId;
       await resolveIncident(incidentId, cardEl, currentUsername || 'unknown');
+    } else if (body.realExecution) {
+      // The real docker restart command itself failed (daemon unreachable,
+      // container missing) — a genuine anomaly, not a normal waiting state.
+      resultEl.className = 'banner guardrail-result shown blocked';
+      resultEl.innerHTML = '<div class="banner-title">Restart failed</div>' + escapeHtml(body.message || 'The real docker restart command failed.');
+      pushActivity('error', '<strong>Guardrail</strong> approved, but the real restart failed — ' + escapeHtml(body.message || ''));
+      approveBtn.style.display = 'none';
+      rejectBtn.style.display = 'none';
+      fixBtn.style.display = 'inline-flex';
+      delete cardEl.dataset.guardrailItemId;
     } else {
       resultEl.className = 'banner guardrail-result shown blocked';
       let html = '<div class="banner-title">Approved but not executed</div>';

@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { readDmv } from "./dmvReader.js";
 import { assessBlockingSessionRemediation } from "./sqlRemediationSafety.js";
+import { restartSupersetContainer, DockerRestartFailedError } from "./dockerExecutor.js";
 import { buildDashboardSummary, UnknownRoleError } from "./dashboardSummary.js";
 import {
   generateRecommendation,
@@ -908,11 +909,85 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         return;
       }
 
+      // One narrow real-execution exception (ADR-012): Docker/dev-superset is
+      // the single target this environment has direct, unprivileged control
+      // over — a local dev container, no new credential, no production
+      // system touched. Every other action/source falls through unchanged to
+      // the honest stand-in below (ADR-010).
+      if (approvedAction.actionType === "restart_service" && approvedAction.targetSystem.name === "dev-superset") {
+        try {
+          const outcome = await restartSupersetContainer();
+          pending.executedAt = new Date().toISOString();
+          logEvent({
+            level: "info",
+            event: "guardrail_executed",
+            context: {
+              itemId,
+              actionType: approvedAction.actionType,
+              realExecution: true,
+              confirmedHealthy: outcome.confirmedHealthy,
+              waitedMs: outcome.waitedMs,
+            },
+          });
+          recordSystemEvent(
+            auditLog,
+            session.username,
+            "guardrail_executed",
+            "success",
+            {
+              actionType: approvedAction.actionType,
+              targetSystem: approvedAction.targetSystem.name,
+              realExecution: true,
+              confirmedHealthy: outcome.confirmedHealthy,
+              waitedMs: outcome.waitedMs,
+            },
+            item.correlationId
+          );
+          sendJson(res, 200, {
+            itemId,
+            status: item.status,
+            result,
+            executed: true,
+            executedAt: pending.executedAt,
+            realExecution: true,
+            confirmedHealthy: outcome.confirmedHealthy,
+            waitedMs: outcome.waitedMs,
+          });
+        } catch (error) {
+          const errorClass = error instanceof DockerRestartFailedError ? error.errorClass : "Error";
+          const message = error instanceof Error ? error.message : String(error);
+          logEvent({
+            level: "error",
+            event: "guardrail_execution_failed",
+            context: { itemId, actionType: approvedAction.actionType, errorClass },
+          });
+          recordSystemEvent(
+            auditLog,
+            session.username,
+            "guardrail_executed",
+            "failure",
+            { actionType: approvedAction.actionType, targetSystem: approvedAction.targetSystem.name, realExecution: true, errorClass },
+            item.correlationId
+          );
+          sendJson(res, 200, {
+            itemId,
+            status: item.status,
+            result,
+            executed: false,
+            realExecution: true,
+            error: "DOCKER_RESTART_FAILED",
+            message,
+          });
+        }
+        return;
+      }
+
       // Real execution: restart the one real, reversible service this process
       // has. This never varies by actionType — the recommendation (what
       // approvedAction says should happen) is real and source-specific per
       // ADR-010; execution stays this one honest stand-in, since no real
-      // write access to SQL Server/IIS/Docker exists in this environment.
+      // write access to SQL Server/IIS/Docker exists in this environment,
+      // except the ADR-012 exception handled above.
       // standInFor makes that explicit in the response rather than letting
       // "executed: true" imply the real target system was actually touched.
       stopMonitoringInternal();
