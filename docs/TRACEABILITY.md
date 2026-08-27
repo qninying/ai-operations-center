@@ -24,5 +24,6 @@ none, because it is context rather than work.
 | REQ-016 | Functional | must | STORY-008 |
 | REQ-017 | Non-functional | should | _(fulfilled directly — `mcp-server/src/correlatedRecommendationService.ts`, no platform story assigned)_ |
 | REQ-018 | Constraint | must | _(constraint — no story)_ |
+| REQ-019 | Safety | should | _(fulfilled directly — `mcp-server/src/evidenceGroundingCheck.ts`, no platform story assigned)_ |
 
 ✅ Every must-have requirement is fulfilled by at least one story.

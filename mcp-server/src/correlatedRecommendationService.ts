@@ -4,6 +4,8 @@ import { querySsrsExecutionLog } from "./ssrsLiveSource.js";
 import { analyzeIncidentRootCause } from "./rootCauseAgent.js";
 import type { EvidenceItem, Incident, RootCauseResult } from "./rootCauseAgent.js";
 import { InvalidDataFormatError } from "./recommendationService.js";
+import { checkEvidenceGrounding } from "./evidenceGroundingCheck.js";
+import type { GroundingResult } from "./evidenceGroundingCheck.js";
 import { logEvent } from "./observability/logger.js";
 import { recordSystemEvent } from "./observability/auditWrite.js";
 import type { AuditLog } from "../../guardrails/auditLog.js";
@@ -127,6 +129,7 @@ export interface CorrelatedRecommendationResult extends RootCauseResult {
   // single-source fallback dressed up as one.
   partialCorrelation: boolean;
   unavailableSources: EvidenceSourceName[];
+  grounding: GroundingResult;
 }
 
 export interface GenerateCorrelatedRecommendationOptions {
@@ -237,5 +240,6 @@ export async function generateCorrelatedRecommendation(
     evidence: [...dmvEvidence, ...ssrsEvidence],
   };
   const result = await analyzeFn(incident);
-  return { ...result, partialCorrelation: unavailableSources.length > 0, unavailableSources };
+  const grounding = checkEvidenceGrounding(incident.evidence, result.evidenceIdsUsed);
+  return { ...result, partialCorrelation: unavailableSources.length > 0, unavailableSources, grounding };
 }

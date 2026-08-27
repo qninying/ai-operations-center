@@ -50,7 +50,7 @@ Then open `http://localhost:8787/console?role=it-manager`.
 ## What's real
 
 Every claim below has a test behind it and was verified against a real running
-server, not just unit-tested. Current counts: **318 tests passing** — 248 in
+server, not just unit-tested. Current counts: **325 tests passing** — 255 in
 `mcp-server/`, 64 in `guardrails/`, 6 in `frontend/`.
 
 **Governance & security**
@@ -83,6 +83,15 @@ server, not just unit-tested. Current counts: **318 tests passing** — 248 in
   differential-gathering, human-escalation) is configurable via env var,
   validated and fail-fast on a malformed value rather than silently disabling
   the gate it controls — `mcp-server/src/confidenceThresholds.ts`.
+- An evidence grounding check (`mcp-server/src/evidenceGroundingCheck.ts`)
+  cross-checks every AI recommendation's cited evidence IDs against the
+  evidence it was actually given, flagging a fabricated citation or a
+  diagnosis that cited nothing at all — closing the gap named by the hardest
+  question in Expo demo-prep review: what stops a confident-but-wrong
+  recommendation from reaching a human approver with no independent signal.
+  Live-verified against a real Claude response (no false positive) and a
+  deliberate break test proving the failure path actually renders — see
+  [ADR-008](docs/ADR-008-evidence-grounding-check.md).
 
 **Audit trail**
 - Every decision and action is recorded immutably and idempotently by ID
@@ -133,7 +142,7 @@ server, not just unit-tested. Current counts: **318 tests passing** — 248 in
 
 ## Architecture decisions
 
-Seven ADRs, each with real alternatives considered and rejected, not just the
+Eight ADRs, each with real alternatives considered and rejected, not just the
 choice made:
 
 | ADR | Decision |
@@ -145,6 +154,7 @@ choice made:
 | [ADR-005](docs/ADR-005-audit-trail-persistence.md) | Append-only JSONL persistence for the audit trail, chosen over SQLite to avoid a first-ever database dependency; size-based rotation into numbered archives over time-based or deletion, added in a later addendum |
 | [ADR-006](docs/ADR-006-totp-mfa.md) | Real TOTP-based MFA over an ntfy-delivered OTP or WebAuthn — hand-rolled with `node:crypto`, and login itself requiring TOTP makes every session inherently MFA-verified, closing a hardcoded placeholder |
 | [ADR-007](docs/ADR-007-second-approver-identity.md) | A real second approver identity over a general N-user credential store — mirrors the existing single-user pattern for exactly the two roles the escalation model actually has |
+| [ADR-008](docs/ADR-008-evidence-grounding-check.md) | A citation-existence check, generic over opaque evidence, over a second "critic" LLM call (not actually independent) or per-source semantic verification (couples a shared module to three separately-evolving schemas) |
 
 The full architecture package — a written summary, layer diagrams, and a
 trust-boundary data-flow diagram — is in

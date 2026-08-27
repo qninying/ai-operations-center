@@ -2,6 +2,8 @@ import { z } from "zod";
 import { queryLiveCloudBlob } from "./cloudBlobSource.js";
 import { analyzeIncidentRootCause } from "./rootCauseAgent.js";
 import type { EvidenceItem, Incident, RootCauseResult } from "./rootCauseAgent.js";
+import { checkEvidenceGrounding } from "./evidenceGroundingCheck.js";
+import type { GroundingResult } from "./evidenceGroundingCheck.js";
 import { logEvent } from "./observability/logger.js";
 import { recordSystemEvent } from "./observability/auditWrite.js";
 import type { AuditLog } from "../../guardrails/auditLog.js";
@@ -89,7 +91,7 @@ export async function generateCloudRecommendation(
   incidentId: string,
   incidentDescription: string,
   options: GenerateCloudRecommendationOptions = {}
-): Promise<RootCauseResult> {
+): Promise<RootCauseResult & { grounding: GroundingResult }> {
   const queryFn = options.queryFn ?? queryLiveCloudBlob;
   const analyzeFn = options.analyzeFn ?? analyzeIncidentRootCause;
 
@@ -129,5 +131,7 @@ export async function generateCloudRecommendation(
   recordSystemEvent(options.auditLog, "cloudRecommendationService", "cloud_recommendation_data_access", "success", { recordCount: evidence.length }, incidentId);
 
   const incident: Incident = { id: incidentId, description: incidentDescription, evidence };
-  return analyzeFn(incident);
+  const result = await analyzeFn(incident);
+  const grounding = checkEvidenceGrounding(evidence, result.evidenceIdsUsed);
+  return { ...result, grounding };
 }

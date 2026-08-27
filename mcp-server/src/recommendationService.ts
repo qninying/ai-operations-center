@@ -2,6 +2,8 @@ import { z } from "zod";
 import { queryLiveDmv } from "./dmvLiveSource.js";
 import { analyzeIncidentRootCause } from "./rootCauseAgent.js";
 import type { EvidenceItem, Incident, RootCauseResult } from "./rootCauseAgent.js";
+import { checkEvidenceGrounding } from "./evidenceGroundingCheck.js";
+import type { GroundingResult } from "./evidenceGroundingCheck.js";
 import { logEvent } from "./observability/logger.js";
 import { recordSystemEvent } from "./observability/auditWrite.js";
 import type { AuditLog } from "../../guardrails/auditLog.js";
@@ -93,7 +95,7 @@ export async function generateRecommendation(
   incidentId: string,
   incidentDescription: string,
   options: GenerateRecommendationOptions = {}
-): Promise<RootCauseResult> {
+): Promise<RootCauseResult & { grounding: GroundingResult }> {
   const queryFn = options.queryFn ?? queryLiveDmv;
   const analyzeFn = options.analyzeFn ?? analyzeIncidentRootCause;
 
@@ -133,5 +135,7 @@ export async function generateRecommendation(
   recordSystemEvent(options.auditLog, "recommendationService", "recommendation_data_access", "success", { rowCount: evidence.length }, incidentId);
 
   const incident: Incident = { id: incidentId, description: incidentDescription, evidence };
-  return analyzeFn(incident);
+  const result = await analyzeFn(incident);
+  const grounding = checkEvidenceGrounding(evidence, result.evidenceIdsUsed);
+  return { ...result, grounding };
 }

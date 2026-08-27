@@ -394,6 +394,8 @@
   .banner.shown { display: block; }
   .banner.escalation { border-color: var(--warning-dim); background: var(--warning-dim); }
   .banner.escalation .banner-title { color: var(--warning); font-weight: 600; margin-bottom: 4px; }
+  .banner.ungrounded { border-color: var(--danger-dim); background: var(--danger-dim); }
+  .banner.ungrounded .banner-title { color: var(--danger); font-weight: 600; margin-bottom: 4px; }
   .banner.error { border-color: #4d2129; background: var(--danger-dim); color: #ffb3bd; }
   .banner.allowed { border-color: var(--success-dim); background: var(--success-dim); }
   .banner.allowed .banner-title { color: var(--success); font-weight: 600; margin-bottom: 4px; }
@@ -837,6 +839,10 @@ function renderIncidentCard(incident) {
         <div class="banner-title">Escalated to a human operator</div>
         <div class="escalation-detail"></div>
       </div>
+      <div class="banner ungrounded">
+        <div class="banner-title">Unverified citation — check manually before approving</div>
+        <div class="ungrounded-detail"></div>
+      </div>
       <div class="incident-actions incident-fix-actions" style="display:none;">
         <button class="btn btn-primary fix-btn">Fix</button>
         <button class="btn btn-primary approve-btn" style="display:none;">Approve</button>
@@ -1052,6 +1058,8 @@ async function troubleshootIncident(incidentId, cardEl) {
   const rootCauseEl = cardEl.querySelector('.root-cause');
   const escalationBanner = cardEl.querySelector('.banner.escalation');
   const escalationDetail = cardEl.querySelector('.escalation-detail');
+  const ungroundedBanner = cardEl.querySelector('.banner.ungrounded');
+  const ungroundedDetail = cardEl.querySelector('.ungrounded-detail');
   const actionsRow = cardEl.querySelector('.incident-fix-actions');
   const source = cardEl.dataset.source;
   const kpiConfidence = $('kpi-confidence');
@@ -1062,6 +1070,7 @@ async function troubleshootIncident(incidentId, cardEl) {
   detail.classList.add('shown');
   errorBanner.className = 'banner error';
   escalationBanner.className = 'banner escalation';
+  ungroundedBanner.className = 'banner ungrounded';
 
   if (source === 'docker') {
     rootCauseEl.style.display = 'block';
@@ -1112,6 +1121,21 @@ async function troubleshootIncident(incidentId, cardEl) {
       pushActivity('warning', '<strong>Escalated</strong> — confidence ' + escapeHtml(body.confidence) + '%, operator notified');
     } else {
       pushActivity('success', '<strong>Troubleshoot</strong> — ' + escapeHtml(body.confidence) + '% confidence');
+    }
+
+    // Independent of confidence/escalation — a recommendation can be both
+    // escalated AND ungrounded, or high-confidence but ungrounded, since these
+    // check different things (how sure the model is vs. whether what it cited
+    // is real). See evidenceGroundingCheck.ts / ADR-008.
+    if (body.grounding && !body.grounding.grounded) {
+      const GROUNDING_MESSAGES = {
+        CITED_EVIDENCE_NOT_FOUND: 'cites evidence that was never given to it',
+        NO_EVIDENCE_CITED: 'gave a diagnosis without citing any of the evidence available',
+      };
+      const reasons = body.grounding.violations.map((v) => GROUNDING_MESSAGES[v] || v).join('; ');
+      ungroundedBanner.className = 'banner ungrounded shown';
+      ungroundedDetail.textContent = 'This recommendation ' + reasons + ' — verify the evidence yourself before approving.';
+      pushActivity('danger', '<strong>Unverified citation</strong> — ' + escapeHtml(reasons));
     }
   } catch (e) {
     errorBanner.className = 'banner error shown';

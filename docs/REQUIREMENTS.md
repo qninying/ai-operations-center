@@ -64,6 +64,31 @@ The system must support rollback capabilities for low-risk, reversible tasks.
 
 Fulfilled by: STORY-011
 
+### REQ-019 — Safety · should
+
+The system must verify that an AI recommendation's cited evidence is real
+before presenting it as an actionable, approvable recommendation.
+
+Fulfilled directly, not through a platform story (this requirement was never
+assigned a STORY id in `.colaberry/plan.json`, and was identified after the
+plan was written — see ADR-008). `mcp-server/src/evidenceGroundingCheck.ts`
+cross-checks `evidenceIdsUsed` against the evidence the model was actually
+given, flagging a citation to evidence that doesn't exist, or a diagnosis
+that cites nothing when real evidence was available. Wired into all three
+recommendation pipelines (`recommendationService.ts`,
+`cloudRecommendationService.ts`, `correlatedRecommendationService.ts`) and
+surfaced as an independent "unverified citation" banner in `dashboard.html`,
+alongside (not instead of) the existing confidence/escalation signals.
+
+This closes a real gap named directly by a hard question in demo-prep review
+(2026-08-27): the guardrail (`guardrails/remediationGuardrail.ts`) checks
+that an action is evidence-*linked* and human-approved, never that the
+citation is genuine — a confident, fluent, but fabricated citation would
+previously reach a human approver with no independent signal at all. This
+does not verify causal correctness of the diagnosis itself (that a cited,
+real piece of evidence actually supports the stated conclusion) — that
+remains open, named explicitly in ADR-008 as future work, not solved here.
+
 ## Audit Trail
 
 ### REQ-005 — Safety · must
