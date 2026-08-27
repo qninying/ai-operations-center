@@ -1,0 +1,134 @@
+---
+name: demo-postgres-incident
+description: Trigger a real Postgres blocking-query incident for CoreOps live demos by seeding a genuine lock-contention scenario in the dev-postgres container, and cancel it early if needed. Use when the user says "let's block a Postgres query", "trigger the postgres incident", "show the postgres incident live", "seed a blocking query", or wants to demo the Troubleshoot/Fix/Approve flow against a real Postgres backend kill in front of an audience.
+---
+
+# CoreOps Postgres Incident Demo
+
+Seeds a real blocking query in the dedicated `dev-postgres` container on command,
+mid-demo, so a genuine blocked-backend incident appears in the live dashboard — the
+presenter then clicks Troubleshoot / Fix / Approve themselves, in their own browser,
+in front of the audience, and CoreOps runs a real `pg_terminate_backend()` on
+approval. This is a live database lock, not a simulated one: two real `pg`
+connections actually contend for the same row, detected via `pg_stat_activity` /
+`pg_blocking_pids()` (polled every 3s server-side, dashboard refreshes every 5s), and
+the proposed fix (`kill_postgres_backend`) is gated by real DBA judgment
+(`pgRemediationSafety.ts`, ADR-013) before it's ever offered.
+
+**Separate from `demo-docker-incident`.** Different container (`dev-postgres`, not
+`dev-superset`), different mechanism (a seeded lock, not a stopped container),
+different real execution (`pg_terminate_backend`, not `docker restart`). Both share
+the same honesty discipline (execution and confirmation are separate steps; only a
+confirmed outcome resolves the incident) but nothing else overlaps.
+
+**Unlike Docker's fixed `docker:superset` id, this needs no recurrence fix.**
+Postgres incident ids are `postgres:pid:${pid}` — a real OS-level process id, unique
+to this one occurrence — so `markResolved()`'s permanent-suppression behavior never
+causes the "can only fire once per server process" problem `demo-docker-incident`
+had to work around (see that skill's own notes on the fix). A fresh seed always
+produces a fresh, real pid.
+
+## Trigger the incident ("let's block a postgres query", "trigger the postgres incident")
+
+1. Make sure `dev-postgres` is actually up — don't assume it's already running:
+   ```
+   docker ps --filter "name=coreops-dev-postgres" --format "{{.Names}}"
+   ```
+   If that returns nothing, start it, from `mcp-server/dev-postgres/`:
+   ```
+   docker compose up -d
+   ```
+   Wait a couple seconds and confirm with the same `docker ps` check before moving on
+   — a container that's still initializing can't take real connections yet.
+
+2. **Seed a real blocking scenario in the background, via a named wrapper script**,
+   not a bare backgrounded `tsx` call — `$!` capture is unreliable in this sandboxed
+   shell (confirmed directly by `demo-start`'s own fault-injector steps for the same
+   reason), and a named script gives `pgrep -f`/`pkill -f` an unambiguous target for
+   the cancel step below:
+   ```
+   cat > /tmp/coreops-pg-blocking-seed.sh <<'EOF'
+   #!/bin/sh
+   cd "<absolute path to mcp-server>"
+   npx tsx src/seedPostgresBlockingScenario.ts "${1:-90}"
+   EOF
+   chmod +x /tmp/coreops-pg-blocking-seed.sh
+   nohup /tmp/coreops-pg-blocking-seed.sh 90 > /tmp/coreops-pg-blocking-seed.log 2>&1 &
+   disown
+   ```
+   Substitute the real absolute path to this repo's `mcp-server/` directory. 90
+   seconds is a generous default hold — long enough that a presenter narrating
+   between clicks won't have it self-resolve before they reach Approve; pass a
+   different number as the script's argument if the user asks for more or less time
+   ("give me two minutes" → 120).
+
+3. Tell the user plainly: the incident should appear on **their own** dashboard soon
+   — timing depends on demo mode, same as `demo-docker-incident` (immediate outside
+   demo mode; a randomized 3-45s reveal delay under `DEMO_MODE=true`, which is how
+   `demo-start` launches the server). Don't drive their browser for them and don't
+   claim you saw it render. If they ask you to confirm it registered server-side, you
+   can check via an authenticated `/api/incidents` call only if you already have a
+   valid, unexpired session cookie (see `demo-start` step 4) — or confirm the real
+   lock directly: `SELECT pid, pg_blocking_pids(pid) FROM pg_stat_activity WHERE
+   pg_blocking_pids(pid) != '{}'` against `dev-postgres` (host `localhost`, port
+   `5434`, db `orders`, user/password `app`/`app`).
+
+4. **The demo's natural ending is the presenter clicking Approve** — that runs a
+   real `pg_terminate_backend()` on the blocker, which kills the seed script's own
+   Session A connection out from under it. The script's own process will then exit
+   with an uncaught `FATAL: terminating connection due to administrator command`
+   error — expected, not a bug, and further proof the kill was real (confirmed live
+   2026-08-27). Nothing to clean up afterward; the process is already gone.
+
+## Cancel early ("stop the postgres demo", "cancel the blocking query", never reached Approve)
+
+If the presenter doesn't go through Fix/Approve and wants to end the scenario
+without waiting out the full hold time:
+
+```
+pkill -f "coreops-pg-blocking-seed.sh"
+pkill -f "seedPostgresBlockingScenario.ts"
+```
+
+Killing the script's process kills its Postgres connection, which Postgres itself
+detects as a lost connection and rolls back the open transaction — the lock releases
+on its own, the same real mechanism as a graceful commit, just abrupt. Both `pkill`s
+are safe to run even if nothing is scheduled (a no-op `pkill` just exits non-zero
+silently). Confirm it actually cleared if asked:
+```
+docker exec coreops-dev-postgres psql -U app -d orders -c \
+  "SELECT pid FROM pg_stat_activity WHERE pg_blocking_pids(pid) != '{}';"
+```
+An empty result confirms no blocking backend remains.
+
+## What this proves, and what it doesn't
+
+**Proves**: a genuine row-lock contention is detected via Postgres's own real
+introspection (`pg_stat_activity`/`pg_blocking_pids()`), diagnosed honestly (no AI
+call for Postgres either — `troubleshootIncident()` says so directly, same pattern
+as Docker), assessed by real, deterministic DBA judgment
+(`pgRemediationSafety.ts`), and — once approved — actually resolved by a real
+`pg_terminate_backend()` call, independently reconfirmed against `pg_stat_activity`
+before the incident is allowed to show as resolved.
+
+**Doesn't prove**: that every blocking query is safe to auto-kill. The seeded
+scenario here is deliberately the simple, safe case (a short-lived client backend,
+no system process, no chain) — `pgRemediationSafety.ts`'s other rules (a long-running
+query, a system backend, a chained blocker) are covered by its own unit tests and by
+`ADR-013`'s live break test against a real Postgres background worker, not by this
+seed script.
+
+## Related
+
+- `demo-docker-incident` — the sibling skill for the Docker/Superset real-execution
+  case. Same demo shape, different container, different mechanism.
+- `demo-start` / `demo-stop` — the full-session bookends. Don't currently manage
+  `dev-postgres/`'s lifecycle (unlike `dev-superset/`, which `demo-start` step 8
+  starts) — start/stop it directly as this skill's own step 1 describes, or extend
+  `demo-start`/`demo-stop` separately if `dev-postgres` should become part of every
+  demo session by default.
+- `docs/ADR-013-real-postgres-remediation.md` — the real DBA judgment and execution
+  design this skill exercises.
+- `mcp-server/src/seedPostgresBlockingScenario.ts` — the real two-connection seed
+  script this skill schedules. Can be run by hand instead with a different hold time
+  if the presenter wants to trigger it live on camera with specific timing.
