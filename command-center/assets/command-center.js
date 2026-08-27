@@ -16,6 +16,8 @@ const TABS = [
 ];
 
 const MODE_KEY = "cc-mode"; // "sample" | "real"
+const THEME_KEY = "coreops-theme"; // same storage key as the main dashboard,
+// so a preference set on either surface applies to both.
 
 function getMode() {
   return localStorage.getItem(MODE_KEY) || "sample";
@@ -24,6 +26,29 @@ function getMode() {
 function setMode(mode) {
   localStorage.setItem(MODE_KEY, mode);
   location.reload();
+}
+
+function getTheme() {
+  const explicit = document.documentElement.getAttribute("data-theme");
+  if (explicit === "light" || explicit === "dark") return explicit;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+// Applies instantly via the CSS custom properties already in place — no
+// reload needed, unlike setMode() above, which changes what data is shown
+// rather than just how it looks.
+function setTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
+  renderThemeToggleIcon();
+}
+
+const SUN_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const MOON_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>';
+
+function renderThemeToggleIcon() {
+  const btn = document.getElementById("cc-theme-toggle");
+  if (btn) btn.innerHTML = getTheme() === "dark" ? MOON_ICON : SUN_ICON;
 }
 
 async function fetchJson(path) {
@@ -140,6 +165,14 @@ function renderChrome(activeTabId, dataAsOf) {
     stamp.textContent = dataAsOf.text;
     stamp.className = "cc-data-as-of" + (dataAsOf.stale ? " cc-stale" : "");
   }
+
+  const themeToggle = document.getElementById("cc-theme-toggle");
+  if (themeToggle) {
+    renderThemeToggleIcon();
+    themeToggle.addEventListener("click", () => {
+      setTheme(getTheme() === "dark" ? "light" : "dark");
+    });
+  }
 }
 
 // init(tabId, renderFn): fetches data, renders shared chrome, then calls
@@ -156,4 +189,5 @@ async function init(tabId, renderFn) {
 window.CommandCenter = {
   TABS, getMode, setMode, loadData, formatDataAsOf, renderChrome, sampleBadge,
   init, getParam, esc: escapeHtml, verificationForRequirement, statusDot,
+  getTheme, setTheme,
 };

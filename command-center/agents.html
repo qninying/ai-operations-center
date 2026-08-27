@@ -2,14 +2,25 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('coreops-theme');
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', saved);
+      }
+    } catch (e) {}
+  })();
+</script>
 <title>CoreOps — AI Agents</title>
-<link rel="stylesheet" href="assets/command-center.css?v=1" />
+<link rel="stylesheet" href="assets/command-center.css?v=2" />
 </head>
 <body>
   <header class="cc-header">
     <div class="cc-header-top">
       <div class="cc-brand">CoreOps Command Center</div>
       <div class="cc-mode-toggle" id="cc-mode-toggle"></div>
+      <button class="cc-theme-toggle" id="cc-theme-toggle" aria-label="Switch between day and night theme" title="Day / Night"></button>
     </div>
     <div class="cc-data-as-of" id="cc-data-as-of">Loading…</div>
     <nav class="cc-nav" id="cc-nav"></nav>
@@ -19,7 +30,7 @@
     <p class="cc-page-desc">The plan doesn't carry a scoped agent roster yet, so this tab is built from who owns each story — owners, not agents.</p>
     <div id="cc-content">Loading…</div>
   </main>
-  <script src="assets/command-center.js?v=3"></script>
+  <script src="assets/command-center.js?v=4"></script>
   <script>
   (function () {
     const { esc, getParam } = CommandCenter;

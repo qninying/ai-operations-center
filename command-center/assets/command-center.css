@@ -1,20 +1,85 @@
 /* CoreOps Command Center — shared styles.
-   Palette lives here, in one place, per the brief: change these variables to
-   rebrand without touching any page. Neutral palette until a brand is chosen. */
+   Moroccan Oasis (Day) / Midnight Riad (Night) — same token values and
+   naming pattern as mcp-server/src/dashboard.html, under this file's own
+   --cc- prefix so every page here stays consistent without touching any
+   individual page. See docs/ADR-011-moroccan-theme-system.md. */
 :root {
-  --cc-bg: #f4f5f7;
-  --cc-panel: #ffffff;
-  --cc-border: #e2e4e9;
-  --cc-text: #1a1d26;
-  --cc-muted: #6b7280;
-  --cc-accent: #2f5fd6;
-  --cc-accent-weak: #eaf0ff;
-  --cc-ok: #1a8a5f;
-  --cc-warn: #b5680a;
-  --cc-warn-bg: #fdf3e3;
-  --cc-danger: #c23b3b;
-  --cc-grey-dot: #9aa1ac;
+  color-scheme: light;
+  --cc-bg: #F5F1E8;
+  --cc-panel: #FBF8F3;
+  --cc-panel-2: #F0EAD9;
+  --cc-border: #E4DDCB;
+  --cc-border-strong: #D3C7AA;
+  --cc-text: #12372F;
+  --cc-muted: #4A5D55;
+  --cc-grey-dot: #7C8B84;
+  --cc-accent: #2E7D6B;
+  --cc-accent-weak: #DCEAE5;
+  --cc-accent-contrast: #FFFFFF;
+  --cc-accent-secondary: #C7683D;
+  --cc-accent-tertiary: #C49A6C;
+  --cc-ok: #1F8F5F;
+  --cc-warn: #B8862E;
+  --cc-warn-bg: #F5E9D3;
+  --cc-danger: #B23B3B;
+  --cc-danger-bg: #F3DEDA;
   --cc-radius: 10px;
+  --cc-radius-lg: 14px;
+  --cc-shadow: 0 1px 2px rgba(18, 55, 47, 0.08), 0 4px 16px rgba(18, 55, 47, 0.06);
+  --cc-space-1: 4px;
+  --cc-space-2: 8px;
+  --cc-space-3: 12px;
+  --cc-space-4: 16px;
+  --cc-space-5: 24px;
+  --cc-space-6: 32px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --cc-bg: #0F202A;
+    --cc-panel: #163832;
+    --cc-panel-2: #1D3535;
+    --cc-border: #26433C;
+    --cc-border-strong: #345048;
+    --cc-text: #F5F1E8;
+    --cc-muted: #A8B5AE;
+    --cc-grey-dot: #71827A;
+    --cc-accent: #3D8F78;
+    --cc-accent-weak: #1D3B33;
+    --cc-accent-contrast: #FFFFFF;
+    --cc-accent-secondary: #C7683D;
+    --cc-accent-tertiary: #D4AF37;
+    --cc-ok: #3FA37F;
+    --cc-warn: #D9A441;
+    --cc-warn-bg: #3D2F14;
+    --cc-danger: #D9605A;
+    --cc-danger-bg: #3A1E1B;
+    --cc-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.24);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --cc-bg: #0F202A;
+  --cc-panel: #163832;
+  --cc-panel-2: #1D3535;
+  --cc-border: #26433C;
+  --cc-border-strong: #345048;
+  --cc-text: #F5F1E8;
+  --cc-muted: #A8B5AE;
+  --cc-grey-dot: #71827A;
+  --cc-accent: #3D8F78;
+  --cc-accent-weak: #1D3B33;
+  --cc-accent-contrast: #FFFFFF;
+  --cc-accent-secondary: #C7683D;
+  --cc-accent-tertiary: #D4AF37;
+  --cc-ok: #3FA37F;
+  --cc-warn: #D9A441;
+  --cc-warn-bg: #3D2F14;
+  --cc-danger: #D9605A;
+  --cc-danger-bg: #3A1E1B;
+  --cc-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.24);
 }
 
 * { box-sizing: border-box; }
@@ -31,8 +96,11 @@ a { color: var(--cc-accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 .cc-header {
-  background: var(--cc-panel);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%23808080' stroke-opacity='0.05' stroke-width='1'%3E%3Cpath d='M30 4 L37 15 L52 15 L41 24 L46 39 L30 30 L14 39 L19 24 L8 15 L23 15 Z'/%3E%3C/g%3E%3C/svg%3E")
+    var(--cc-panel);
   border-bottom: 1px solid var(--cc-border);
+  border-top: 2px solid var(--cc-accent);
   padding: 16px 32px;
   position: sticky;
   top: 0;
@@ -78,8 +146,25 @@ a:hover { text-decoration: underline; }
 
 .cc-mode-btn.active {
   background: var(--cc-accent);
-  color: white;
+  color: var(--cc-accent-contrast);
 }
+
+.cc-theme-toggle {
+  border: 1px solid var(--cc-border);
+  background: var(--cc-panel);
+  color: var(--cc-muted);
+  border-radius: 100px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cc-theme-toggle:hover { color: var(--cc-text); border-color: var(--cc-border-strong); }
+.cc-theme-toggle svg { width: 15px; height: 15px; }
 
 .cc-data-as-of {
   font-size: 12px;
@@ -157,10 +242,13 @@ main {
 .cc-card {
   background: var(--cc-panel);
   border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius);
+  border-top: 2px solid var(--cc-accent);
+  border-radius: var(--cc-radius-lg) var(--cc-radius-lg) var(--cc-radius) var(--cc-radius);
+  box-shadow: var(--cc-shadow);
   padding: 18px;
   display: block;
   color: var(--cc-text);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .cc-card:hover {
@@ -188,7 +276,9 @@ main {
 .cc-panel-box {
   background: var(--cc-panel);
   border: 1px solid var(--cc-border);
-  border-radius: var(--cc-radius);
+  border-top: 2px solid var(--cc-accent);
+  border-radius: var(--cc-radius-lg) var(--cc-radius-lg) var(--cc-radius) var(--cc-radius);
+  box-shadow: var(--cc-shadow);
   padding: 20px;
   margin-bottom: 20px;
 }

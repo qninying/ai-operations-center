@@ -2,8 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('coreops-theme');
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', saved);
+      }
+    } catch (e) {}
+  })();
+</script>
 <title>CoreOps — Project Management</title>
-<link rel="stylesheet" href="assets/command-center.css?v=1" />
+<link rel="stylesheet" href="assets/command-center.css?v=2" />
 <style>
   .cc-gantt-row { display: flex; align-items: center; margin-bottom: 10px; font-size: 12px; }
   .cc-gantt-label { width: 220px; flex-shrink: 0; color: var(--cc-muted); }
@@ -17,6 +27,7 @@
     <div class="cc-header-top">
       <div class="cc-brand">CoreOps Command Center</div>
       <div class="cc-mode-toggle" id="cc-mode-toggle"></div>
+      <button class="cc-theme-toggle" id="cc-theme-toggle" aria-label="Switch between day and night theme" title="Day / Night"></button>
     </div>
     <div class="cc-data-as-of" id="cc-data-as-of">Loading…</div>
     <nav class="cc-nav" id="cc-nav"></nav>
@@ -26,7 +37,7 @@
     <p class="cc-page-desc">Releases and per-story status, straight from the plan and progress files.</p>
     <div id="cc-content">Loading…</div>
   </main>
-  <script src="assets/command-center.js?v=3"></script>
+  <script src="assets/command-center.js?v=4"></script>
   <script>
   (function () {
     const { esc, getParam } = CommandCenter;

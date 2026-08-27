@@ -1,22 +1,63 @@
-/* Reuses the exact palette from assets/command-center.css so CoreOps's two UIs
-   (the Command Center meta-dashboard and this Operations Console) read as one
-   product, not two disconnected prototypes. Kept as its own copy rather than a
-   shared import — separate build pipelines (static HTML/JS vs. Vite) — so keep
-   these tokens in sync with assets/command-center.css by hand if that palette
-   ever changes. */
+/* Reuses the exact Moroccan Day/Night palette from assets/command-center.css
+   (and mcp-server/src/dashboard.html) so CoreOps's UIs read as one product —
+   see docs/ADR-011-moroccan-theme-system.md. Kept as its own copy rather than
+   a shared import — separate build pipelines (static HTML/JS vs. Vite) — so
+   keep these tokens in sync with assets/command-center.css by hand if that
+   palette ever changes. Re-skinned only; this is the one surface confirmed
+   thin enough that no new navigation/components were added alongside it —
+   it does read the same shared `coreops-theme` localStorage key as the other
+   two surfaces (see main.tsx), so a preference set elsewhere still applies
+   here, without this app needing its own toggle control. */
 :root {
-  --oc-bg: #f4f5f7;
-  --oc-panel: #ffffff;
-  --oc-border: #e2e4e9;
-  --oc-text: #1a1d26;
-  --oc-muted: #6b7280;
-  --oc-accent: #2f5fd6;
-  --oc-accent-weak: #eaf0ff;
-  --oc-ok: #1a8a5f;
-  --oc-ok-bg: #e7f5ee;
-  --oc-warn: #b5680a;
-  --oc-warn-bg: #fdf3e3;
+  color-scheme: light;
+  --oc-bg: #F5F1E8;
+  --oc-panel: #FBF8F3;
+  --oc-border: #E4DDCB;
+  --oc-text: #12372F;
+  --oc-muted: #4A5D55;
+  --oc-accent: #2E7D6B;
+  --oc-accent-weak: #DCEAE5;
+  --oc-ok: #1F8F5F;
+  --oc-ok-bg: #DCEEE3;
+  --oc-warn: #B8862E;
+  --oc-warn-bg: #F5E9D3;
   --oc-radius: 10px;
+  --oc-radius-lg: 14px;
+  --oc-shadow: 0 1px 2px rgba(18, 55, 47, 0.08), 0 4px 16px rgba(18, 55, 47, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --oc-bg: #0F202A;
+    --oc-panel: #163832;
+    --oc-border: #26433C;
+    --oc-text: #F5F1E8;
+    --oc-muted: #A8B5AE;
+    --oc-accent: #3D8F78;
+    --oc-accent-weak: #1D3B33;
+    --oc-ok: #3FA37F;
+    --oc-ok-bg: #163B2E;
+    --oc-warn: #D9A441;
+    --oc-warn-bg: #3D2F14;
+    --oc-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.24);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --oc-bg: #0F202A;
+  --oc-panel: #163832;
+  --oc-border: #26433C;
+  --oc-text: #F5F1E8;
+  --oc-muted: #A8B5AE;
+  --oc-accent: #3D8F78;
+  --oc-accent-weak: #1D3B33;
+  --oc-ok: #3FA37F;
+  --oc-ok-bg: #163B2E;
+  --oc-warn: #D9A441;
+  --oc-warn-bg: #3D2F14;
+  --oc-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.24);
 }
 
 * {
@@ -76,13 +117,13 @@ body {
   flex: 1;
   background: var(--oc-panel);
   border: 1px solid var(--oc-border);
-  border-left: 3px solid var(--oc-accent);
-  border-radius: var(--oc-radius);
+  border-top: 2px solid var(--oc-accent);
+  border-radius: var(--oc-radius-lg) var(--oc-radius-lg) var(--oc-radius) var(--oc-radius);
   padding: 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  box-shadow: var(--oc-shadow);
 }
 
 .summary-value {
