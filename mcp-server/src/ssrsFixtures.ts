@@ -40,15 +40,4 @@ export const executionLogFixture: SsrsExecutionLogRow[] = [
     time_processing_ms: 0,
     time_rendering_ms: 0,
   },
-  {
-    instance_name: "SSRS01",
-    report_path: "/Sales/RegionalPipeline",
-    user_name: "svc-report-runner",
-    status: "rsInternalError",
-    time_start: "2026-08-24T06:30:10Z",
-    time_end: "2026-08-24T06:30:52Z",
-    time_data_retrieval_ms: 12000,
-    time_processing_ms: 29000,
-    time_rendering_ms: 0,
-  },
 ];

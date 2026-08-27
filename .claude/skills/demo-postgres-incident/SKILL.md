@@ -5,12 +5,14 @@ description: Trigger a real Postgres blocking-query incident for CoreOps live de
 
 # CoreOps Postgres Incident Demo
 
-Seeds a real blocking query in the dedicated `dev-postgres` container on command,
-mid-demo, so a genuine blocked-backend incident appears in the live dashboard — the
-presenter then clicks Troubleshoot / Fix / Approve themselves, in their own browser,
-in front of the audience, and CoreOps runs a real `pg_terminate_backend()` on
-approval. This is a live database lock, not a simulated one: two real `pg`
-connections actually contend for the same row, detected via `pg_stat_activity` /
+Seeds 2 real, independent blocking queries in the dedicated `dev-postgres`
+container on command, mid-demo — matching the "2 incidents per source" shape
+SQL/SSRS's fixture data also uses (trimmed 2026-08-27) — so two genuine
+blocked-backend incidents appear in the live dashboard. The presenter then clicks
+Troubleshoot / Fix / Approve on each themselves, in their own browser, in front of
+the audience, and CoreOps runs a real `pg_terminate_backend()` per approval. This is
+a live database lock, not a simulated one: on each of two different order rows, two
+real `pg` connections contend for the same row, detected via `pg_stat_activity` /
 `pg_blocking_pids()` (polled every 3s server-side, dashboard refreshes every 5s), and
 the proposed fix (`kill_postgres_backend`) is gated by real DBA judgment
 (`pgRemediationSafety.ts`, ADR-013) before it's ever offered.
@@ -41,7 +43,9 @@ produces a fresh, real pid.
    Wait a couple seconds and confirm with the same `docker ps` check before moving on
    — a container that's still initializing can't take real connections yet.
 
-2. **Seed a real blocking scenario in the background, via a named wrapper script**,
+2. **Seed both real blocking scenarios in the background, via a named wrapper script**
+   (one script call seeds both — `seedPostgresBlockingScenario.ts` runs two
+   independent blocking pairs concurrently, on order rows id=1 and id=2),
    not a bare backgrounded `tsx` call — `$!` capture is unreliable in this sandboxed
    shell (confirmed directly by `demo-start`'s own fault-injector steps for the same
    reason), and a named script gives `pgrep -f`/`pkill -f` an unambiguous target for
@@ -73,12 +77,17 @@ produces a fresh, real pid.
    pg_blocking_pids(pid) != '{}'` against `dev-postgres` (host `localhost`, port
    `5434`, db `orders`, user/password `app`/`app`).
 
-4. **The demo's natural ending is the presenter clicking Approve** — that runs a
-   real `pg_terminate_backend()` on the blocker, which kills the seed script's own
-   Session A connection out from under it. The script's own process will then exit
-   with an uncaught `FATAL: terminating connection due to administrator command`
-   error — expected, not a bug, and further proof the kill was real (confirmed live
-   2026-08-27). Nothing to clean up afterward; the process is already gone.
+4. **The demo's natural ending is the presenter clicking Approve on each of the two
+   incidents** — every approval runs a real `pg_terminate_backend()` on that
+   blocker, which kills that specific Session A connection out from under it.
+   Approving just one still leaves the seed script's other Session A/B pair running
+   normally on its own row — the two scenarios are fully independent. Once both are
+   approved (or their hold time elapses on its own), the script's process exits
+   cleanly; if the script's remaining connections get killed by real terminations, it
+   exits instead with an uncaught `FATAL: terminating connection due to
+   administrator command` error per killed connection — expected, not a bug, and
+   further proof each kill was real (confirmed live 2026-08-27). Nothing to clean up
+   afterward either way; any killed connection is already gone.
 
 ## Cancel early ("stop the postgres demo", "cancel the blocking query", never reached Approve)
 
@@ -90,9 +99,11 @@ pkill -f "coreops-pg-blocking-seed.sh"
 pkill -f "seedPostgresBlockingScenario.ts"
 ```
 
-Killing the script's process kills its Postgres connection, which Postgres itself
-detects as a lost connection and rolls back the open transaction — the lock releases
-on its own, the same real mechanism as a graceful commit, just abrupt. Both `pkill`s
+Killing the script's process kills all of its Postgres connections at once — both
+scenarios cancel together, since one script process holds both pairs — which
+Postgres itself detects as lost connections and rolls back each open transaction —
+both locks release on their own, the same real mechanism as a graceful commit, just
+abrupt. Both `pkill`s
 are safe to run even if nothing is scheduled (a no-op `pkill` just exits non-zero
 silently). Confirm it actually cleared if asked:
 ```
@@ -129,6 +140,7 @@ seed script.
   demo session by default.
 - `docs/ADR-013-real-postgres-remediation.md` — the real DBA judgment and execution
   design this skill exercises.
-- `mcp-server/src/seedPostgresBlockingScenario.ts` — the real two-connection seed
-  script this skill schedules. Can be run by hand instead with a different hold time
-  if the presenter wants to trigger it live on camera with specific timing.
+- `mcp-server/src/seedPostgresBlockingScenario.ts` — the real seed script this skill
+  schedules, now seeding 2 independent blocking pairs (4 connections total) instead
+  of 1. Can be run by hand instead with a different hold time if the presenter wants
+  to trigger it live on camera with specific timing.
