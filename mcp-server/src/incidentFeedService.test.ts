@@ -157,4 +157,32 @@ describe("incidentFeedService", () => {
     expect(incidents[0].source).toBe("sql");
     handle.stop();
   });
+
+  it("a resolved Docker incident (fixed, non-timestamped id) can recur once the underlying condition clears and then fails again", async () => {
+    mockAllSources({});
+    const checkSupersetHealth = vi.fn().mockRejectedValue(new Error("unreachable"));
+    vi.doMock("./supersetHealthSource.js", () => ({ checkSupersetHealth }));
+    const { startIncidentFeed, getRevealedIncidents, markResolved } = await import("./incidentFeedService.js");
+
+    const handle = startIncidentFeed();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getRevealedIncidents().map((i) => i.id)).toContain("docker:superset");
+
+    markResolved("docker:superset");
+    expect(getRevealedIncidents()).toHaveLength(0);
+
+    // Superset comes back healthy — resolved, and nothing rediscovers it yet.
+    checkSupersetHealth.mockResolvedValue(undefined);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(getRevealedIncidents()).toHaveLength(0);
+
+    // Superset goes down again — unlike the SQL fixture case above (same
+    // still-blocking row, stays suppressed), this is a genuinely new
+    // occurrence and must surface, not stay silently suppressed forever.
+    checkSupersetHealth.mockRejectedValue(new Error("unreachable again"));
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(getRevealedIncidents().map((i) => i.id)).toContain("docker:superset");
+
+    handle.stop();
+  });
 });

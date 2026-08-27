@@ -207,6 +207,22 @@ async function tick(): Promise<void> {
   const discovered = [sql, ssrs, cloud, docker]
     .filter((r): r is PromiseFulfilledResult<DashboardIncident[]> => r.status === "fulfilled")
     .flatMap((r) => r.value);
+  const discoveredIds = new Set(discovered.map((incident) => incident.id));
+
+  // A resolved incident whose underlying condition has since cleared can recur.
+  // Most sources' ids are naturally scoped to one occurrence (a specific SSRS
+  // run's timestamp, a specific blocking session pair), so this rarely matters
+  // for them — but Docker's id (`docker:superset`) has no per-occurrence
+  // component, so without this a resolved outage could only ever be detected
+  // once per process lifetime, even if Superset goes down again later. Only
+  // un-suppress once the id stops being discovered at all; an id still being
+  // discovered (the same still-blocking session, an unhealed fixture row)
+  // stays suppressed exactly as before.
+  for (const id of resolvedIds) {
+    if (!discoveredIds.has(id)) {
+      resolvedIds.delete(id);
+    }
+  }
 
   const now = Date.now();
   for (const incident of discovered) {
