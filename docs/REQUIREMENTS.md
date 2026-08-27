@@ -89,6 +89,28 @@ does not verify causal correctness of the diagnosis itself (that a cited,
 real piece of evidence actually supports the stated conclusion) — that
 remains open, named explicitly in ADR-008 as future work, not solved here.
 
+### REQ-020 — Safety · should
+
+The system must verify that an AI recommendation's specific factual claims
+about cited evidence actually match what that evidence contains, not just
+that the citation exists.
+
+Fulfilled directly, not through a platform story (identified after the plan
+was written, one level deeper than REQ-019 — see ADR-009). Extends
+`mcp-server/src/evidenceGroundingCheck.ts` with a structured claim check:
+`rootCauseAgent.ts` now asks the model for `{text, evidenceId, field,
+value}` entries alongside its prose root cause, and each claim's field/value
+is verified against the real cited evidence, catching a citation that's real
+but misstated — not just a fabricated one (REQ-019's scope). Live-verified
+against a real Claude response that complied correctly on the first
+attempt, and a deliberate break test proving the failure path renders.
+
+This does not verify the overall diagnosis is causally correct — a
+recommendation can get every individual claim right and still draw the
+wrong conclusion from them. That remains open, named explicitly in ADR-009.
+The human approval requirement is unaffected by design: this makes the
+approver's review better-informed, not less necessary.
+
 ## Audit Trail
 
 ### REQ-005 — Safety · must

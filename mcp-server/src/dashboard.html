@@ -1131,6 +1131,7 @@ async function troubleshootIncident(incidentId, cardEl) {
       const GROUNDING_MESSAGES = {
         CITED_EVIDENCE_NOT_FOUND: 'cites evidence that was never given to it',
         NO_EVIDENCE_CITED: 'gave a diagnosis without citing any of the evidence available',
+        CLAIM_NOT_SUPPORTED_BY_EVIDENCE: 'makes a specific factual claim that doesn\'t match the evidence it cites',
       };
       const reasons = body.grounding.violations.map((v) => GROUNDING_MESSAGES[v] || v).join('; ');
       ungroundedBanner.className = 'banner ungrounded shown';

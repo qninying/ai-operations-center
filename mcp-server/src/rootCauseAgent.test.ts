@@ -125,6 +125,33 @@ describe("analyzeIncidentRootCause", () => {
     expect(callModel).toHaveBeenCalledTimes(3); // 1 initial + 2 retries
   });
 
+  it("parses structured claims when the model provides them", async () => {
+    const callModel = vi.fn().mockResolvedValue(
+      jsonResponse({
+        rootCause: "Session 61 is blocked by session 52",
+        confidence: 90,
+        evidenceIdsUsed: ["evt-1"],
+        claims: [{ text: "session 61 is blocked by session 52", evidenceId: "evt-1", field: "blocking_session_id", value: "52" }],
+      })
+    );
+
+    const result = await analyzeIncidentRootCause(baseIncident(), { callModel });
+
+    expect(result.claims).toEqual([
+      { text: "session 61 is blocked by session 52", evidenceId: "evt-1", field: "blocking_session_id", value: "52" },
+    ]);
+  });
+
+  it("defaults claims to an empty array when the model omits the field entirely — not a parse failure", async () => {
+    const callModel = vi.fn().mockResolvedValue(
+      jsonResponse({ rootCause: "Blocking chain", confidence: 85, evidenceIdsUsed: ["evt-1"] })
+    );
+
+    const result = await analyzeIncidentRootCause(baseIncident(), { callModel });
+
+    expect(result.claims).toEqual([]);
+  });
+
   it("is repeatable: the same incident and the same model response produce the same result twice", async () => {
     const callModel = vi.fn().mockResolvedValue(
       jsonResponse({ rootCause: "Blocking chain", confidence: 90, evidenceIdsUsed: ["evt-1"] })

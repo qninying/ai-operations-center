@@ -31,11 +31,19 @@ export interface Incident {
   evidence: EvidenceItem[];
 }
 
+export interface Claim {
+  text: string;
+  evidenceId: string;
+  field: string;
+  value: string;
+}
+
 export interface RootCauseResult {
   rootCause: string;
   confidence: number; // 0-100
   evidenceIdsUsed: string[];
   insufficientEvidence: boolean;
+  claims: Claim[];
 }
 
 export interface AnalyzeOptions {
@@ -87,10 +95,21 @@ const rootCauseCircuitBreaker = new CircuitBreaker({
   cooldownMs: 30_000,
 });
 
+const ClaimSchema = z.object({
+  text: z.string().min(1),
+  evidenceId: z.string(),
+  field: z.string(),
+  value: z.string(),
+});
+
 const RootCauseResponseSchema = z.object({
   rootCause: z.string().min(1),
   confidence: z.number().min(0).max(100),
   evidenceIdsUsed: z.array(z.string()),
+  // Optional and defaulted: this is the first time the model has been asked
+  // for this field, so a response that omits it (or an older cached
+  // prompt/response shape) degrades to today's behavior, not a hard failure.
+  claims: z.array(ClaimSchema).optional().default([]),
 });
 
 function insufficientEvidenceResult(reason: string): RootCauseResult {
@@ -99,6 +118,7 @@ function insufficientEvidenceResult(reason: string): RootCauseResult {
     confidence: 0,
     evidenceIdsUsed: [],
     insufficientEvidence: true,
+    claims: [],
   };
 }
 
@@ -110,7 +130,8 @@ function buildPrompt(incident: Incident): string {
     ...incident.evidence.map((e) => `- [${e.id}] (${e.source}): ${JSON.stringify(e.data)}`),
     ``,
     `Based only on the evidence above, respond with a JSON object matching exactly:`,
-    `{"rootCause": string, "confidence": number (0-100), "evidenceIdsUsed": string[]}`,
+    `{"rootCause": string, "confidence": number (0-100), "evidenceIdsUsed": string[], "claims": [{"text": string, "evidenceId": string, "field": string, "value": string}]}`,
+    `For each specific fact in your rootCause that is drawn directly from one field of one piece of evidence — not inference or synthesis across multiple items — add an entry to claims naming the exact evidenceId, the literal field name from that evidence's data, and its literal value as a string. Only include claims you can point to one literal field for; do not force synthesis or inference into a claim.`,
     `If the evidence does not support a confident root cause, set confidence below ${INSUFFICIENT_CONFIDENCE_THRESHOLD} and explain why in rootCause.`,
     `Respond with JSON only, no other text.`,
   ].join("\n");
@@ -185,6 +206,7 @@ export async function analyzeIncidentRootCause(
     confidence: parsed.confidence,
     evidenceIdsUsed: parsed.evidenceIdsUsed,
     insufficientEvidence: parsed.confidence < INSUFFICIENT_CONFIDENCE_THRESHOLD,
+    claims: parsed.claims,
   };
 
   logEvent({

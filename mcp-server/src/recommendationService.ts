@@ -136,6 +136,6 @@ export async function generateRecommendation(
 
   const incident: Incident = { id: incidentId, description: incidentDescription, evidence };
   const result = await analyzeFn(incident);
-  const grounding = checkEvidenceGrounding(evidence, result.evidenceIdsUsed);
+  const grounding = checkEvidenceGrounding(evidence, result.evidenceIdsUsed, result.claims);
   return { ...result, grounding };
 }

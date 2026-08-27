@@ -240,6 +240,6 @@ export async function generateCorrelatedRecommendation(
     evidence: [...dmvEvidence, ...ssrsEvidence],
   };
   const result = await analyzeFn(incident);
-  const grounding = checkEvidenceGrounding(incident.evidence, result.evidenceIdsUsed);
+  const grounding = checkEvidenceGrounding(incident.evidence, result.evidenceIdsUsed, result.claims);
   return { ...result, partialCorrelation: unavailableSources.length > 0, unavailableSources, grounding };
 }

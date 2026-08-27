@@ -50,7 +50,7 @@ Then open `http://localhost:8787/console?role=it-manager`.
 ## What's real
 
 Every claim below has a test behind it and was verified against a real running
-server, not just unit-tested. Current counts: **325 tests passing** — 255 in
+server, not just unit-tested. Current counts: **334 tests passing** — 264 in
 `mcp-server/`, 64 in `guardrails/`, 6 in `frontend/`.
 
 **Governance & security**
@@ -91,7 +91,15 @@ server, not just unit-tested. Current counts: **325 tests passing** — 255 in
   recommendation from reaching a human approver with no independent signal.
   Live-verified against a real Claude response (no false positive) and a
   deliberate break test proving the failure path actually renders — see
-  [ADR-008](docs/ADR-008-evidence-grounding-check.md).
+  [ADR-008](docs/ADR-008-evidence-grounding-check.md). Extended one level
+  deeper by structured claim verification — the model now cites the exact
+  field and value backing each specific fact in its diagnosis, checked
+  against the real evidence, catching a citation that's real but misstated,
+  not just a fabricated one. Live-verified against a real Claude response
+  that complied correctly on the first attempt — see
+  [ADR-009](docs/ADR-009-structured-claim-verification.md). Neither check
+  makes human approval less necessary — only better-informed; the approval
+  gate itself is untouched by design.
 
 **Audit trail**
 - Every decision and action is recorded immutably and idempotently by ID
@@ -142,7 +150,7 @@ server, not just unit-tested. Current counts: **325 tests passing** — 255 in
 
 ## Architecture decisions
 
-Eight ADRs, each with real alternatives considered and rejected, not just the
+Nine ADRs, each with real alternatives considered and rejected, not just the
 choice made:
 
 | ADR | Decision |
@@ -155,6 +163,7 @@ choice made:
 | [ADR-006](docs/ADR-006-totp-mfa.md) | Real TOTP-based MFA over an ntfy-delivered OTP or WebAuthn — hand-rolled with `node:crypto`, and login itself requiring TOTP makes every session inherently MFA-verified, closing a hardcoded placeholder |
 | [ADR-007](docs/ADR-007-second-approver-identity.md) | A real second approver identity over a general N-user credential store — mirrors the existing single-user pattern for exactly the two roles the escalation model actually has |
 | [ADR-008](docs/ADR-008-evidence-grounding-check.md) | A citation-existence check, generic over opaque evidence, over a second "critic" LLM call (not actually independent) or per-source semantic verification (couples a shared module to three separately-evolving schemas) |
+| [ADR-009](docs/ADR-009-structured-claim-verification.md) | Structured claim-to-field verification over a fuzzy semantic/substring check — the model cites the exact field and value backing each fact, checked with an exact (not inferred) comparison, avoiding the false-positive risk a text-similarity check would carry |
 
 The full architecture package — a written summary, layer diagrams, and a
 trust-boundary data-flow diagram — is in
