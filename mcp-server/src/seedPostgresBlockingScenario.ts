@@ -7,23 +7,42 @@ import pg from "pg";
 // seedBlockingScenario.ts's SQL Server shape, translated to Postgres. Not part of
 // the app — run by hand: `npx tsx src/seedPostgresBlockingScenario.ts [holdSeconds]`.
 //
-// Seeds 2 independent blocking pairs (on order rows id=1 and id=2), matching the
-// "2 incidents per source" shape SQL/SSRS's fixture data now also uses. Each pair
-// is its own real lock: Session A opens a transaction and holds a row lock, Session
-// B concurrently tries to touch the same row and genuinely blocks on it in
-// Postgres's own lock manager — no fixture data involved, and the two pairs don't
-// interact (different rows), so both blocks are real and simultaneous.
+// Seeds 2 independent, genuinely different-looking blocking scenarios — a stuck
+// order update and a stuck payment update — not the same query on two ids. The
+// first version of this script used one `orders` table with a parameterized
+// `WHERE id = $1`, so pg_stat_activity's `query` column (which shows the literal
+// SQL text sent over the wire, not the bound value) rendered byte-identical for
+// both incidents — confirmed live 2026-08-27: a real demo confusion, not a fixture
+// artifact. Fixed two ways: a second, distinctly-named table, and literal (not
+// parameterized) ids in the UPDATE text so the real query shown on each incident
+// card actually differs and is readable. Safe here specifically because the ids
+// come from this file's own hardcoded SCENARIOS array, never from user input —
+// this reasoning does not extend to anything taking real input.
 //
-// No env-var gating like seedBlockingScenario.ts's SQL Server connection — these
-// are dev-postgres/docker-compose.yml's own fixed, non-secret local credentials,
-// not a real external system's secrets.
+// Both scenarios are the same safe, short-lived, single-row-lock case (both real,
+// both killable by kill_postgres_backend) — this script isn't meant to also cover
+// pgRemediationSafety.ts's other rules (long-running, system backend, chained
+// blocker); those are covered by that module's own unit tests and ADR-013's live
+// break test.
 const PG_HOST = process.env.PG_DEMO_HOST ?? "localhost";
 const PG_PORT = Number(process.env.PG_DEMO_PORT ?? 5434);
 const PG_DATABASE = process.env.PG_DEMO_DATABASE ?? "orders";
 const PG_USER = process.env.PG_DEMO_USER ?? "app";
 const PG_PASSWORD = process.env.PG_DEMO_PASSWORD ?? "app";
 
-const ROW_IDS = [1, 2];
+interface Scenario {
+  label: string;
+  table: string;
+  id: number;
+  fromStatus: string;
+  holdStatus: string;
+  blockStatus: string;
+}
+
+const SCENARIOS: Scenario[] = [
+  { label: "order", table: "orders", id: 1, fromStatus: "pending", holdStatus: "processing", blockStatus: "shipped" },
+  { label: "payment", table: "payments", id: 1, fromStatus: "pending", holdStatus: "authorizing", blockStatus: "failed" },
+];
 
 function readConfig(): pg.ClientConfig {
   return {
@@ -36,51 +55,61 @@ function readConfig(): pg.ClientConfig {
   };
 }
 
-async function ensureDemoTable(client: pg.Client): Promise<void> {
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS orders (
-      id INT PRIMARY KEY,
-      status TEXT NOT NULL
+async function ensureDemoTables(client: pg.Client): Promise<void> {
+  for (const scenario of SCENARIOS) {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${scenario.table} (
+        id INT PRIMARY KEY,
+        status TEXT NOT NULL
+      );
+    `);
+    await client.query(
+      `INSERT INTO ${scenario.table} (id, status) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING;`,
+      [scenario.id, scenario.fromStatus]
     );
-  `);
-  for (const id of ROW_IDS) {
-    await client.query(`INSERT INTO orders (id, status) VALUES ($1, 'pending') ON CONFLICT (id) DO NOTHING;`, [id]);
   }
 }
 
-async function holdLock(client: pg.Client, rowId: number, holdMs: number): Promise<void> {
+async function holdLock(client: pg.Client, scenario: Scenario, holdMs: number): Promise<void> {
   await client.query("BEGIN");
-  console.log(`[Session A${rowId}] Opening a transaction, taking a row lock on orders id=${rowId}...`);
-  await client.query(`UPDATE orders SET status = 'processing' WHERE id = $1;`, [rowId]);
+  console.log(`[Session A/${scenario.label}] Opening a transaction, taking a row lock on ${scenario.table} id=${scenario.id}...`);
+  // Literal id, not parameterized — see the file-level comment on why that's safe
+  // here (a fixed internal constant, never user input) and why it matters (the
+  // real query text shown on the incident card needs to actually be readable).
+  await client.query(`UPDATE ${scenario.table} SET status = '${scenario.holdStatus}' WHERE id = ${scenario.id};`);
   console.log(
-    `[Session A${rowId}] Lock held for ${holdMs / 1000}s. Query pg_stat_activity now (or run the demo) to see the block.`
+    `[Session A/${scenario.label}] Lock held for ${holdMs / 1000}s. Query pg_stat_activity now (or run the demo) to see the block.`
   );
   await new Promise((resolve) => setTimeout(resolve, holdMs));
   await client.query("COMMIT");
-  console.log(`[Session A${rowId}] Transaction committed, lock released.`);
+  console.log(`[Session A/${scenario.label}] Transaction committed, lock released.`);
 }
 
-async function attemptBlockedWrite(client: pg.Client, rowId: number): Promise<void> {
+async function attemptBlockedWrite(client: pg.Client, scenario: Scenario): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 2_000)); // let Session A take its lock first
-  console.log(`[Session B${rowId}] Attempting to update the same row — this will block until Session A${rowId} commits...`);
+  console.log(`[Session B/${scenario.label}] Attempting to update the same row — this will block until Session A/${scenario.label} commits...`);
   const start = Date.now();
-  await client.query(`UPDATE orders SET status = 'shipped' WHERE id = $1;`, [rowId]);
-  console.log(`[Session B${rowId}] Unblocked after ${Date.now() - start}ms.`);
+  await client.query(`UPDATE ${scenario.table} SET status = '${scenario.blockStatus}' WHERE id = ${scenario.id};`);
+  console.log(`[Session B/${scenario.label}] Unblocked after ${Date.now() - start}ms.`);
 }
 
 async function main(): Promise<void> {
-  const holdSeconds = Number(process.argv[2]) || 20;
+  // 180s default — the first version's 90s default was tight against a real
+  // click-through of both incident cards (Troubleshoot, read, Fix, read, repeat)
+  // and confirmed live 2026-08-27 to self-resolve mid-demo. Pass a different
+  // number as this script's argument for a shorter or longer hold.
+  const holdSeconds = Number(process.argv[2]) || 180;
   const config = readConfig();
 
-  const clients = await Promise.all(ROW_IDS.map(() => [new pg.Client(config), new pg.Client(config)] as const));
+  const clients = await Promise.all(SCENARIOS.map(() => [new pg.Client(config), new pg.Client(config)] as const));
   await Promise.all(clients.flat().map((client) => client.connect()));
 
   try {
-    await ensureDemoTable(clients[0][0]);
+    await ensureDemoTables(clients[0][0]);
     await Promise.all(
-      ROW_IDS.flatMap((rowId, i) => {
+      SCENARIOS.flatMap((scenario, i) => {
         const [clientA, clientB] = clients[i];
-        return [holdLock(clientA, rowId, holdSeconds * 1000), attemptBlockedWrite(clientB, rowId)];
+        return [holdLock(clientA, scenario, holdSeconds * 1000), attemptBlockedWrite(clientB, scenario)];
       })
     );
   } finally {

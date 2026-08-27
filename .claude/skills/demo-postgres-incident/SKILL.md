@@ -5,17 +5,29 @@ description: Trigger a real Postgres blocking-query incident for CoreOps live de
 
 # CoreOps Postgres Incident Demo
 
-Seeds 2 real, independent blocking queries in the dedicated `dev-postgres`
-container on command, mid-demo — matching the "2 incidents per source" shape
-SQL/SSRS's fixture data also uses (trimmed 2026-08-27) — so two genuine
-blocked-backend incidents appear in the live dashboard. The presenter then clicks
-Troubleshoot / Fix / Approve on each themselves, in their own browser, in front of
-the audience, and CoreOps runs a real `pg_terminate_backend()` per approval. This is
-a live database lock, not a simulated one: on each of two different order rows, two
-real `pg` connections contend for the same row, detected via `pg_stat_activity` /
-`pg_blocking_pids()` (polled every 3s server-side, dashboard refreshes every 5s), and
-the proposed fix (`kill_postgres_backend`) is gated by real DBA judgment
-(`pgRemediationSafety.ts`, ADR-013) before it's ever offered.
+Seeds 2 real, independent, genuinely different-looking blocking queries in the
+dedicated `dev-postgres` container on command, mid-demo — a stuck order update and
+a stuck payment update, not the same query twice — matching the "2 incidents per
+source" shape SQL/SSRS's fixture data also uses (trimmed 2026-08-27). The presenter
+then clicks Troubleshoot / Fix / Approve on each themselves, in their own browser,
+in front of the audience, and CoreOps runs a real `pg_terminate_backend()` per
+approval. This is a live database lock, not a simulated one: two real `pg`
+connections contend for the same row on each of two separate tables (`orders`,
+`payments`), detected via `pg_stat_activity`/`pg_blocking_pids()` (polled every 3s
+server-side, dashboard refreshes every 5s), and the proposed fix
+(`kill_postgres_backend`) is gated by real DBA judgment (`pgRemediationSafety.ts`,
+ADR-013) before it's ever offered.
+
+**A real demo bug found live, fixed 2026-08-27**: the first version of this seed
+script used one `orders` table with a parameterized `WHERE id = $1` for both
+scenarios — `pg_stat_activity`'s `query` column shows the literal SQL text sent
+over the wire, not the bound value, so both incident cards rendered
+byte-identical query text and looked like the same issue twice. Fixed with a
+second, distinct table and literal (not parameterized) ids in the seed script's own
+`UPDATE` text — safe there specifically because the ids come from a hardcoded
+internal array, never user input. The default hold was also too short (90s) against
+a real two-card click-through and was observed live to self-resolve mid-demo,
+producing a confusing "no evidence found" on Fix — raised to 180s.
 
 **Separate from `demo-docker-incident`.** Different container (`dev-postgres`, not
 `dev-superset`), different mechanism (a seeded lock, not a stopped container),
@@ -44,8 +56,8 @@ produces a fresh, real pid.
    — a container that's still initializing can't take real connections yet.
 
 2. **Seed both real blocking scenarios in the background, via a named wrapper script**
-   (one script call seeds both — `seedPostgresBlockingScenario.ts` runs two
-   independent blocking pairs concurrently, on order rows id=1 and id=2),
+   (one script call seeds both — `seedPostgresBlockingScenario.ts` runs the order
+   and payment blocking pairs concurrently),
    not a bare backgrounded `tsx` call — `$!` capture is unreliable in this sandboxed
    shell (confirmed directly by `demo-start`'s own fault-injector steps for the same
    reason), and a named script gives `pgrep -f`/`pkill -f` an unambiguous target for
@@ -54,17 +66,17 @@ produces a fresh, real pid.
    cat > /tmp/coreops-pg-blocking-seed.sh <<'EOF'
    #!/bin/sh
    cd "<absolute path to mcp-server>"
-   npx tsx src/seedPostgresBlockingScenario.ts "${1:-90}"
+   npx tsx src/seedPostgresBlockingScenario.ts "${1:-180}"
    EOF
    chmod +x /tmp/coreops-pg-blocking-seed.sh
-   nohup /tmp/coreops-pg-blocking-seed.sh 90 > /tmp/coreops-pg-blocking-seed.log 2>&1 &
+   nohup /tmp/coreops-pg-blocking-seed.sh 180 > /tmp/coreops-pg-blocking-seed.log 2>&1 &
    disown
    ```
-   Substitute the real absolute path to this repo's `mcp-server/` directory. 90
-   seconds is a generous default hold — long enough that a presenter narrating
-   between clicks won't have it self-resolve before they reach Approve; pass a
-   different number as the script's argument if the user asks for more or less time
-   ("give me two minutes" → 120).
+   Substitute the real absolute path to this repo's `mcp-server/` directory. 180
+   seconds (3 minutes) is the script's own default — confirmed live 2026-08-27 that
+   the original 90s default was too tight for a real two-card Troubleshoot/Fix
+   click-through and self-resolved mid-demo; pass a different number as the script's
+   argument if the user asks for more or less time ("give me five minutes" → 300).
 
 3. Tell the user plainly: the incident should appear on **their own** dashboard soon
    — timing depends on demo mode, same as `demo-docker-incident` (immediate outside
