@@ -390,6 +390,12 @@
     background: var(--bg); font-size: 13px; line-height: 1.6; color: var(--text-secondary);
   }
 
+  .claims-list { margin-top: 8px; padding: 10px 15px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-elevated); }
+  .claims-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary); margin-bottom: 6px; }
+  .claim-row { font-size: 12.5px; line-height: 1.7; color: var(--text-secondary); }
+  .claim-row .claim-field, .claim-row .claim-value { font-family: var(--mono); color: var(--text); }
+  .claim-row .claim-source { color: var(--text-tertiary); }
+
   .banner { margin-top: 14px; padding: 12px 15px; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 13px; display: none; }
   .banner.shown { display: block; }
   .banner.escalation { border-color: var(--warning-dim); background: var(--warning-dim); }
@@ -835,6 +841,7 @@ function renderIncidentCard(incident) {
         <div class="confidence-caption">confidence</div>
       </div>
       <div class="root-cause" style="display:none;"></div>
+      <div class="claims-list" style="display:none;"></div>
       <div class="banner escalation">
         <div class="banner-title">Escalated to a human operator</div>
         <div class="escalation-detail"></div>
@@ -1056,6 +1063,7 @@ async function troubleshootIncident(incidentId, cardEl) {
   const confBlock = cardEl.querySelector('.confidence-row');
   const confNumber = cardEl.querySelector('.confidence-number');
   const rootCauseEl = cardEl.querySelector('.root-cause');
+  const claimsEl = cardEl.querySelector('.claims-list');
   const escalationBanner = cardEl.querySelector('.banner.escalation');
   const escalationDetail = cardEl.querySelector('.escalation-detail');
   const ungroundedBanner = cardEl.querySelector('.banner.ungrounded');
@@ -1071,6 +1079,8 @@ async function troubleshootIncident(incidentId, cardEl) {
   errorBanner.className = 'banner error';
   escalationBanner.className = 'banner escalation';
   ungroundedBanner.className = 'banner ungrounded';
+  claimsEl.style.display = 'none';
+  claimsEl.innerHTML = '';
 
   if (source === 'docker') {
     rootCauseEl.style.display = 'block';
@@ -1106,6 +1116,20 @@ async function troubleshootIncident(incidentId, cardEl) {
     rootCauseEl.style.display = 'block';
     rootCauseEl.textContent = body.rootCause;
     actionsRow.style.display = 'flex';
+
+    // The literal field/value each specific fact is drawn from, so a DBA can
+    // see exactly what's being claimed and where it comes from without
+    // having to trust the prose alone — the manual-verification answer to
+    // "how do I check this myself." See evidenceGroundingCheck.ts / ADR-009.
+    if (body.claims && body.claims.length > 0) {
+      claimsEl.style.display = 'block';
+      claimsEl.innerHTML = '<div class="claims-title">Supporting facts cited</div>' +
+        body.claims.map((c) =>
+          '<div class="claim-row"><span class="claim-field">' + escapeHtml(c.field) + '</span> = ' +
+          '<span class="claim-value">' + escapeHtml(c.value) + '</span> ' +
+          '<span class="claim-source">— ' + escapeHtml(c.evidenceId) + '</span></div>'
+        ).join('');
+    }
 
     setCorrelationId(incidentId, aiIncidentId, cardEl);
 
