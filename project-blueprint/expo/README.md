@@ -41,13 +41,17 @@ correlation-ID audit trail).
   execution paths (Docker, Postgres). Not published as an Artifact — a local,
   self-contained HTML file, opened directly in a browser. Links to the three files
   above rather than redrawing their diagrams.
-- **`presentation-script.md`** — added 2026-08-27, a live-demo speaking script
-  (distinct from `../demo-script.md`'s older 90-second screencast voiceover for an
-  early version of this app). Walks five real incidents in a fixed, deliberate order
-  — Postgres, Docker, Cloud, SQL, SSRS — matching the dashboard's own fixed sort
-  order, each demonstrating a different real capability, then names every honest gap
-  before an audience would have to ask. Not published as an Artifact — plain
-  Markdown, meant to be read from directly while presenting.
+## Presentation script
+
+The live-demo speaking script is **not in this repo** — it lives at
+`~/Desktop/artifacts/coreops-expo-presentation-script.md` (with a matching
+`.pdf` alongside it), a pre-existing, already-rehearsed script that predates
+this expo package. It was updated 2026-08-27 to walk five real incidents in
+the dashboard's own fixed sort order — Postgres, Docker, Cloud, SQL, SSRS —
+each demonstrating a different real capability, and to name every honest gap
+before an audience would have to ask. An earlier session mistakenly created a
+duplicate here at `presentation-script.md`; it has been removed — the
+Desktop file is the only one that exists.
 
 ## Updating
 
