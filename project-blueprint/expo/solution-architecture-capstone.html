@@ -249,12 +249,12 @@
       <div class="navgroup">
         <div class="navgroup-label">Architecture</div>
         <div class="navlink" data-kw="architecture layers mcp-server guardrails frontend" onclick="jump('architecture')">System Architecture — 7 Layers</div>
-        <div class="navlink" data-kw="adr decision log jwt totp mfa session audit persistence" onclick="jump('adrlog')">Architecture Decision Log <span class="count">7</span></div>
+        <div class="navlink" data-kw="adr decision log jwt totp mfa session audit persistence docker postgres real execution" onclick="jump('adrlog')">Architecture Decision Log <span class="count">13</span></div>
       </div>
       <div class="navgroup">
         <div class="navgroup-label">Evidence</div>
         <div class="navlink" data-kw="requirements traceability matrix must should" onclick="jump('traceability')">Requirements Traceability <span class="count">18</span></div>
-        <div class="navlink" data-kw="test verification evidence live azure ntfy" onclick="jump('evidence')">Verification &amp; Test Evidence <span class="count">301</span></div>
+        <div class="navlink" data-kw="test verification evidence live azure ntfy" onclick="jump('evidence')">Verification &amp; Test Evidence <span class="count">376</span></div>
         <div class="navlink" data-kw="delivery timeline build log releases dates" onclick="jump('timeline')">Delivery Timeline</div>
         <div class="navlink" data-kw="cost operating footprint azure free tier" onclick="jump('cost')">Operating Footprint &amp; Cost Posture</div>
       </div>
@@ -270,21 +270,22 @@
   <main class="main">
 
     <section class="hero" id="overview">
-      <div class="eyebrow"><span class="dot"></span>Real system · 12/12 stories verified · 18/18 requirements fulfilled · 301/301 tests passing</div>
+      <div class="eyebrow"><span class="dot"></span>Real system · 12/12 stories verified · 18/18 requirements fulfilled · 376/376 tests passing · 2 real execution paths</div>
       <h1>CoreOps — Solution Architecture Capstone</h1>
-      <p class="lede">An enterprise-grade AI Operations Dashboard for SQL Server, SSIS, SSRS, and Windows servers — an intelligent command center that detects, diagnoses, and proposes remediations for operational incidents, with every production-affecting action gated behind a real human approval. Built solo, end to end, with Claude Code as an AI pair, in 8 real calendar days.</p>
+      <p class="lede">An enterprise-grade AI Operations Dashboard for SQL Server, SSIS, SSRS, and Windows servers — an intelligent command center that detects, diagnoses, and proposes remediations for operational incidents, with every production-affecting action gated behind a real human approval. Built solo, end to end, with Claude Code as an AI pair, in 11 real calendar days.</p>
       <p>This document is the architecture-and-evidence capstone for that build: the real decision log, the real requirement-to-story trace, the real test and live-verification record, and the real delivery timeline — everything traces to a file, a commit, or a test run in <a href="https://github.com/qninying/ai-operations-center" target="_blank" rel="noopener">github.com/qninying/ai-operations-center</a>. Nothing here is illustrative or hypothetical unless explicitly labeled as such.</p>
-      <div class="byline">Quincy Nkwain Ninying · Sole builder &amp; solution architect · Repo generated 2026-08-17 → this revision 2026-08-25</div>
+      <div class="byline">Quincy Nkwain Ninying · Sole builder &amp; solution architect · Repo generated 2026-08-17 → this revision 2026-08-27</div>
 
       <div class="statgrid">
         <div class="stat"><div class="num">12 / 12</div><div class="label">Stories verified</div></div>
         <div class="stat"><div class="num">38 / 38</div><div class="label">Acceptance criteria passed</div></div>
-        <div class="stat"><div class="num">301</div><div class="label">Tests passing, 3 suites</div></div>
-        <div class="stat"><div class="num">7</div><div class="label">Architecture decision records</div></div>
+        <div class="stat"><div class="num">376</div><div class="label">Tests passing, 3 suites</div></div>
+        <div class="stat"><div class="num">13</div><div class="label">Architecture decision records</div></div>
         <div class="stat"><div class="num">18 / 18</div><div class="label">Requirements fulfilled</div></div>
-        <div class="stat"><div class="num">9 days</div><div class="label">2026-08-17 → 2026-08-25</div></div>
-        <div class="stat"><div class="num">88</div><div class="label">Real commits</div></div>
-        <div class="stat"><div class="num">5,949</div><div class="label">Production LOC</div></div>
+        <div class="stat"><div class="num">2</div><div class="label">Real execution paths (Docker, Postgres)</div></div>
+        <div class="stat"><div class="num">11 days</div><div class="label">2026-08-17 → 2026-08-27</div></div>
+        <div class="stat"><div class="num">115</div><div class="label">Real commits</div></div>
+        <div class="stat"><div class="num">7,463</div><div class="label">Production LOC</div></div>
       </div>
 
       <div class="callout honest">
@@ -341,8 +342,8 @@
 
     <section class="block" id="adrlog">
       <div class="section-kicker">Architecture Decision Log</div>
-      <h2>7 real ADRs — every one naming what it rejected</h2>
-      <p>All seven were written and closed inside the same 8-day build, most on 2026-08-23/24 in response to a documented trust-posture assessment. Each links a real decision to a real, cited alternative it beat, and to a real verification step — not just the choice made.</p>
+      <h2>13 real ADRs — every one naming what it rejected</h2>
+      <p>All thirteen were written and closed inside the same 11-day build. ADR-001 through 007 came out of a documented trust-posture assessment (2026-08-23/24); ADR-008 through 013 followed a second round of hard-question review that pushed past "the AI reasons well" into whether its citations are real, its individual factual claims check out, and — the biggest shift — whether it can execute a fix for real instead of only ever simulating one. Each links a real decision to a real, cited alternative it beat, and to a real verification step — not just the choice made.</p>
 
       <div class="card">
         <h4><span class="adr-num">ADR-001</span> Transport selection for the MCP Tool Gateway <span class="badge verified">Implemented</span></h4>
@@ -392,6 +393,48 @@
         <p><span class="rejected">Rejected:</span> a general N-user credential file — "the escalation model has no third role to justify it," called out explicitly as premature abstraction against this repo's own conventions.</p>
         <div class="verify-line"><strong>Verified live, on the real clock:</strong> proposed a remediation as the primary approver, waited the real 15-minute decision window, logged in as the real backup approver and decided the item, then confirmed the primary could no longer decide it (<code>403 UNAUTHORIZED_DECIDER</code>). The full 4-event sequence — <code>hitl_enqueued → hitl_escalated → hitl_decision → hitl_decision_rejected</code> — is in the real audit log.</div>
       </div>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-008</span> Evidence grounding check <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> a new pure module, <code>evidenceGroundingCheck.ts</code>, checks that every evidence id the model cites (<code>evidenceIdsUsed</code>) actually exists in the evidence it was given — catching a hallucinated citation outright — and flags when real evidence existed but nothing was cited. Wired into all three recommendation services as an independent, informational banner, not a blocker.</p>
+        <p><span class="rejected">Rejected:</span> a second LLM "critic" call (same model family, same blind spots — not provably independent, doubles cost and latency) · per-source semantic verification (would couple one shared module to three independently-evolving evidence schemas) · outcome-based confidence calibration (the real long-term answer, but no feedback loop existed yet to build it on).</p>
+        <div class="verify-line"><strong>Verified:</strong> re-ran the real SSIS/Cloud Troubleshoot flow live and inspected the real Claude response for the new <code>grounding</code> field; then a deliberate break test — a fabricated citation to a nonexistent evidence id — confirmed the ungrounded banner actually renders, not just the happy path.</div>
+      </div>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-009</span> Structured claim verification <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> ADR-008 proves a citation is real; it doesn't prove the specific fact drawn from it is accurate. <code>RootCauseResponseSchema</code> gains an optional <code>claims[]</code> field (evidence id, literal field name, literal value); <code>evidenceGroundingCheck.ts</code> extends with <code>CLAIM_NOT_SUPPORTED_BY_EVIDENCE</code>, comparing each claim's stated value against the real field on the cited evidence.</p>
+        <p>The direct follow-on to ADR-008, not an alternative-weighing decision on its own — deliberately scoped to single-field factual claims, not the correctness of the model's overall synthesis, which still requires a human reader.</p>
+        <div class="verify-line"><strong>Verified:</strong> live Claude call inspected to confirm <code>claims</code> populates correctly on real evidence; then the same break-test technique as ADR-008 — a fabricated claim whose value doesn't match its cited evidence — confirmed the new violation message renders.</div>
+      </div>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-010</span> Source-aware remediation with real SQL DBA judgment <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> every incident used to propose the same hardcoded generic action. <code>sqlRemediationSafety.ts</code> now applies three real, deterministic DBA rules — never touch a system session (id ≤ 50), never blind-kill a transaction running over 5 minutes, trace a chained blocker to its real root — before <code>kill_blocking_session</code> is ever offered as an option. SSRS/Cloud/Docker incidents also gained real, source-correct proposed actions instead of one generic fallback.</p>
+        <p><span class="rejected">Rejected:</span> adding a fifth data source/integration instead — judged lower-leverage for demonstrating real architectural judgment than closing this gap, a direct call made with the user rather than assumed.</p>
+        <div class="verify-line"><strong>Verified live against 5 real scenarios:</strong> a real bug was found and fixed in the process — the first version assessed the blocked session's own safety instead of its blocker's, so every incident came back "unsafe" on the first live run. Fixed, re-verified: 2 real, independent safe cases (one traces correctly past a chained blocker to the true root cause) and 3 correctly refused, each for a distinct, named reason.</div>
+      </div>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-011</span> A shared Day/Night theme system across all three UI surfaces <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> one shared token vocabulary (color, spacing, radius) applied consistently to <code>dashboard.html</code>/<code>login.html</code>, the Command Center, and the React console — every existing token <em>name</em> preserved, only values changed, so no component CSS needed rewriting. A real light/dark toggle, <code>localStorage</code>-backed, shared across all three surfaces via one key.</p>
+        <p>Audited before writing any code: two Explore passes plus direct reading found three independently-styled surfaces, not one design system. Resolved directly with the user: the React console (confirmed a genuine stub — one page, no router) gets re-skinned only, no new component library built on top of it.</p>
+        <div class="verify-line"><strong>Verified live, both themes, all three surfaces:</strong> real data (9 real incidents across 4 sources) renders correctly in both palettes on the main dashboard; the Command Center's real card grid renders correctly served over real HTTP; the React console's real summary view renders correctly re-skinned. <code>frontend</code> 6/6 unaffected.</div>
+      </div>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-012</span> One real execution path — Docker/Superset restart <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> every remediation up to this point executed through one honest, deliberately-labeled stand-in — the recommendation was always real, execution never touched a real system. Docker/Superset is the one narrow exception: a real <code>docker restart</code> on the dev-superset container, run only after human approval, with execution and confirmation kept as two separate steps — a restart that isn't independently confirmed healthy is never reported as resolved.</p>
+        <p><span class="rejected">Rejected:</span> extending real execution to SQL/SSRS/Cloud too (no real credentialed write access exists for any of them — a materially bigger, separate decision) · silently falling back to the stand-in if the real restart fails (would recreate the exact "looks real but isn't" gap this closes, in the opposite direction).</p>
+        <div class="verify-line"><strong>Verified live, end to end:</strong> stopped the real container, confirmed via <code>docker ps</code> mid-click that Approve genuinely restarted it (not simulated), confirmed the durable audit log recorded <code>confirmedHealthy: true</code>, and confirmed the incident only cleared once health was independently reconfirmed.</div>
+      </div>
+
+      <div class="card">
+        <h4><span class="adr-num">ADR-013</span> A second real execution path — Postgres blocking-query kill <span class="badge verified">Implemented</span></h4>
+        <p><strong>Decision:</strong> a second, deliberately different real execution case — not a clone of ADR-012. A new dedicated <code>orders-db</code> Postgres container, a real blocking query detected via <code>pg_stat_activity</code>/<code>pg_blocking_pids()</code>, assessed by real DBA judgment (<code>pgRemediationSafety.ts</code>, mirroring ADR-010's rules, translated to Postgres's own system-view semantics), and — when safe — terminated via a real, parameterized <code>pg_terminate_backend()</code> call, confined to exactly one file and structurally checked by a new "pg write confinement" guard.</p>
+        <p><span class="rejected">Rejected:</span> repurposing <code>dev-superset</code>'s existing Postgres container (it already has a real, unrelated job — Superset's own demo) · renaming it "PostgreSQL" (the product name, not a role — this repo names infrastructure by what it does) · a second Docker-restart clone (would prove nothing new beyond ADR-012).</p>
+        <div class="verify-line"><strong>Verified live, including two real bugs found and fixed along the way</strong> (a query that would have silently broken the safe case; approving one scenario crashing the process and force-closing an unrelated sibling scenario) — both caught by actually running the flow against real infrastructure, not by reading the code. Final proof: a real blocking scenario, a real <code>pg_terminate_backend()</code> confirmed both independently and via the durable audit log, and a live break test against a real Postgres background worker correctly refused.</div>
+      </div>
     </section>
 
     <section class="block" id="traceability">
@@ -431,17 +474,17 @@
 
     <section class="block" id="evidence">
       <div class="section-kicker">Verification &amp; Test Evidence</div>
-      <h2>301 tests, and the live bugs they actually caught</h2>
+      <h2>376 tests, and the live bugs they actually caught</h2>
       <table>
         <thead><tr><th>Package</th><th>Files</th><th>Tests</th><th>Runner</th><th>Production LOC</th></tr></thead>
         <tbody>
-          <tr><td><code>mcp-server/</code></td><td class="num-cell">26</td><td class="num-cell">231</td><td>vitest</td><td class="num-cell">4,817</td></tr>
-          <tr><td><code>guardrails/</code></td><td class="num-cell">4</td><td class="num-cell">64</td><td>vitest</td><td class="num-cell">966</td></tr>
+          <tr><td><code>mcp-server/</code></td><td class="num-cell">36</td><td class="num-cell">300</td><td>vitest</td><td class="num-cell">6,287</td></tr>
+          <tr><td><code>guardrails/</code></td><td class="num-cell">4</td><td class="num-cell">70</td><td>vitest</td><td class="num-cell">1,010</td></tr>
           <tr><td><code>frontend/</code></td><td class="num-cell">1</td><td class="num-cell">6</td><td>vitest</td><td class="num-cell">166</td></tr>
-          <tr><td><strong>Total</strong></td><td class="num-cell"><strong>31</strong></td><td class="num-cell"><strong>301</strong></td><td>—</td><td class="num-cell"><strong>5,949</strong></td></tr>
+          <tr><td><strong>Total</strong></td><td class="num-cell"><strong>41</strong></td><td class="num-cell"><strong>376</strong></td><td>—</td><td class="num-cell"><strong>7,463</strong></td></tr>
         </tbody>
       </table>
-      <p>Re-run live for this document, 2026-08-25: all three suites reported <code>passed</code> with zero failures.</p>
+      <p>Re-run live for this document, 2026-08-27: all three suites reported <code>passed</code> with zero failures.</p>
       <h3>Real bugs the tests and live verification actually caught before shipping</h3>
       <table>
         <thead><tr><th>Where</th><th>What was found live</th></tr></thead>
@@ -456,14 +499,18 @@
           <tr><td>ADR-007 · Second approver</td><td>Verified on the real wall clock — a genuine 15-minute wait, a real escalation to a real second human, and a real lockout of the original approver afterward.</td></tr>
           <tr><td>REQ-014 · Confidence thresholds</td><td>Live-verified across three separate real subprocesses: default behavior unchanged, a real override genuinely changes escalation gating, and a malformed value throws at import time instead of silently corrupting the threshold and disabling the gate it controls.</td></tr>
           <tr><td>REQ-017 · Cross-system correlation</td><td>Live-verified against the real running server that both sources can be genuinely unavailable for two different real reasons at once (SQL: Azure quota exhausted; SSRS: not configured) — the route correctly returned a real 503, with two distinct per-source entries under one correlation ID in the real durable audit log, not a single collapsed failure.</td></tr>
+          <tr><td>ADR-010 · SQL remediation safety</td><td>The safety module assessed the <em>blocked</em> session's own risk instead of its <em>blocker</em>'s — every one of 5 real incidents came back "unsafe" on the first live run. The unit tests passed throughout, since they exercised the pure function correctly in isolation; the bug was entirely in how the route called it, caught only by running all 5 real scenarios live.</td></tr>
+          <tr><td>ADR-012 · Real Docker execution</td><td>Discovered mid-session that <code>dashboard.html</code> is read into memory once at server startup, not per request — a pure front-end edit needs a server restart to take effect, same as a code change. Not a defect, but undocumented until this build hit it directly.</td></tr>
+          <tr><td>ADR-013 · Real Postgres remediation</td><td>Two real bugs, both caught by running the flow against a live Postgres instance, not by reading the code: the activity query was filtered to blocked-only rows, which would have silently broken the safe case (a blocker not itself blocked never appears in that set); and approving one blocking scenario crashed the seed process's shared error handling, force-closing an unrelated sibling scenario's still-legitimate lock as collateral damage. Both fixed and re-verified live.</td></tr>
+          <tr><td>Docker incident recurrence</td><td>A resolved incident's suppression never expired — fine for SQL/SSRS, whose ids are naturally scoped per occurrence, but Docker's fixed <code>docker:superset</code> id meant a resolved outage could only ever be detected once per server process. Found on the very first live use of the on-demand Docker demo skill; fixed so a resolved id un-suppresses once its condition genuinely clears.</td></tr>
         </tbody>
       </table>
     </section>
 
     <section class="block" id="timeline">
       <div class="section-kicker">Delivery Timeline</div>
-      <h2>8 real calendar days, ahead of the platform's own plan</h2>
-      <svg viewBox="0 0 860 210" style="width:100%;height:auto;margin:16px 0;">
+      <h2>11 real calendar days, ahead of the platform's own plan</h2>
+      <svg viewBox="0 0 860 240" style="width:100%;height:auto;margin:16px 0;">
         <g font-size="11" fill="var(--text-secondary)">
           <text x="10" y="16" font-family="var(--font-mono)" fill="var(--text-tertiary)">08-17</text>
           <text x="140" y="16" font-family="var(--font-mono)" fill="var(--text-tertiary)">08-18</text>
@@ -471,6 +518,7 @@
           <text x="380" y="16" font-family="var(--font-mono)" fill="var(--text-tertiary)">08-20</text>
           <text x="500" y="16" font-family="var(--font-mono)" fill="var(--text-tertiary)">08-21</text>
           <text x="740" y="16" font-family="var(--font-mono)" fill="var(--text-tertiary)">08-24</text>
+          <text x="800" y="16" font-family="var(--font-mono)" fill="var(--text-tertiary)">08-27</text>
 
           <rect x="10" y="26" width="90" height="24" rx="4" fill="var(--surface)" stroke="var(--line)"/>
           <text x="16" y="42">STORY-000</text>
@@ -492,6 +540,9 @@
 
           <rect x="380" y="176" width="450" height="24" rx="4" fill="var(--surface)" stroke="var(--line)"/>
           <text x="386" y="192">Governance engine + 7 ADRs + trust-scorecard hardening</text>
+
+          <rect x="740" y="206" width="110" height="24" rx="4" fill="var(--verified-dim)" stroke="var(--line)"/>
+          <text x="746" y="222" fill="var(--verified)">ADR-008…013</text>
         </g>
       </svg>
       <table>
@@ -505,10 +556,12 @@
           <tr><td>r4</td><td>Advanced Monitoring and Incident Management</td><td>STORY-008, 009, 010, 011</td><td class="num-cell">2026-08-19 → 08-21</td></tr>
           <tr><td>Hardening</td><td>Governance engine (ABAC/HITL), ADR-002 → ADR-007, trust-scorecard closures</td><td>—</td><td class="num-cell">2026-08-20 → 08-24</td></tr>
           <tr><td>Follow-up</td><td>Close the two remaining requirement gaps directly (no story)</td><td>REQ-014, REQ-017</td><td class="num-cell">2026-08-25</td></tr>
+          <tr><td>Trust round 2</td><td>Evidence grounding, structured claim verification, source-aware SQL remediation, Moroccan theme system across all 3 UI surfaces</td><td>—</td><td class="num-cell">2026-08-25 → 08-27</td></tr>
+          <tr><td>Real execution</td><td>The recommendation-vs-execution boundary was crossed for the first time — two real, independently-confirmed execution paths (Docker restart, Postgres backend termination), each behind the same human-approval gate as everything else</td><td>—</td><td class="num-cell">2026-08-27</td></tr>
         </tbody>
       </table>
       <div class="callout">
-        <strong>Ahead of the platform's own generated plan, not behind it:</strong> <code>.colaberry/plan.json</code>'s own <code>schedule</code> block states <code>build_start: 2026-08-20</code>, <code>build_end: 2026-10-01</code>, <code>demo_day: 2026-10-08</code> — a planned ~6-week build. The real, git-dated history shows the first story commit landing 2026-08-17, three days <em>before</em> the plan's stated start, with all 12 stories (804/804 points) verified by 2026-08-24 and the last two requirement gaps closed the following day — well over five weeks ahead of the plan's own build-end date. Both facts are in the repo; this is a real, checkable pace, not a claimed one.
+        <strong>Ahead of the platform's own generated plan, not behind it:</strong> <code>.colaberry/plan.json</code>'s own <code>schedule</code> block states <code>build_start: 2026-08-20</code>, <code>build_end: 2026-10-01</code>, <code>demo_day: 2026-10-08</code> — a planned ~6-week build. The real, git-dated history shows the first story commit landing 2026-08-17, three days <em>before</em> the plan's stated start, with all 12 stories (804/804 points) verified by 2026-08-24, the last two requirement gaps closed the following day, and a second full round of hardening — including the system's first real execution capability — landing by 2026-08-27, still well over five weeks ahead of the plan's own build-end date. Both facts are in the repo; this is a real, checkable pace, not a claimed one.
       </div>
     </section>
 
@@ -545,26 +598,28 @@
 
     <section class="block" id="execsummary">
       <div class="section-kicker">Executive Summary</div>
-      <h2>Where CoreOps actually stands, 2026-08-25</h2>
+      <h2>Where CoreOps actually stands, 2026-08-27</h2>
       <div class="doc-preview" id="doc-exec">
         <div class="doc-cover">
           <div class="doc-num">Document 6 of 6</div>
           <h3>Capstone Executive Summary</h3>
           <div class="doc-controls">
             <span>Author: Quincy Nkwain Ninying</span>
-            <span>Date: 2026-08-25</span>
+            <span>Date: 2026-08-27</span>
             <span>Status: <span class="badge verified">Ready for portfolio review</span></span>
           </div>
         </div>
         <div class="doc-body">
           <h4>Built</h4>
-          <p>12 of 12 stories verified (804/804 points, 38/38 acceptance criteria), across 5 releases plus the Command Center. All 18 requirements are fulfilled — 16 by a verified story, plus REQ-014 and REQ-017 fulfilled directly on 2026-08-25 without a fabricated story id, since neither was ever a <em>must</em>. 301 tests pass across 3 real suites, several with live verification against real external systems — a live Azure SQL Database, a live Azure Blob Storage account, a live Anthropic API, and a live ntfy.sh push channel, not mocks standing in for them. 7 architecture decision records exist, each naming a real rejected alternative, several closing gaps found through the project's own documented trust-posture assessments rather than left unexamined.</p>
+          <p>12 of 12 stories verified (804/804 points, 38/38 acceptance criteria), across 5 releases plus the Command Center. All 18 requirements are fulfilled — 16 by a verified story, plus REQ-014 and REQ-017 fulfilled directly on 2026-08-25 without a fabricated story id, since neither was ever a <em>must</em>. 376 tests pass across 3 real suites, several with live verification against real external systems — a live Azure SQL Database, a live Azure Blob Storage account, a live Anthropic API, a live ntfy.sh push channel, a real Docker daemon, and a real Postgres instance, not mocks standing in for any of them. 13 architecture decision records exist, each naming a real rejected alternative.</p>
+          <h4>The real shift since 2026-08-25: recommendation became execution</h4>
+          <p>Every remediation used to execute through one honest, deliberately-labeled stand-in — the AI's recommendation was always real and evidence-grounded, but nothing it proposed ever actually touched a real system. That boundary was crossed for the first time on 2026-08-27, for two deliberately narrow, deliberately different cases: a real <code>docker restart</code> on a Docker/Superset incident (ADR-012), and a real, parameterized <code>pg_terminate_backend()</code> on a Postgres blocking query, gated by real deterministic DBA judgment (ADR-013) — both behind the exact same human-approval gate as every other action, both confirming their outcome independently before ever reporting success. Neither was extended to SQL Server, SSRS, or Cloud, deliberately — none of those has real credentialed write access in this environment, and that remains a genuinely separate, bigger decision, not an oversight.</p>
           <h4>Honestly not built</h4>
-          <p>REQ-017's own literal 50-70% correlation-reduction figure is still unmeasured — the functional gap (no code path ever combined evidence from more than one system) is what closed on 2026-08-25; the percentage target needs production usage history this repo doesn't have yet, and isn't claimed. The target architecture's higher-scale components (Kafka, TimescaleDB, Faust, PostgreSQL, Telegraf) are not implemented; the real system runs in-process with JSONL-file persistence, a deliberate choice at this scale (ADR-005), not an oversight. No dollar cost or token-usage figure exists for the AI reasoning layer — nothing has instrumented it yet.</p>
+          <p>REQ-017's own literal 50-70% correlation-reduction figure is still unmeasured — the functional gap (no code path ever combined evidence from more than one system) closed on 2026-08-25; the percentage target needs production usage history this repo doesn't have yet, and isn't claimed. SQL Server, SSRS, and Cloud remediations remain the honest execution stand-in — real write access to any of them would be its own separate, larger decision. The target architecture's higher-scale components (Kafka, TimescaleDB, Faust, PostgreSQL, Telegraf) are not implemented; the real system runs in-process with JSONL-file persistence, a deliberate choice at this scale (ADR-005), not an oversight. No dollar cost or token-usage figure exists for the AI reasoning layer — nothing has instrumented it yet.</p>
           <h4>Pace</h4>
-          <p>The platform-generated build plan projected 2026-08-20 through 2026-10-01 (demo 2026-10-08). The real, git-dated history shows work starting 2026-08-17, every story verified by 2026-08-24, and the last two requirement gaps closed the following day — three days ahead of the plan's own stated start, and finished more than five weeks ahead of its own stated end.</p>
+          <p>The platform-generated build plan projected 2026-08-20 through 2026-10-01 (demo 2026-10-08). The real, git-dated history shows work starting 2026-08-17, every story verified by 2026-08-24, the last two requirement gaps closed the following day, and a second full round of hardening — evidence grounding, claim verification, source-aware SQL remediation, a full theme system, and the system's first real execution capability — landing by 2026-08-27: three days ahead of the plan's own stated start, and still finished more than five weeks ahead of its own stated end.</p>
           <h4>Recommendation</h4>
-          <p><strong>Ready to present as portfolio evidence</strong> of real, verifiable solution-architecture and governance-engineering capability: a system with genuine external integrations, real bugs found and fixed through live testing (not just passing mocks), and a provable, restart-durable audit trail — not a toy CRUD demo. The two named non-must gaps and the absent cost-instrumentation are the honest next items, not disqualifying omissions.</p>
+          <p><strong>Ready to present as portfolio evidence</strong> of real, verifiable solution-architecture and governance-engineering capability: a system with genuine external integrations, two real execution paths proven live (not just a well-designed simulation), real bugs found and fixed through live testing at every stage — including three in one demo script alone, each caught only by actually running it, not by reading the code — and a provable, restart-durable audit trail. The remaining execution stand-ins, the absent cost-instrumentation, and REQ-017's unmeasured percentage target are the honest next items, named here rather than hidden.</p>
         </div>
         <div class="doc-signoff"><span>Prepared by: Quincy Nkwain Ninying</span><span>github.com/qninying/ai-operations-center</span></div>
         <div class="doc-toolbar">
@@ -580,7 +635,7 @@
 
       <div class="doc-preview" id="doc-adr">
         <div class="doc-cover"><div class="doc-num">Document 1 of 6</div><h3>Architecture Decision Record Log</h3>
-          <div class="doc-controls"><span>7 ADRs</span><span>Status: <span class="badge verified">All implemented</span></span></div>
+          <div class="doc-controls"><span>13 ADRs</span><span>Status: <span class="badge verified">All implemented</span></span></div>
         </div>
         <div class="doc-body">
           <table id="csv-adr">
@@ -593,10 +648,16 @@
               <tr><td>005</td><td>Audit trail persistence + rotation</td><td>2026-08-24</td><td>Append-only JSONL, rehydrate on startup, size-based rotation (5,000/segment), never delete</td><td>SQLite; defer/document only; time-based or delete-after-N-days rotation</td></tr>
               <tr><td>006</td><td>Real TOTP-based MFA</td><td>2026-08-24</td><td>Hand-rolled RFC 6238 TOTP gating login directly</td><td>OTP via ntfy.sh; WebAuthn/passkeys</td></tr>
               <tr><td>007</td><td>Second approver identity</td><td>2026-08-24</td><td>Named second user, own TOTP verifier state, optional backup-approver env vars</td><td>General N-user credential file</td></tr>
+              <tr><td>008</td><td>Evidence grounding check</td><td>2026-08-27</td><td>Verify every cited evidence id is real; flag when real evidence went uncited</td><td>A second LLM critic call; per-source semantic verification; outcome-based calibration</td></tr>
+              <tr><td>009</td><td>Structured claim verification</td><td>2026-08-27</td><td>Verify individual factual claims against the literal evidence field they cite</td><td>N/A — direct follow-on to ADR-008</td></tr>
+              <tr><td>010</td><td>Source-aware SQL remediation safety</td><td>2026-08-27</td><td>Real deterministic DBA rules gate kill_blocking_session; source-correct actions for SSRS/Cloud/Docker</td><td>Adding a fifth data source instead</td></tr>
+              <tr><td>011</td><td>Moroccan Day/Night theme system</td><td>2026-08-27</td><td>One shared token vocabulary, Day/Night palette, across all 3 UI surfaces</td><td>N/A — design system unification, not an alternatives choice</td></tr>
+              <tr><td>012</td><td>Real Docker execution</td><td>2026-08-27</td><td>Real docker restart on Superset incidents, execution and confirmation kept separate</td><td>Extending real execution to SQL/SSRS/Cloud; silent fallback to the stand-in on failure</td></tr>
+              <tr><td>013</td><td>Real Postgres remediation</td><td>2026-08-27</td><td>New dedicated container, real DBA judgment, real pg_terminate_backend(), confined to one file</td><td>Repurposing dev-superset's Postgres; renaming it "PostgreSQL"; a second Docker-restart clone</td></tr>
             </tbody>
           </table>
         </div>
-        <div class="doc-signoff"><span>Prepared by: Quincy Nkwain Ninying</span><span>Source: docs/ADR-001…007</span></div>
+        <div class="doc-signoff"><span>Prepared by: Quincy Nkwain Ninying</span><span>Source: docs/ADR-001…013</span></div>
         <div class="doc-toolbar">
           <button onclick="downloadCSV('csv-adr','CoreOps-ADR-Log')">Download CSV</button>
           <button onclick="downloadDocHTML('doc-adr','CoreOps-ADR-Log')">Download HTML</button>
@@ -622,16 +683,16 @@
 
       <div class="doc-preview" id="doc-test">
         <div class="doc-cover"><div class="doc-num">Document 3 of 6</div><h3>Verification &amp; Test Evidence Summary</h3>
-          <div class="doc-controls"><span>301 tests · 3 suites</span><span>Status: <span class="badge verified">All passing</span></span></div>
+          <div class="doc-controls"><span>376 tests · 3 suites</span><span>Status: <span class="badge verified">All passing</span></span></div>
         </div>
         <div class="doc-body"><p>See <a href="#evidence">Verification &amp; Test Evidence</a> above for the full suite table and the live-bug list this document packages.</p></div>
-        <div class="doc-signoff"><span>Prepared by: Quincy Nkwain Ninying</span><span>Source: live npm test runs, 2026-08-25</span></div>
+        <div class="doc-signoff"><span>Prepared by: Quincy Nkwain Ninying</span><span>Source: live npm test runs, 2026-08-27</span></div>
         <div class="doc-toolbar"><button onclick="printDoc('evidence')">Print / Save as PDF</button></div>
       </div>
 
       <div class="doc-preview" id="doc-timeline">
         <div class="doc-cover"><div class="doc-num">Document 4 of 6</div><h3>Delivery Timeline / Build Log</h3>
-          <div class="doc-controls"><span>8 real days</span><span>84 commits</span></div>
+          <div class="doc-controls"><span>11 real days</span><span>115 commits</span></div>
         </div>
         <div class="doc-body"><p>See <a href="#timeline">Delivery Timeline</a> above for the full release-by-release table and the plan-vs-actual comparison.</p></div>
         <div class="doc-signoff"><span>Prepared by: Quincy Nkwain Ninying</span><span>Source: git log --all, .colaberry/plan.json</span></div>
@@ -676,8 +737,8 @@
   "project": "CoreOps AI Operations Dashboard",
   "repo_url": "https://github.com/qninying/ai-operations-center",
   "author": "Quincy Nkwain Ninying",
-  "generated_at": "2026-08-25",
-  "build_span": { "first_commit": "2026-08-17", "last_commit_considered": "2026-08-25", "total_commits": 88 },
+  "generated_at": "2026-08-27",
+  "build_span": { "first_commit": "2026-08-17", "last_commit_considered": "2026-08-27", "total_commits": 115 },
   "stories_total": 12,
   "stories_verified": 12,
   "criteria_total": 38,
@@ -688,14 +749,15 @@
   "requirements_must_fulfilled": 16,
   "requirements_fulfilled_directly_no_story": ["REQ-014", "REQ-017"],
   "requirements_gaps_named": [],
-  "tests_total": 301,
+  "tests_total": 376,
   "test_suites": [
-    { "package": "mcp-server", "files": 26, "tests": 231 },
-    { "package": "guardrails", "files": 4, "tests": 64 },
+    { "package": "mcp-server", "files": 36, "tests": 300 },
+    { "package": "guardrails", "files": 4, "tests": 70 },
     { "package": "frontend", "files": 1, "tests": 6 }
   ],
-  "adrs_total": 7,
-  "production_loc_total": 5949,
+  "adrs_total": 13,
+  "real_execution_paths": ["docker_restart_adr012", "postgres_terminate_backend_adr013"],
+  "production_loc_total": 7463,
   "cost_model": "none_fabricated_no_real_usage_data_exists",
   "nothing_faked": true
 }
@@ -784,19 +846,22 @@
   // Offline "Ask the Guide" — keyword-scored over real facts only.
   const QA = [
     {kw:['what','is','coreops'], a:'CoreOps is an enterprise-grade AI Operations Dashboard for SQL Server, SSIS, SSRS, and Windows servers — an intelligent command center that detects, diagnoses, and proposes remediations, with every production-affecting action gated behind a real human approval.', src:'CLAUDE.md'},
-    {kw:['who','built','solo','author'], a:'Quincy Nkwain Ninying built it solo, using Claude Code as an AI pair, across 9 real calendar days (2026-08-17 → 2026-08-25).', src:'git log --all'},
+    {kw:['who','built','solo','author'], a:'Quincy Nkwain Ninying built it solo, using Claude Code as an AI pair, across 11 real calendar days (2026-08-17 → 2026-08-27).', src:'git log --all'},
     {kw:['how','many','requirements'], a:'18 requirements (REQ-001 through REQ-018), split Functional / Safety / Reliability / Constraint / Non-functional.', src:'docs/REQUIREMENTS.md'},
     {kw:['requirements','not','fulfilled','gap','gaps','missing'], a:'All 18 requirements are now fulfilled. The last two (REQ-014, configurable confidence thresholds; REQ-017, cross-system correlation) were closed directly on 2026-08-25, without a platform story, since neither was ever a must. REQ-017\'s own literal 50-70% figure is still unmeasured and not claimed — that needs production usage history this repo doesn\'t have yet.', src:'docs/TRACEABILITY.md, docs/REQUIREMENTS.md'},
     {kw:['how','many','stories','verified'], a:'12 of 12 stories are verified — 804 of 804 points awarded, 38 of 38 acceptance criteria passed.', src:'.colaberry/progress.json'},
-    {kw:['adr','decision','how','many'], a:'7 architecture decision records, all implemented and live-verified: transport selection, correlation-ID unification, session auth over JWT, console serving topology, audit persistence, TOTP MFA, and a second approver identity.', src:'docs/ADR-001…007'},
+    {kw:['adr','decision','how','many'], a:'13 architecture decision records, all implemented and live-verified: transport selection, correlation-ID unification, session auth over JWT, console serving topology, audit persistence, TOTP MFA, a second approver identity, evidence grounding, structured claim verification, source-aware SQL remediation, a shared theme system, and two real execution paths (Docker, Postgres).', src:'docs/ADR-001…013'},
     {kw:['jwt','session','authentication','auth'], a:'Session-based authentication was chosen over JWT (ADR-003) — JWT would need a server-side blocklist for revocation, and a JWT in localStorage sits in the same exposure class an XSS audit had just closed. This was an explicit user decision point, not a default.', src:'ADR-003'},
     {kw:['mfa','totp','multi-factor'], a:'Real TOTP (RFC 6238), hand-rolled with node:crypto, required on every login (ADR-006) — verified against the published RFC test vectors, with replay protection confirmed live even against the correct password.', src:'ADR-006'},
     {kw:['audit','persist','restart','log'], a:'The audit trail persists to an append-only JSONL file (ADR-005), rehydrated on startup, rotated by size (5,000 lines/segment) and never deleted. Live-verified by killing the running server mid-session and confirming a prior decision was still retrievable after restart.', src:'ADR-005'},
     {kw:['confidence','60','escalate','escalation'], a:'Below 60% confidence, an incident escalates to a human (REQ-011 / STORY-009) — boundary-tested at exactly 59% vs 60%, and live-verified on the real SQL path.', src:'STORY-009'},
     {kw:['confidence','80','diagnostics','differential'], a:'Below 80% confidence, the system gathers a differential of additional possible causes instead of presenting one under-confident guess (REQ-010 / STORY-004).', src:'STORY-004'},
-    {kw:['how','many','tests','pass','passing'], a:'301 tests pass across 3 suites: 231 in mcp-server/, 64 in guardrails/, 6 in frontend/ — all re-run live for this document on 2026-08-25.', src:'live npm test'},
-    {kw:['real','systems','verified','against','live'], a:'Verified against a real, live Azure SQL Database (Free tier), a real Azure Blob Storage account, a real Anthropic API (Claude Sonnet 5), and a real ntfy.sh push channel — not mocks standing in for any of them.', src:'STORY-006, STORY-007, STORY-010'},
-    {kw:['how','long','take','build','time','days'], a:'9 real calendar days, 2026-08-17 to 2026-08-25, 88 commits — three days ahead of the platform-generated plan\'s own stated build_start, and over five weeks ahead of its stated build_end.', src:'.colaberry/plan.json vs. git log'},
+    {kw:['how','many','tests','pass','passing'], a:'376 tests pass across 3 suites: 300 in mcp-server/, 70 in guardrails/, 6 in frontend/ — all re-run live for this document on 2026-08-27.', src:'live npm test'},
+    {kw:['real','systems','verified','against','live'], a:'Verified against a real, live Azure SQL Database (Free tier), a real Azure Blob Storage account, a real Anthropic API (Claude Sonnet 5), a real ntfy.sh push channel, a real Docker daemon, and a real Postgres instance — not mocks standing in for any of them.', src:'STORY-006, STORY-007, STORY-010, ADR-012, ADR-013'},
+    {kw:['how','long','take','build','time','days'], a:'11 real calendar days, 2026-08-17 to 2026-08-27, 115 commits — three days ahead of the platform-generated plan\'s own stated build_start, and over five weeks ahead of its stated build_end.', src:'.colaberry/plan.json vs. git log'},
+    {kw:['execute','execution','real','fix','write','automate','automated','docker','postgres'], a:'Two real execution paths exist, both added 2026-08-27, both deliberately narrow: a real docker restart on a Docker/Superset incident (ADR-012), and a real, parameterized pg_terminate_backend() on a safe Postgres blocking query, gated by real deterministic DBA judgment (ADR-013). Every other action — SQL Server, SSRS, Cloud — still executes through the original honest stand-in; real write access to any of them would be its own separate decision.', src:'ADR-012, ADR-013'},
+    {kw:['dba','judgment','safe','safety','kill','blocking','session','backend'], a:'Two real rule sets decide whether it\'s safe to automatically kill a blocking session or backend — never a system process, never a transaction running over 5 minutes (blind-killing forces an expensive rollback), and always trace a chained blocker to its real root instead of killing an intermediate one. One set for SQL Server (ADR-010), one translated for Postgres\'s own system views (ADR-013) — both pure, deterministic, never AI-decided.', src:'sqlRemediationSafety.ts, pgRemediationSafety.ts'},
+    {kw:['mcp','inspector','tool','gateway'], a:'The MCP Tool Gateway (2 resources, 3 tools — SQL Server DMV reads, SSRS execution log reads, a stub diagnostic-query tool) was verified live for the first time on 2026-08-27 with the real MCP Inspector, connected over stdio: real tool calls through the actual UI, results matching the exact current fixture data. It exists as a standalone capability — not wired into the dashboard itself, which already gets the same data more directly.', src:'mcp-server/src/mcpServerFactory.ts'},
     {kw:['core','design','guarantee'], a:'Exactly one path in this system can write anything to a monitored server, and it can only act after a human explicitly approves a pending remediation — every collector, AI agent, and read path is architecturally incapable of writing to production, enforced in code and covered by tests.', src:'README.md'},
     {kw:['not','built','aspirational','kafka','timescaledb','future'], a:'The target architecture names Kafka, TimescaleDB, Faust, PostgreSQL, and Telegraf for a future, higher-scale version — none of that is implemented today. The real system holds state in-process and in a JSONL file, a deliberate scale-appropriate choice.', src:'project-blueprint/architecture.md'},
     {kw:['cost','price','pricing','dollar','budget'], a:'No dollar cost model exists — there is no token, invocation, or usage logging anywhere in this codebase to compute one from. Real, non-dollar facts: Azure SQL Free tier, free ntfy.sh, and Claude Sonnet 5 as the model actually called.', src:'repo-wide grep, 2026-08-25'},
