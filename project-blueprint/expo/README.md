@@ -27,18 +27,27 @@ correlation-ID audit trail).
   interactions, responsibilities, and significance spelled out in prose, not just a
   table row. Not published as an Artifact — plain Markdown, meant to be read or
   submitted directly (e.g. as coursework).
-- **`solution-architecture-capstone.html`** — built 2026-08-24, a knowledge-base-style
-  portfolio document (search, an offline "Ask the Guide" Q&A assistant, six
-  downloadable documents with CSV/HTML export) covering the same real system as
-  the files above, but framed for a reviewer/hiring-manager audience: the full ADR
-  log (7), the requirements traceability matrix (18 requirements → 12 stories, with
-  REQ-014/REQ-017 named as open gaps rather than hidden), the 284-test verification
-  record with the real live bugs it caught, the real 8-day delivery timeline against
-  the platform's own planned 6-week schedule, an honest cost/operating-footprint
-  section (no fabricated dollar figures — none exist in this repo), and a capstone
-  executive summary. Not published as an Artifact — a local, self-contained HTML
-  file, opened directly in a browser. Links to the three files above rather than
-  redrawing their diagrams.
+- **`solution-architecture-capstone.html`** — built 2026-08-24, updated 2026-08-27,
+  a knowledge-base-style portfolio document (search, an offline "Ask the Guide" Q&A
+  assistant, six downloadable documents with CSV/HTML export) covering the same real
+  system as the files above, but framed for a reviewer/hiring-manager audience: the
+  full ADR log (13), the requirements traceability matrix (18 requirements → 12
+  stories, with REQ-014/REQ-017 named as closed-directly rather than hidden), the
+  376-test verification record with the real live bugs it caught, the real 11-day
+  delivery timeline against the platform's own planned 6-week schedule, an honest
+  cost/operating-footprint section (no fabricated dollar figures — none exist in
+  this repo), and a capstone executive summary — including, as of the 2026-08-27
+  update, the shift from recommendation-only to two real, independently-confirmed
+  execution paths (Docker, Postgres). Not published as an Artifact — a local,
+  self-contained HTML file, opened directly in a browser. Links to the three files
+  above rather than redrawing their diagrams.
+- **`presentation-script.md`** — added 2026-08-27, a live-demo speaking script
+  (distinct from `../demo-script.md`'s older 90-second screencast voiceover for an
+  early version of this app). Walks five real incidents in a fixed, deliberate order
+  — Postgres, Docker, Cloud, SQL, SSRS — matching the dashboard's own fixed sort
+  order, each demonstrating a different real capability, then names every honest gap
+  before an audience would have to ask. Not published as an Artifact — plain
+  Markdown, meant to be read from directly while presenting.
 
 ## Updating
 
