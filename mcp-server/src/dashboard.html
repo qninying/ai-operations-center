@@ -932,6 +932,10 @@ function formatDuration(ms) {
 }
 
 const SOURCE_LABELS = { sql: 'SQL Server', cloud: 'Cloud', ssrs: 'SSRS', docker: 'Docker', postgres: 'Postgres' };
+// Fixed demo walkthrough order, requested 2026-08-27 for a specific narration
+// sequence — Postgres first, SSRS always last. Not a severity/timestamp sort;
+// deliberately fixed by source regardless of when each incident was discovered.
+const SOURCE_PRIORITY = { postgres: 0, docker: 1, cloud: 2, sql: 3, ssrs: 4 };
 
 // One card per incident: identity + evidence at the top, then a collapsed
 // detail region that Troubleshoot fills in and Fix acts on — everything for
@@ -1038,14 +1042,26 @@ async function loadIncidents() {
     for (const existingCard of Array.from(rowsEl.children)) {
       if (!seenIds.has(existingCard.dataset.incidentId)) existingCard.remove();
     }
-    const renderedIds = new Set(Array.from(rowsEl.children).map((c) => c.dataset.incidentId));
-    for (const incident of incidents) {
-      if (renderedIds.has(incident.id)) continue;
-      rowsEl.appendChild(renderIncidentCard(incident));
-      pushActivity(
-        incident.severity === 'critical' ? 'danger' : incident.severity === 'error' ? 'danger' : 'warning',
-        '<strong>New incident</strong> — ' + escapeHtml(incident.title)
-      );
+    // Sorted to the fixed demo walkthrough order (SOURCE_PRIORITY) every render,
+    // not just on first appearance — a new incident revealed later (staggered
+    // demo-mode delay) must insert into its correct position, not just land at
+    // the end. appendChild on an already-present node moves it rather than
+    // duplicating, so walking the full sorted list on every poll keeps existing
+    // cards correctly positioned too, not just newly-created ones.
+    const existingById = new Map(Array.from(rowsEl.children).map((c) => [c.dataset.incidentId, c]));
+    const sortedIncidents = [...incidents].sort(
+      (a, b) => (SOURCE_PRIORITY[a.source] ?? 99) - (SOURCE_PRIORITY[b.source] ?? 99)
+    );
+    for (const incident of sortedIncidents) {
+      let cardEl = existingById.get(incident.id);
+      if (!cardEl) {
+        cardEl = renderIncidentCard(incident);
+        pushActivity(
+          incident.severity === 'critical' ? 'danger' : incident.severity === 'error' ? 'danger' : 'warning',
+          '<strong>New incident</strong> — ' + escapeHtml(incident.title)
+        );
+      }
+      rowsEl.appendChild(cardEl);
     }
 
     activeIncidentCount = incidents.length;
