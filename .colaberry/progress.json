@@ -9,7 +9,7 @@
     "stories_not_started": 0,
     "criteria_total": 38,
     "criteria_passed": 38,
-    "points_awarded": 804
+    "points_awarded": 1362
   },
   "stories": [
     {
@@ -65,7 +65,7 @@
         "commit_sha": "aaac8b84bde6873879e8e0f317518fd63c8c7395",
         "commit_url": "https://github.com/qninying/ai-operations-center/commit/aaac8b84bde6873879e8e0f317518fd63c8c7395",
         "commit_at": "2026-08-18T02:47:34Z",
-        "points_awarded": 67,
+        "points_awarded": 129,
         "outstanding": []
       }
     },
@@ -105,7 +105,7 @@
         "commit_sha": "b55c1179827f3bed3b174e795e72ceaff770d6fe",
         "commit_url": "https://github.com/qninying/ai-operations-center/commit/b55c1179827f3bed3b174e795e72ceaff770d6fe",
         "commit_at": "2026-08-18T13:36:23Z",
-        "points_awarded": 67,
+        "points_awarded": 129,
         "outstanding": []
       }
     },
@@ -143,7 +143,7 @@
         "commit_sha": "5d47099cc413f096500677aeb91448d2d1277321",
         "commit_url": "https://github.com/qninying/ai-operations-center/commit/5d47099cc413f096500677aeb91448d2d1277321",
         "commit_at": "2026-08-18T14:28:57Z",
-        "points_awarded": 67,
+        "points_awarded": 129,
         "outstanding": []
       }
     },
@@ -182,7 +182,7 @@
         "commit_sha": "08ce1a202c23ce11c42c0f4d388c1edd8b0eb853",
         "commit_url": "https://github.com/qninying/ai-operations-center/commit/08ce1a202c23ce11c42c0f4d388c1edd8b0eb853",
         "commit_at": "2026-08-19T00:32:43Z",
-        "points_awarded": 67,
+        "points_awarded": 129,
         "outstanding": []
       }
     },
@@ -220,7 +220,7 @@
         "commit_sha": "08da6efc5353c1292c4f6db782cd7f160a279b77",
         "commit_url": "https://github.com/qninying/ai-operations-center/commit/08da6efc5353c1292c4f6db782cd7f160a279b77",
         "commit_at": "2026-08-19T01:44:22Z",
-        "points_awarded": 67,
+        "points_awarded": 129,
         "outstanding": []
       }
     },
@@ -266,7 +266,7 @@
         "commit_sha": "b899a7ddcab1797818ac2bf760b8e22259398ca0",
         "commit_url": "https://github.com/qninying/ai-operations-center/commit/b899a7ddcab1797818ac2bf760b8e22259398ca0",
         "commit_at": "2026-08-19T15:21:11Z",
-        "points_awarded": 67,
+        "points_awarded": 129,
         "outstanding": []
       }
     },
@@ -308,7 +308,7 @@
         "commit_sha": "a49e90dbac0587be7d80234222ad8127398af522",
         "commit_url": "https://github.com/qninying/ai-operations-center/commit/a49e90dbac0587be7d80234222ad8127398af522",
         "commit_at": "2026-08-19T16:30:58Z",
-        "points_awarded": 67,
+        "points_awarded": 129,
         "outstanding": []
       }
     },
@@ -352,7 +352,7 @@
         "commit_sha": "b6db24332cbdcfc0957f6f93fabcbddae8aa3ad2",
         "commit_url": "https://github.com/qninying/ai-operations-center/commit/b6db24332cbdcfc0957f6f93fabcbddae8aa3ad2",
         "commit_at": "2026-08-19T21:35:40Z",
-        "points_awarded": 67,
+        "points_awarded": 129,
         "outstanding": []
       }
     },
@@ -391,7 +391,7 @@
         "commit_sha": "4a35923d8ddabe594bd06046660e87fb86bc0107",
         "commit_url": "https://github.com/qninying/ai-operations-center/commit/4a35923d8ddabe594bd06046660e87fb86bc0107",
         "commit_at": "2026-08-19T21:59:30Z",
-        "points_awarded": 67,
+        "points_awarded": 129,
         "outstanding": []
       }
     },
