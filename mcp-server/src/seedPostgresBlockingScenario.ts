@@ -30,6 +30,14 @@ import pg from "pg";
 // Holds effectively indefinitely by default (see main()) — a fixed short hold
 // raced a real presenter twice (90s, then 180s, both confirmed live 2026-08-27 to
 // self-resolve mid-demo) before this was fixed to hold until acted upon instead.
+//
+// Each scenario runs fully isolated (own connections, own error handling, own
+// close) — confirmed live 2026-08-27 that a real Approve on ONE scenario (a real
+// termination killing that connection, see pgRemediationExecutor.ts) crashed this
+// script's entire process via an unhandled Node error, which force-closed the
+// OTHER, still-valid scenario's connections as collateral damage even though
+// nobody had approved it. A real remediation kill on one scenario must never
+// affect the other.
 const PG_HOST = process.env.PG_DEMO_HOST ?? "localhost";
 const PG_PORT = Number(process.env.PG_DEMO_PORT ?? 5434);
 const PG_DATABASE = process.env.PG_DEMO_DATABASE ?? "orders";
@@ -99,6 +107,37 @@ async function attemptBlockedWrite(client: pg.Client, scenario: Scenario): Promi
   console.log(`[Session B/${scenario.label}] Unblocked after ${Date.now() - start}ms.`);
 }
 
+// Fully self-contained: this scenario's own connections, own error handling, own
+// cleanup. A real remediation kill (via a genuine Approve, see
+// pgRemediationExecutor.ts) on either connection here is expected and handled
+// locally — it must never surface as an unhandled rejection or an unhandled
+// Client 'error' event, both of which would otherwise crash the whole process
+// and take the sibling scenario down too.
+async function runScenario(scenario: Scenario, holdSeconds: number): Promise<void> {
+  const config = readConfig();
+  const clientA = new pg.Client(config);
+  const clientB = new pg.Client(config);
+
+  const onConnectionLost = (who: string) => (err: Error) => {
+    console.log(`[${who}/${scenario.label}] connection lost (likely a real remediation kill): ${err.message}`);
+  };
+  clientA.on("error", onConnectionLost("Session A"));
+  clientB.on("error", onConnectionLost("Session B"));
+
+  await clientA.connect();
+  await clientB.connect();
+
+  try {
+    await Promise.all([holdLock(clientA, scenario, holdSeconds * 1000), attemptBlockedWrite(clientB, scenario)]);
+  } catch (err) {
+    console.log(
+      `[${scenario.label}] scenario ended early (likely a real remediation kill): ${err instanceof Error ? err.message : String(err)}`
+    );
+  } finally {
+    await Promise.allSettled([clientA.end(), clientB.end()]);
+  }
+}
+
 async function main(): Promise<void> {
   // 1800s (30 min) default — a fixed hold is fundamentally fragile for a live demo:
   // 90s, then 180s, both confirmed live 2026-08-27 to self-resolve mid-demo (a
@@ -110,22 +149,18 @@ async function main(): Promise<void> {
   // a number to budget the demo against. Pass a shorter number as this script's
   // argument if a specific timed demonstration is actually wanted.
   const holdSeconds = Number(process.argv[2]) || 1800;
-  const config = readConfig();
 
-  const clients = await Promise.all(SCENARIOS.map(() => [new pg.Client(config), new pg.Client(config)] as const));
-  await Promise.all(clients.flat().map((client) => client.connect()));
-
+  const setupClient = new pg.Client(readConfig());
+  await setupClient.connect();
   try {
-    await ensureDemoTables(clients[0][0]);
-    await Promise.all(
-      SCENARIOS.flatMap((scenario, i) => {
-        const [clientA, clientB] = clients[i];
-        return [holdLock(clientA, scenario, holdSeconds * 1000), attemptBlockedWrite(clientB, scenario)];
-      })
-    );
+    await ensureDemoTables(setupClient);
   } finally {
-    await Promise.all(clients.flat().map((client) => client.end()));
+    await setupClient.end();
   }
+
+  // allSettled, not all — one scenario ending early (a real kill) must never
+  // affect the other's independent lifecycle.
+  await Promise.allSettled(SCENARIOS.map((scenario) => runScenario(scenario, holdSeconds)));
 }
 
 main().catch((err) => {
