@@ -21,6 +21,25 @@ import { readConfidenceThreshold } from "./confidenceThresholds.js";
 // REQ-014: configurable via CONFIDENCE_THRESHOLD_ESCALATION — see confidenceThresholds.ts.
 const ESCALATION_THRESHOLD = readConfidenceThreshold("CONFIDENCE_THRESHOLD_ESCALATION", 60);
 
+// Found live: dashboard.html's Troubleshoot button re-enables after each call with
+// no dedup, so re-clicking it on the same still-active, unchanged incident reruns
+// analyzeIncidentRootCause() and, correctly, gets the same confidence/rootCause back
+// on unchanged evidence — but this function then unconditionally re-fired a real
+// operator notification for that identical conclusion every single time. A real
+// violation of this repo's own non-negotiable idempotency rule (side effects gated
+// by an idempotency key when the operation is replayable) — the same class of bug
+// the SQL/Postgres/Cloud seed scripts' own dedup keys already guard against.
+// Deliberately keyed on (confidence, rootCause) content, NOT incidentId — every
+// caller mints a fresh incidentId per click (see httpServer.ts's aiIncidentId),
+// so keying on it would never collide and the dedup would never fire. rootCause is
+// a full natural-language sentence citing specific evidence values (session ids,
+// pids, timestamps), so two genuinely different real incidents producing
+// byte-identical text is not a realistic collision to worry about. In-memory only,
+// same "process-lifetime suppression" precedent as incidentFeedService.ts's own
+// resolvedIds set — a restart clears it, which is fine: a fresh process means a
+// fresh presenter session, not a rapid-fire re-click storm to guard against.
+const notifiedEscalations = new Set<string>();
+
 export interface EscalationRecord {
   incidentId: string;
   confidence: number;
@@ -109,25 +128,35 @@ export function evaluateEscalation(
   // Fire-and-forget, same reasoning as monitoringService.ts — evaluateEscalation()
   // stays synchronous (its established contract from STORY-009), and
   // notifyOperators()'s own capped retry shouldn't block this function's return.
-  const notifyFn = options.notifyFn ?? notifyOperators;
-  notifyFn(
-    {
-      actionType: "escalation",
-      incidentId,
-      summary: rootCause,
-      // Yellow-flavored: a step down from a fresh incident's urgent/red, still
-      // visibly elevated (unlike the green, no-accent auth-code notification).
-      priority: "high",
-      tags: "warning",
-    },
-    { auditLog: options.auditLog }
-  ).catch((error) => {
+  const dedupeKey = `${confidence}::${rootCause}`;
+  if (notifiedEscalations.has(dedupeKey)) {
     safeLogEvent({
-      level: "error",
-      event: "operator_notification_dispatch_failed",
-      context: { incidentId, errorClass: error instanceof Error ? error.name : "Error" },
+      level: "info",
+      event: "escalation_notification_deduped",
+      context: { incidentId, confidence },
     });
-  });
+  } else {
+    notifiedEscalations.add(dedupeKey);
+    const notifyFn = options.notifyFn ?? notifyOperators;
+    notifyFn(
+      {
+        actionType: "escalation",
+        incidentId,
+        summary: rootCause,
+        // Yellow-flavored: a step down from a fresh incident's urgent/red, still
+        // visibly elevated (unlike the green, no-accent auth-code notification).
+        priority: "high",
+        tags: "warning",
+      },
+      { auditLog: options.auditLog }
+    ).catch((error) => {
+      safeLogEvent({
+        level: "error",
+        event: "operator_notification_dispatch_failed",
+        context: { incidentId, errorClass: error instanceof Error ? error.name : "Error" },
+      });
+    });
+  }
 
   return record;
 }

@@ -152,6 +152,45 @@ describe("evaluateEscalation", () => {
     expect(auditLog.all()).toHaveLength(0);
   });
 
+  it("found live: re-clicking Troubleshoot on the same unchanged incident does not re-notify a duplicate escalation", async () => {
+    const notifyFn = vi.fn().mockResolvedValue(undefined);
+
+    // Two separate calls, two separate throwaway incidentIds (exactly how
+    // dashboard.html actually calls this today — a fresh aiIncidentId per
+    // click) but identical confidence and rootCause, i.e. unchanged evidence.
+    const first = evaluateEscalation("inc-1000", 33, "Session 200 blocked by session 199", { notifyFn });
+    const second = evaluateEscalation("inc-2000", 33, "Session 200 blocked by session 199", { notifyFn });
+
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull(); // still honestly reported as escalated both times
+    expect(notifyFn).toHaveBeenCalledTimes(1); // but only notified once
+  });
+
+  it("a genuinely new confidence for the same underlying incident still notifies again", () => {
+    const notifyFn = vi.fn().mockResolvedValue(undefined);
+
+    evaluateEscalation("inc-3000", 40, "Session 300 blocked by session 299", { notifyFn });
+    evaluateEscalation("inc-4000", 22, "Session 300 blocked by session 299 — now also waiting 6 minutes", { notifyFn });
+
+    expect(notifyFn).toHaveBeenCalledTimes(2); // different rootCause text = genuinely new conclusion
+  });
+
+  it("logs a distinct event when a duplicate escalation is deduped, not silently", async () => {
+    const logSpy = vi.spyOn(logger, "logEvent");
+    const notifyFn = vi.fn().mockResolvedValue(undefined);
+
+    evaluateEscalation("inc-5000", 18, "Session 400 blocked by session 399", { notifyFn });
+    evaluateEscalation("inc-6000", 18, "Session 400 blocked by session 399", { notifyFn });
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "info",
+        event: "escalation_notification_deduped",
+        context: expect.objectContaining({ incidentId: "inc-6000", confidence: 18 }),
+      })
+    );
+  });
+
   it("ADR-002 (the actual point): escalation and the notification it triggers share one correlation ID end to end", async () => {
     const originalEnv = process.env.OPERATOR_CONTACTS;
     process.env.OPERATOR_CONTACTS = "ops-oncall@example.com";
