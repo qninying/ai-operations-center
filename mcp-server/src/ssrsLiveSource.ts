@@ -52,6 +52,14 @@ export class SsrsLiveSourceUnavailableError extends Error {
 // validated against SUPPORTED_SSRS_QUERIES by the caller before this map is even
 // consulted, so it is never used to build SQL text. rsSuccess is excluded at the
 // query level — this path exists to surface incidents, not a full execution log.
+//
+// Found live, 2026-08-28, the first time this query ever ran against a real
+// ExecutionLog3 table (seedSsrsExecutionLog.ts): TimeStart/TimeEnd are DATETIME2
+// columns, and the mssql driver deserializes those as native JS Date objects, not
+// strings — SsrsExecutionLogRowSchema expects z.string() (matching
+// ssrsFixtures.ts's own ISO-string rows), so every real row failed validation
+// with InvalidSsrsDataFormatError. CONVERT(..., 127) forces an ISO 8601 string at
+// the SQL layer instead of relying on the driver's own type mapping.
 const SSRS_QUERIES: Record<SupportedSsrsQuery, string> = {
   ExecutionLog3: `
     SELECT TOP (3)
@@ -59,8 +67,8 @@ const SSRS_QUERIES: Record<SupportedSsrsQuery, string> = {
       ItemPath AS report_path,
       UserName AS user_name,
       Status AS status,
-      TimeStart AS time_start,
-      TimeEnd AS time_end,
+      CONVERT(VARCHAR(33), TimeStart, 127) AS time_start,
+      CONVERT(VARCHAR(33), TimeEnd, 127) AS time_end,
       TimeDataRetrieval AS time_data_retrieval_ms,
       TimeProcessing AS time_processing_ms,
       TimeRendering AS time_rendering_ms
