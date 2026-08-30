@@ -9,12 +9,16 @@ import { logEvent } from "./observability/logger.js";
 import { safeLogEvent } from "./observability/safeLogEvent.js";
 
 // Unified, multi-source incident feed: SQL Server (DMV blocking chains), Cloud
-// (Blob diagnostics), SSRS (ExecutionLog3), and Docker (the dev-superset stack's
-// own health) all surface into one list, instead of the dashboard making the
-// user pick a single source before it shows anything. Only genuine problems
-// count as incidents — a source being unreachable means "can't check this
-// source" (logged, not fabricated as a finding), except Docker, where
-// unreachable IS the incident: there's nothing else to check for that source.
+// (Blob diagnostics), SSRS (ExecutionLog3), Docker (the dev-superset stack's own
+// health), and Postgres (blocking queries, or the dev-postgres container's own
+// health) all surface into one list, instead of the dashboard making the user
+// pick a single source before it shows anything. Only genuine problems count
+// as incidents — a source being unreachable means "can't check this source"
+// (logged, not fabricated as a finding), except Docker and Postgres, where
+// unreachable IS a real incident of its own — both are local dev containers
+// this environment can genuinely detect down and genuinely restart (see
+// dockerExecutor.ts), unlike SQL Server/SSRS/Cloud's remote, sometimes-
+// legitimately-unreachable dependencies.
 //
 // Staged reveal is a deliberate, demo-mode-only choice, not baked into "what
 // counts as an incident": every discovered incident gets a revealAt timestamp
@@ -82,7 +86,12 @@ async function discoverSqlIncidents(): Promise<DashboardIncident[]> {
       event: "incident_feed_source_check",
       context: { source: "sql", outcome: "failure", errorClass: error instanceof Error ? error.name : "Error" },
     });
-    return [];
+    // Re-thrown, not swallowed into []: tick()'s Promise.allSettled distinguishes
+    // "checked, genuinely clear" (fulfilled, empty array) from "couldn't check"
+    // (rejected) — collapsing both into [] would make tick()'s stale-incident
+    // pruning below treat a transient SQL Server outage as proof every previously
+    // active session cleared, silently hiding real incidents during an outage.
+    throw error;
   }
 }
 
@@ -109,7 +118,7 @@ async function discoverSsrsIncidents(): Promise<DashboardIncident[]> {
       event: "incident_feed_source_check",
       context: { source: "ssrs", outcome: "failure", errorClass: error instanceof Error ? error.name : "Error" },
     });
-    return [];
+    throw error;
   }
 }
 
@@ -147,7 +156,7 @@ async function discoverCloudIncidents(): Promise<DashboardIncident[]> {
       event: "incident_feed_source_check",
       context: { source: "cloud", outcome: "failure", errorClass: error instanceof Error ? error.name : "Error" },
     });
-    return [];
+    throw error;
   }
 }
 
@@ -198,12 +207,34 @@ async function discoverPostgresIncidents(): Promise<DashboardIncident[]> {
         sourceMode: "live" as const,
       }));
   } catch (error) {
+    // Unlike SQL/SSRS/Cloud's remote, sometimes-legitimately-unreachable
+    // dependencies, dev-postgres is a fully local, fully-controlled dev
+    // container (same reasoning pgActivitySource.ts's own header comment
+    // already gives for why it has no fixture-fallback) — unreachable here IS
+    // a real incident of its own, mirroring discoverDockerIncidents() below
+    // exactly, not just "can't check this source." Deliberately a fulfilled
+    // result (not re-thrown): a genuine, successful check that found the
+    // container down is real information, and tick()'s pruning below should
+    // treat it as such — if a real blocking-query incident was active when
+    // the container went down, this fixed id correctly replaces it as the
+    // one real problem to report, the same way Docker's single fixed id
+    // already works.
     logEvent({
-      level: "error",
+      level: "warn",
       event: "incident_feed_source_check",
       context: { source: "postgres", outcome: "failure", errorClass: error instanceof Error ? error.name : "Error" },
     });
-    return [];
+    return [
+      {
+        id: "postgres:unreachable",
+        source: "postgres",
+        title: "Postgres (dev-postgres) unreachable",
+        detail: "Verify Docker Desktop is running and the dev-postgres container is up (mcp-server/dev-postgres/).",
+        severity: "warning",
+        occurredAt: new Date().toISOString(),
+        sourceMode: "live",
+      },
+    ];
   }
 }
 
@@ -228,17 +259,50 @@ async function pushIncidentNotification(incident: DashboardIncident): Promise<vo
 }
 
 async function tick(): Promise<void> {
-  const [sql, ssrs, cloud, docker, postgres] = await Promise.allSettled([
+  const SOURCES: IncidentSource[] = ["sql", "ssrs", "cloud", "docker", "postgres"];
+  const settled = await Promise.allSettled([
     discoverSqlIncidents(),
     discoverSsrsIncidents(),
     discoverCloudIncidents(),
     discoverDockerIncidents(),
     discoverPostgresIncidents(),
   ]);
-  const discovered = [sql, ssrs, cloud, docker, postgres]
+  const discovered = settled
     .filter((r): r is PromiseFulfilledResult<DashboardIncident[]> => r.status === "fulfilled")
     .flatMap((r) => r.value);
   const discoveredIds = new Set(discovered.map((incident) => incident.id));
+  // Only a source that genuinely checked this tick (fulfilled — see each
+  // discover*Incidents()'s catch, which re-throws rather than swallowing into
+  // []) can be trusted to say "nothing found here." A rejected source means
+  // "couldn't check," not "all clear" — conflating the two below would let a
+  // transient SQL Server/SSRS/Cloud/Postgres outage silently prune every one
+  // of that source's real active incidents out of the feed.
+  const checkedSources = new Set(
+    settled.flatMap((r, i) => (r.status === "fulfilled" ? [SOURCES[i]] : []))
+  );
+
+  // An active, never-explicitly-resolved incident whose underlying condition
+  // clears on its own (a SQL/Postgres lock releases, Superset comes back
+  // healthy) must leave the active feed too — not just the human-resolved
+  // path markResolved() covers. Found live: a real SQL blocking scenario
+  // self-released (confirmed via a direct DMV query showing zero blocked
+  // sessions) while the dashboard kept showing it as active indefinitely,
+  // holding System Health at "Unhealthy" for a problem that no longer existed.
+  // This is a separate, un-notified, un-audited clearing — deliberately NOT
+  // added to resolvedIds (that set's suppression semantics are for a human's
+  // guardrail-approved fix specifically, per markResolved()'s own doc comment)
+  // and NOT rendered in the "Resolved" panel (that panel reads the guardrail
+  // audit trail, not this module's state) — it just quietly stops being active.
+  for (const [id, tracked] of state) {
+    if (checkedSources.has(tracked.incident.source) && !discoveredIds.has(id)) {
+      state.delete(id);
+      logEvent({
+        level: "info",
+        event: "incident_naturally_cleared",
+        context: { incidentId: id, source: tracked.incident.source },
+      });
+    }
+  }
 
   // A resolved incident whose underlying condition has since cleared can recur.
   // Most sources' ids are naturally scoped to one occurrence (a specific SSRS
