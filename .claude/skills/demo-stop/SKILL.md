@@ -73,16 +73,22 @@ running — every step here is idempotent, matching this repo's own idempotency 
    supervisor — e.g. outside this skill), fall back to
    `pkill -f "tsx src/httpServer.ts"` as well; harmless if nothing matches.
 
-5. **Tear down the Superset stack**, if `demo-start`'s step 8 started it — its own
-   README says plainly it's not meant to run unattended:
+5. **Stop the Superset containers — don't remove them.** Changed 2026-08-29: this
+   used to run `docker compose down -v` (full teardown — containers, network, and
+   volume all removed), which meant every `demo-start` paid for a real, slow
+   `setup.sh` re-init (container pull, migrations, driver install) from scratch.
+   Same reasoning `dev-postgres` already gets from this skill (see the Related
+   section below) now applies to Superset too — stop it, keep its state:
    ```
-   cd mcp-server/dev-superset && docker compose down -v && cd -
+   docker stop coreops-dev-superset-db coreops-dev-superset
    ```
-   Safe to run even if nothing is up — `docker compose down` on an already-stopped
-   or never-started stack is a no-op, same idempotent-by-default reasoning as the
-   `pkill`s in step 1. Removes the containers, network, and volume together (`-v`),
-   so a later `demo-start` gets a genuinely fresh Superset init rather than reusing
-   stale state.
+   Safe to run even if nothing is up — stopping an already-stopped or
+   never-started container is a no-op, same idempotent-by-default reasoning as the
+   `pkill`s in step 1. `demo-start`'s own step 9 already checks for a running
+   stack before calling `setup.sh` — after this change, that same check now also
+   catches the common case of "stopped but still present," restarting the existing
+   containers (`docker start`) instead of re-running `setup.sh` unnecessarily; see
+   `demo-start`'s own updated step 9 for the exact check.
 
 6. **Confirm it's actually down**, don't just assume the kill worked:
    ```
@@ -94,20 +100,25 @@ running — every step here is idempotent, matching this repo's own idempotency 
 
 7. **Report the clean state.** Confirm to the user that any pending fault injection
    was cancelled, monitoring was stopped, the HTTP server is down, and the Superset
-   stack was torn down — don't leave them wondering whether something is still
-   running in the background after they've closed their laptop.
+   containers were stopped (not removed — their data and setup survive to the next
+   `demo-start`) — don't leave them wondering whether something is still running in
+   the background after they've closed their laptop.
 
 ## Related
 
-- `demo-start` — the matching setup skill. Step 9 there starts the Superset stack
-  this skill's step 5 tears down; step 8 schedules the Postgres blocking scenario
-  this skill's step 1 cancels.
-- `mcp-server/dev-superset/` — its own README explains why this teardown matters:
-  dev/verification tooling, explicitly not meant to be left running.
+- `demo-start` — the matching setup skill. Step 9 there brings the Superset stack
+  this skill's step 5 stops back up (a fast `docker start` if it already exists,
+  falling back to a full `setup.sh` init only the first time); step 8 schedules the
+  Postgres blocking scenario this skill's step 1 cancels.
+- `mcp-server/dev-superset/` — its own README explains what this stack is for.
+  Previously torn down (`docker compose down -v`) after every demo; changed
+  2026-08-29 to stop-not-remove, same as `dev-postgres` below, so `demo-start`
+  doesn't pay for a full re-init every single time.
 - `mcp-server/dev-postgres/` — the Postgres container `demo-start` step 8 may start.
   Not torn down by this skill (deliberately, same as `demo-postgres-incident`'s own
   scope decision) — only the fault-injector process and any active block are
-  cancelled in step 1; the container itself is left running between demos.
+  cancelled in step 1; the container itself is left running (or stopped, not
+  removed) between demos, the same pattern Superset now follows too.
 - `mcp-server/scripts/demoSupervisor.mjs` — the process step 4 stops. Also stops
   itself cleanly (kills its own child, no auto-restart) on SIGTERM, so a plain
   `pkill -f "demoSupervisor.mjs"` is enough — no separate step needed for the

@@ -164,13 +164,27 @@ the blocking scenario, not waiting on a cold start.
 9. **Start the Superset stack**, for the reporting-service integration demo
    (`mcp-server/src/demoSsrsExecutionLog.ts` and
    `mcp-server/dev-superset/verify-live-pattern.ts` — see
-   `project-blueprint/demo-script.md`'s Acts 4-5). Check first whether it's already
-   running, same idempotent-skip reasoning as step 1:
+   `project-blueprint/demo-script.md`'s Acts 4-5). Three possible states now that
+   `demo-stop` stops rather than removes the containers (changed 2026-08-29) — check
+   in this order, same idempotent-skip reasoning as step 1:
    ```
    docker ps --filter "name=coreops-dev-superset" --format "{{.Names}}"
    ```
-   If that returns `coreops-dev-superset` and `coreops-dev-superset-db`, skip to
-   step 10 — don't re-run setup against an already-running stack. Otherwise, from
+   If that returns both `coreops-dev-superset` and `coreops-dev-superset-db`,
+   already running — skip to step 10. Otherwise check whether they exist at all,
+   just stopped:
+   ```
+   docker ps -a --filter "name=coreops-dev-superset" --format "{{.Names}}"
+   ```
+   If that returns both names, they exist from a prior session — just restart them,
+   real query history and all, no re-init needed:
+   ```
+   docker start coreops-dev-superset-db coreops-dev-superset
+   ```
+   then poll `curl -s -o /dev/null -w "%{http_code}" http://localhost:8088/health`
+   a few seconds apart (bounded) until it's healthy, and skip to step 10. Only if
+   neither container exists at all (a genuinely first run, or one after
+   `docker compose down -v` was used by hand) does this need the full init, from
    `mcp-server/dev-superset/`:
    ```
    ./setup.sh
