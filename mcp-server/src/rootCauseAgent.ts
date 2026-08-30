@@ -139,10 +139,23 @@ function buildPrompt(incident: Incident): string {
   ].join("\n");
 }
 
+// Found live: despite the prompt's explicit "Respond with JSON only, no other
+// text," the model still sometimes wraps its response in a markdown code
+// fence (```json ... ```) — a well-known model habit, not something a prompt
+// instruction alone reliably suppresses. Stripping a fence here is a parsing
+// concern, not a trust concern: the JSON payload inside is still fully
+// schema-validated below exactly as before, so this doesn't loosen what
+// counts as a valid response, only what counts as "text JSON.parse can read."
+function stripMarkdownCodeFence(text: string): string {
+  const trimmed = text.trim();
+  const match = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
+  return match ? match[1].trim() : trimmed;
+}
+
 function parseResponse(text: string): z.infer<typeof RootCauseResponseSchema> {
   let json: unknown;
   try {
-    json = JSON.parse(text);
+    json = JSON.parse(stripMarkdownCodeFence(text));
   } catch (error) {
     throw new MalformedResponseError(error);
   }
@@ -157,7 +170,13 @@ async function defaultCallModel(prompt: string): Promise<string> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const response = await client.messages.create({
     model: MODEL,
-    max_tokens: 1024,
+    // Found live: the correlated SQL+SSRS path (the most evidence of any
+    // caller, up to 6 rows) hit this cap mid-claim, truncating the JSON
+    // response inside a string value — parseResponse() correctly rejected the
+    // invalid JSON as MalformedResponseError, but the real fix is giving the
+    // model enough room to finish a full rootCause plus several claims rather
+    // than tuning the parser to tolerate a cut-off response.
+    max_tokens: 4096,
     messages: [{ role: "user", content: prompt }],
   });
 

@@ -121,6 +121,17 @@ describe("analyzeIncidentRootCause", () => {
     );
   });
 
+  it("tolerates the model wrapping its JSON response in a markdown code fence — found live", async () => {
+    const callModel = vi.fn().mockResolvedValue(
+      "```json\n" + jsonResponse({ rootCause: "Blocking chain on session 61", confidence: 90, evidenceIdsUsed: ["evt-1"] }) + "\n```"
+    );
+
+    const result = await analyzeIncidentRootCause(baseIncident(), { callModel });
+
+    expect(result.rootCause).toBe("Blocking chain on session 61");
+    expect(result.confidence).toBe(90);
+  });
+
   it("throws MissingApiKeyError when no key is configured and no callModel is injected, without attempting a call", async () => {
     delete process.env.ANTHROPIC_API_KEY;
 
