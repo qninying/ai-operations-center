@@ -54,7 +54,10 @@ const ACTIVITY_QUERY = `
   WHERE pid != pg_backend_pid()
 `;
 
-function readConfig(): pg.ClientConfig {
+// Exported so dockerExecutor.ts's real-restart health probe for dev-postgres
+// can reuse the exact same connection parameters rather than maintaining a
+// second, driftable copy of PG_HOST/PORT/DATABASE/USER/PASSWORD.
+export function readPgDemoConfig(): pg.ClientConfig {
   return {
     host: PG_HOST,
     port: PG_PORT,
@@ -66,7 +69,7 @@ function readConfig(): pg.ClientConfig {
 }
 
 async function runQuery(): Promise<PgActivityRow[]> {
-  const client = new pg.Client(readConfig());
+  const client = new pg.Client(readPgDemoConfig());
   try {
     await client.connect();
     const result = await client.query<PgActivityRow>(ACTIVITY_QUERY);

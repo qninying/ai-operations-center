@@ -1238,6 +1238,19 @@ async function troubleshootIncident(incidentId, cardEl) {
     return;
   }
 
+  if (source === 'postgres' && incidentId === 'postgres:unreachable') {
+    // Mirrors the docker branch above exactly — a plain connectivity check,
+    // no evidence to reason over, same honesty pattern.
+    rootCauseEl.style.display = 'block';
+    rootCauseEl.textContent = 'Postgres (dev-postgres) unreachable — verify Docker Desktop is running and the dev-postgres container is up (cd mcp-server/dev-postgres && docker compose up -d). No AI analysis applies here — this is a plain connectivity check, not evidence to reason over.';
+    actionsRow.style.display = 'flex';
+    setCorrelationId(incidentId, 'demo-postgres-' + Date.now(), cardEl);
+    pushActivity('warning', '<strong>Troubleshoot</strong> — Postgres/dev-postgres unreachable');
+    btn.disabled = false;
+    btn.textContent = 'Troubleshoot';
+    return;
+  }
+
   if (source === 'postgres') {
     // ADR-013: no AI recommendation call here — /api/recommendation and
     // /api/correlated-recommendation are SQL Server/SSRS-specific evidence

@@ -1,6 +1,6 @@
 ---
 name: demo-postgres-incident
-description: Trigger a real Postgres blocking-query incident for CoreOps live demos by seeding a genuine lock-contention scenario in the dev-postgres container, and cancel it early if needed. Use when the user says "let's block a Postgres query", "trigger the postgres incident", "show the postgres incident live", "seed a blocking query", or wants to demo the Troubleshoot/Fix/Approve flow against a real Postgres backend kill in front of an audience.
+description: Trigger a real Postgres incident for CoreOps live demos — either a genuine lock-contention scenario in the dev-postgres container, or the container itself going unreachable (added 2026-08-28, mirroring demo-docker-incident) — and cancel/restore it. Use when the user says "let's block a Postgres query", "trigger the postgres incident", "show the postgres incident live", "seed a blocking query", "stop dev-postgres", "make postgres unreachable", or wants to demo the Troubleshoot/Fix/Approve flow against a real Postgres backend kill or a real container restart in front of an audience.
 ---
 
 # CoreOps Postgres Incident Demo
@@ -45,12 +45,69 @@ different real execution (`pg_terminate_backend`, not `docker restart`). Both sh
 the same honesty discipline (execution and confirmation are separate steps; only a
 confirmed outcome resolves the incident) but nothing else overlaps.
 
-**Unlike Docker's fixed `docker:superset` id, this needs no recurrence fix.**
-Postgres incident ids are `postgres:pid:${pid}` — a real OS-level process id, unique
-to this one occurrence — so `markResolved()`'s permanent-suppression behavior never
-causes the "can only fire once per server process" problem `demo-docker-incident`
-had to work around (see that skill's own notes on the fix). A fresh seed always
-produces a fresh, real pid.
+**Unlike Docker's fixed `docker:superset` id, the blocking-query scenario below
+needs no recurrence fix.** Postgres incident ids for a real block are
+`postgres:pid:${pid}` — a real OS-level process id, unique to this one
+occurrence — so `markResolved()`'s permanent-suppression behavior never causes the
+"can only fire once per server process" problem `demo-docker-incident` had to work
+around (see that skill's own notes on the fix). A fresh seed always produces a
+fresh, real pid. **The container-unreachable scenario added below is the one
+exception** — `postgres:unreachable` is a fixed, non-timestamped id, exactly like
+`docker:superset`, so it *does* rely on the same recurrence handling
+`incidentFeedService.ts` already has for Docker (un-suppressed once it stops being
+discovered at all) — added 2026-08-28 alongside the incident itself, covered by its
+own test.
+
+## Trigger the unreachable incident ("stop dev-postgres", "make postgres unreachable")
+
+Mirrors `demo-docker-incident`'s stop/restore steps exactly, second container — a
+real `docker stop`/`start`, not a seeded lock. Detection (`postgres:unreachable`)
+and the real restart-and-confirm remediation were added 2026-08-28
+(`docs/ADR-012-real-docker-execution.md`'s addendum) specifically so this is a
+genuine, repeatable on-command demo beat, not just a blocking-query one.
+
+1. Check current state first — don't stop what's already stopped:
+   ```
+   docker ps --filter "name=coreops-dev-postgres" --format "{{.Names}}: {{.Status}}"
+   ```
+   If nothing is listed, it's already down — say so, don't re-stop it.
+
+2. Stop the container:
+   ```
+   docker stop coreops-dev-postgres
+   ```
+
+3. Tell the user plainly: the incident should appear on **their own** dashboard
+   soon, titled "Postgres (dev-postgres) unreachable" — same timing caveat as
+   `demo-docker-incident` (immediate outside demo mode; a randomized 3-45s reveal
+   delay under `DEMO_MODE=true`). Don't drive their browser for them or claim you
+   saw it render.
+
+### Restore ("bring postgres back", "restore dev-postgres")
+
+1. Check current state first:
+   ```
+   docker ps --filter "name=coreops-dev-postgres" --format "{{.Names}}: {{.Status}}"
+   ```
+   If already `Up`, nothing to do.
+
+2. Start it:
+   ```
+   docker start coreops-dev-postgres
+   ```
+   Confirm it's genuinely accepting connections, not just `Up` —
+   `docker exec coreops-dev-postgres psql -U app -d orders -c "SELECT 1;"` — typically
+   ready within a couple seconds (Postgres boots far faster than Superset).
+
+3. Tell the user the incident should clear from their dashboard's active list on its
+   own within one poll cycle — same as Docker's restore step, they confirm visually,
+   not you.
+
+**Real execution, same as Docker's**: approving the proposed fix on this incident
+runs a genuine `docker restart coreops-dev-postgres` (`restartPostgresContainer()`
+in `dockerExecutor.ts`) and independently reconfirms the container is actually
+reachable before the incident is allowed to show as resolved — not the ADR-010
+honest stand-in every other non-Docker/Postgres action still uses.
 
 ## Trigger the incident ("let's block a postgres query", "trigger the postgres incident")
 
@@ -163,7 +220,10 @@ seed script.
   `demo-start`/`demo-stop` separately if `dev-postgres` should become part of every
   demo session by default.
 - `docs/ADR-013-real-postgres-remediation.md` — the real DBA judgment and execution
-  design this skill exercises.
+  design the blocking-query scenario exercises.
+- `docs/ADR-012-real-docker-execution.md` — its 2026-08-28 addendum covers the
+  unreachable/restart scenario above; `mcp-server/src/dockerExecutor.ts`'s
+  `restartPostgresContainer()` is the real execution it calls.
 - `mcp-server/src/seedPostgresBlockingScenario.ts` — the real seed script this skill
   schedules, now seeding 2 independent blocking pairs (4 connections total) instead
   of 1. Can be run by hand instead with a different hold time if the presenter wants

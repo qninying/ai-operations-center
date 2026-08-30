@@ -40,3 +40,34 @@ Asked directly for one deliberate, narrow exception: "its out of scope but i nee
 ## What would change this decision
 
 Extending real execution to any other source would need its own dedicated review of the new privileged access it requires — the exact reversibility/blast-radius argument this ADR makes for Docker (local, unprivileged, trivially reversible) does not automatically transfer to SQL Server or IIS.
+
+## Addendum (2026-08-28): dev-postgres joins as a second target
+
+For a live-demo capability — manually stopping `dev-postgres`/`dev-superset` mid-demo
+to show CoreOps genuinely detect and alert on it — `dev-postgres` needed the same
+treatment Docker already had: detection of "unreachable" as a real incident of its
+own (not just "can't check this source"), and a real restart, not a stand-in. This
+is not a new decision, the exact reasoning above already covers it: `dev-postgres`
+is the same class of target as `dev-superset` — a local dev container this
+environment already owns outright, `docker restart coreops-dev-postgres` needs no
+new credential, touches no production system, is trivially reversible.
+
+`dockerExecutor.ts`'s restart-then-confirm mechanism was generalized to take a
+container name and a health-probe function, rather than duplicated — Superset's
+probe stays an HTTP health check; Postgres's is a direct `pg` connect + `SELECT 1`,
+deliberately separate from `pgActivitySource.ts`'s own circuit breaker for the same
+reason Superset's probe stays separate from `supersetHealthSource.ts`'s. Wired
+through the identical `POST /api/guardrail/propose`/`decide` path, reusing the same
+`restart_service` action type (no new action type, no guardrail change) — only
+`targetSystem.name` differs (`dev-postgres` vs `dev-superset`), and the response
+shape (`executed`, `realExecution`, `realOutcome: { confirmed, detail }`) is
+byte-for-byte the same generic shape `dashboard.html` already renders for both.
+
+Detection required one deliberate exception to `incidentFeedService.ts`'s general
+"unreachable = can't check, not a finding" policy — `discoverPostgresIncidents()`
+now returns a real `postgres:unreachable` incident (a fulfilled result, mirroring
+`discoverDockerIncidents()`'s catch branch exactly) instead of re-throwing. This
+means a container-down event correctly *replaces* any active blocking-query
+incident as the one real problem to report, the same way Docker's single fixed id
+already works — covered by a new test (`incidentFeedService.test.ts`) asserting
+exactly that replacement, not just the detection in isolation.

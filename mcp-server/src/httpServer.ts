@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { readDmv } from "./dmvReader.js";
 import { assessBlockingSessionRemediation } from "./sqlRemediationSafety.js";
-import { restartSupersetContainer } from "./dockerExecutor.js";
+import { restartSupersetContainer, restartPostgresContainer } from "./dockerExecutor.js";
 import { queryPgActivity } from "./pgActivitySource.js";
 import { assessPostgresRemediation } from "./pgRemediationSafety.js";
 import { terminatePostgresBackend } from "./pgRemediationExecutor.js";
@@ -808,6 +808,22 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
       return proposeAction(res, action, `Kill blocking session ${blockerSessionId}, evidence-linked, awaiting approval.`);
     }
 
+    // Postgres unreachable (the dev-postgres container itself is down) is a
+    // distinct incident shape from a blocking-query chain — its id carries no
+    // pid to parse, so this must be checked before the pid-based branch
+    // below. Mirrors the `docker` entry in SOURCE_ACTIONS exactly: same
+    // action type, same real-restart mechanism (dockerExecutor.ts), just a
+    // different target container.
+    if (source === "postgres" && incidentId === "postgres:unreachable") {
+      const action: RemediationAction = {
+        actionType: "restart_service",
+        evidenceIds,
+        approval: null,
+        targetSystem: { name: "dev-postgres", productionWriteProtected: true },
+      };
+      return proposeAction(res, action, `restart_service on dev-postgres, evidence-linked, awaiting approval.`);
+    }
+
     // ADR-013: same real-DBA-judgment shape as SQL above, translated to
     // Postgres — assessPostgresRemediation() is the actual gate on whether
     // kill_postgres_backend is even offered.
@@ -1020,6 +1036,19 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
           return outcome.confirmedHealthy
             ? { confirmed: true, detail: `confirmed healthy in ${seconds}s` }
             : { confirmed: false, detail: `not confirmed healthy after ${seconds}s — check Docker directly` };
+        }, "DOCKER_RESTART_FAILED");
+        return;
+      }
+
+      // Same mechanism as dev-superset above, second target: dev-postgres is
+      // also a local dev container this environment can genuinely restart.
+      if (approvedAction.actionType === "restart_service" && approvedAction.targetSystem.name === "dev-postgres") {
+        await executeReal(async () => {
+          const outcome = await restartPostgresContainer();
+          const seconds = Math.round(outcome.waitedMs / 1000);
+          return outcome.confirmedHealthy
+            ? { confirmed: true, detail: `confirmed reachable in ${seconds}s` }
+            : { confirmed: false, detail: `not confirmed reachable after ${seconds}s — check Docker directly` };
         }, "DOCKER_RESTART_FAILED");
         return;
       }
