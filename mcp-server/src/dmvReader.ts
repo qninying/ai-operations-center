@@ -105,7 +105,11 @@ function buildResult(
 
 export async function readDmv(
   input: ReadDmvInput,
-  liveSource: (input: ReadDmvInput) => Promise<DmvExecRequestRow[]> = queryLiveDmv
+  liveSource: (
+    input: ReadDmvInput,
+    onAttempt?: (attempt: number, maxAttempts: number) => void
+  ) => Promise<DmvExecRequestRow[]> = queryLiveDmv,
+  onAttempt?: (attempt: number, maxAttempts: number) => void
 ): Promise<DmvReadResult> {
   if (!isSupportedDmv(input.dmvName)) {
     throw new UnsupportedDmvError(input.dmvName);
@@ -114,7 +118,10 @@ export async function readDmv(
   const normalizedInput = normalizeInput(input);
 
   try {
-    const rows = await liveSource(normalizedInput);
+    // Only pass a second argument when a real callback exists, so a caller with
+    // no progress interest (e.g. an existing test's fake liveSource) sees the
+    // exact same single-argument call it always has.
+    const rows = onAttempt ? await liveSource(normalizedInput, onAttempt) : await liveSource(normalizedInput);
     return buildResult("live", rows, normalizedInput);
   } catch (error) {
     if (!isKnownLiveSourceFailure(error)) {

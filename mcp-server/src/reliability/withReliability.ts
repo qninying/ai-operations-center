@@ -10,6 +10,7 @@ export interface ReliabilityOptions {
   baseDelayMs: number;
   maxDelayMs: number;
   circuitBreaker?: CircuitBreaker;
+  onAttempt?: (attempt: number, maxAttempts: number) => void;
 }
 
 export class UpstreamTimeoutError extends Error {
@@ -68,11 +69,13 @@ export async function withReliability<T>(
   operation: () => Promise<T>,
   options: ReliabilityOptions
 ): Promise<T> {
-  const { timeoutMs, maxRetries, baseDelayMs, maxDelayMs, circuitBreaker } = options;
+  const { timeoutMs, maxRetries, baseDelayMs, maxDelayMs, circuitBreaker, onAttempt } = options;
   const maxAttempts = maxRetries + 1;
 
   let lastError: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    onAttempt?.(attempt, maxAttempts);
+
     if (circuitBreaker) {
       const retryAfterMs = circuitBreaker.checkAvailability();
       if (retryAfterMs !== null) {

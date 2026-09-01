@@ -59,9 +59,26 @@ export function createCoreOpsMcpServer(): McpServer {
           .describe("Optional database name to filter returned rows by."),
       },
     },
-    async ({ dmvName, databaseName }) => {
+    async ({ dmvName, databaseName }, extra) => {
+      const progressToken = extra._meta?.progressToken;
+      // Progress notifications are opt-in per MCP spec: only build and pass a
+      // callback when the caller actually attached a progressToken, so a client
+      // that never asked for updates gets the exact same call path as before.
+      const onAttempt =
+        progressToken === undefined
+          ? undefined
+          : (attempt: number, maxAttempts: number) =>
+              void extra.sendNotification({
+                method: "notifications/progress",
+                params: {
+                  progressToken,
+                  progress: attempt,
+                  total: maxAttempts,
+                  message: `Querying ${dmvName} (attempt ${attempt} of ${maxAttempts})`,
+                },
+              });
       try {
-        const { source, rows } = await readDmv({ dmvName, databaseName });
+        const { source, rows } = await readDmv({ dmvName, databaseName }, undefined, onAttempt);
         return {
           content: [
             {

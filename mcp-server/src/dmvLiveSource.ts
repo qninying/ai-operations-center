@@ -121,7 +121,10 @@ async function runQuery(
 // exhausted), or CircuitOpenError (breaker open, no attempt made). Never returns a
 // partial/best-effort result. The caller (dmvReader.ts) decides what to do with any
 // of these, typically falling back to fixture data.
-export async function queryLiveDmv(input: ReadDmvInput): Promise<DmvExecRequestRow[]> {
+export async function queryLiveDmv(
+  input: ReadDmvInput,
+  onAttempt?: (attempt: number, maxAttempts: number) => void
+): Promise<DmvExecRequestRow[]> {
   const config = readConnectionConfig();
 
   return withReliability(() => runQuery(input, config), {
@@ -130,5 +133,6 @@ export async function queryLiveDmv(input: ReadDmvInput): Promise<DmvExecRequestR
     baseDelayMs: BASE_DELAY_MS,
     maxDelayMs: MAX_DELAY_MS,
     circuitBreaker: dmvCircuitBreaker,
+    onAttempt,
   });
 }
