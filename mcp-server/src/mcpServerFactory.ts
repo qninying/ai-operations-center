@@ -17,6 +17,8 @@ import { readDmv, SUPPORTED_DMVS, UnsupportedDmvError } from "./dmvReader.js";
 import { executionLogFixture } from "./ssrsFixtures.js";
 import { readSsrsExecutionLog, SUPPORTED_SSRS_QUERIES, UnsupportedSsrsQueryError } from "./ssrsReader.js";
 import { sendMcpLog } from "./observability/mcpLog.js";
+import { resolveWithinRoots, PathOutsideRootsError, NoRootsDeclaredError } from "./security/rootsEnforcement.js";
+import { readDiagnosticLogFile } from "./diagnosticLogReader.js";
 
 export function createCoreOpsMcpServer(): McpServer {
   const server = new McpServer(
@@ -259,6 +261,92 @@ export function createCoreOpsMcpServer(): McpServer {
           },
         ],
       };
+    }
+  );
+
+  server.registerTool(
+    "read_diagnostic_log_file",
+    {
+      title: "Read diagnostic log file",
+      description:
+        "Reads a local diagnostic log file (e.g. a SQL Server error log excerpt) and returns its most recent lines as structured JSON. Read-only: performs no write of any kind. The file must resolve to a real path inside a root the connected client has declared via MCP roots — anything else, including a path that only reaches outside those roots via \"..\" traversal or a symlink, is denied.",
+      inputSchema: {
+        path: z.string().min(1).describe("Absolute or relative path to the diagnostic log file to read."),
+        maxLines: z
+          .number()
+          .int()
+          .min(1)
+          .max(1000)
+          .optional()
+          .describe("Maximum number of most-recent lines to return (default 200)."),
+      },
+    },
+    async ({ path, maxLines }) => {
+      const correlationId = crypto.randomUUID();
+      sendMcpLog(server, "info", "mcp_tool_invocation_started", {
+        correlationId,
+        tool: "read_diagnostic_log_file",
+        requestedPath: path,
+      });
+
+      let realPath: string;
+      try {
+        realPath = await resolveWithinRoots(server, path);
+      } catch (error) {
+        if (error instanceof PathOutsideRootsError || error instanceof NoRootsDeclaredError) {
+          sendMcpLog(server, "warning", "mcp_tool_denied", {
+            correlationId,
+            tool: "read_diagnostic_log_file",
+            requestedPath: path,
+            errorClass: error.name,
+            reason: error.message,
+          });
+          return {
+            isError: true,
+            content: [{ type: "text", text: `${error.name}: ${error.message}` }],
+          };
+        }
+        sendMcpLog(server, "error", "mcp_tool_error", {
+          correlationId,
+          tool: "read_diagnostic_log_file",
+          errorClass: error instanceof Error ? error.name : "Error",
+        });
+        throw error;
+      }
+
+      try {
+        sendMcpLog(server, "info", "mcp_external_call_started", {
+          correlationId,
+          tool: "read_diagnostic_log_file",
+          target: "diagnostic_log_file",
+        });
+        const startedAt = Date.now();
+        const result = await readDiagnosticLogFile(realPath, { maxLines });
+        sendMcpLog(server, "info", "mcp_external_call_finished", {
+          correlationId,
+          tool: "read_diagnostic_log_file",
+          target: "diagnostic_log_file",
+          durationMs: Date.now() - startedAt,
+          lineCount: result.lines.length,
+          truncatedBySize: result.truncatedBySize,
+          truncatedByLineCount: result.truncatedByLineCount,
+        });
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ path: realPath, ...result }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        sendMcpLog(server, "error", "mcp_tool_error", {
+          correlationId,
+          tool: "read_diagnostic_log_file",
+          errorClass: error instanceof Error ? error.name : "Error",
+        });
+        throw error;
+      }
     }
   );
 
