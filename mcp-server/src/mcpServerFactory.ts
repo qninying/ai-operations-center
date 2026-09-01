@@ -12,9 +12,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { dmExecRequestsFixture } from "./dmvFixtures.js";
 import { readDmv, SUPPORTED_DMVS, UnsupportedDmvError } from "./dmvReader.js";
-import { executionLogFixture } from "./ssrsFixtures.js";
 import { readSsrsExecutionLog, SUPPORTED_SSRS_QUERIES, UnsupportedSsrsQueryError } from "./ssrsReader.js";
 import { sendMcpLog } from "./observability/mcpLog.js";
 import { resolveWithinRoots, PathOutsideRootsError, NoRootsDeclaredError } from "./security/rootsEnforcement.js";
@@ -34,24 +32,35 @@ export function createCoreOpsMcpServer(): McpServer {
     }
   );
 
+  // Found live, 2026-08-30: this resource hardcoded dmExecRequestsFixture and
+  // claimed "STUB" in its own description, even though read_sql_server_dmv (the
+  // equivalent tool, just below) has called the real live readDmv() path since
+  // day one — a live SQL Server connection was never actually missing, this
+  // resource just never used it. Fixed to call the same readDmv() the tool
+  // uses, including its real fixture-fallback on a genuine connection failure —
+  // the response's own "source" field says which happened on any given read,
+  // so a client is never left guessing whether this is live or fallback data.
   server.registerResource(
     "sql-server-dmv-exec-requests",
     "dmv://sql-server/exec-requests",
     {
       title: "SQL Server DMV: sys.dm_exec_requests",
       description:
-        "Read-only snapshot of currently executing SQL Server requests, including blocking sessions and wait types. STUB: served from fixture data until a live SQL Server connection is wired in.",
+        "Read-only snapshot of currently executing SQL Server requests, including blocking sessions and wait types. Live-queried against the real SQL Server connection; falls back to fixture data only if that connection genuinely fails, reported honestly via this response's own \"source\" field.",
       mimeType: "application/json",
     },
-    async (uri) => ({
-      contents: [
-        {
-          uri: uri.href,
-          mimeType: "application/json",
-          text: JSON.stringify(dmExecRequestsFixture, null, 2),
-        },
-      ],
-    })
+    async (uri) => {
+      const { source, rows } = await readDmv({ dmvName: "sys.dm_exec_requests" });
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "application/json",
+            text: JSON.stringify({ dmvName: "sys.dm_exec_requests", source, rowCount: rows.length, rows }, null, 2),
+          },
+        ],
+      };
+    }
   );
 
   server.registerTool(
@@ -143,24 +152,31 @@ export function createCoreOpsMcpServer(): McpServer {
     }
   );
 
+  // Same fix as the DMV resource above, same date: this resource hardcoded
+  // executionLogFixture while read_ssrs_execution_log already called the real
+  // live path — as of 2026-08-29's real ExecutionLog3 table
+  // (seedSsrsExecutionLog.ts), that live path is no longer fixture-only either.
   server.registerResource(
     "ssrs-execution-log",
     "ssrs://report-server/execution-log",
     {
       title: "SSRS ExecutionLog3: recent non-success report executions",
       description:
-        "Read-only snapshot of recent SSRS report executions that did not complete successfully, including timeouts and processing errors. STUB: served from fixture data until a live SSRS ReportServer database connection is wired in.",
+        "Read-only snapshot of recent SSRS report executions that did not complete successfully, including timeouts and processing errors. Live-queried against the real ExecutionLog3 table; falls back to fixture data only if that connection genuinely fails, reported honestly via this response's own \"source\" field.",
       mimeType: "application/json",
     },
-    async (uri) => ({
-      contents: [
-        {
-          uri: uri.href,
-          mimeType: "application/json",
-          text: JSON.stringify(executionLogFixture, null, 2),
-        },
-      ],
-    })
+    async (uri) => {
+      const { source, rows } = await readSsrsExecutionLog({ queryName: "ExecutionLog3" });
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "application/json",
+            text: JSON.stringify({ queryName: "ExecutionLog3", source, rowCount: rows.length, rows }, null, 2),
+          },
+        ],
+      };
+    }
   );
 
   server.registerTool(
