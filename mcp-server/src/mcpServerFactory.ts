@@ -16,12 +16,21 @@ import { dmExecRequestsFixture } from "./dmvFixtures.js";
 import { readDmv, SUPPORTED_DMVS, UnsupportedDmvError } from "./dmvReader.js";
 import { executionLogFixture } from "./ssrsFixtures.js";
 import { readSsrsExecutionLog, SUPPORTED_SSRS_QUERIES, UnsupportedSsrsQueryError } from "./ssrsReader.js";
+import { sendMcpLog } from "./observability/mcpLog.js";
 
 export function createCoreOpsMcpServer(): McpServer {
-  const server = new McpServer({
-    name: "coreops-mcp-server",
-    version: "0.1.0",
-  });
+  const server = new McpServer(
+    {
+      name: "coreops-mcp-server",
+      version: "0.1.0",
+    },
+    // Without declaring this, a connected client silently drops every
+    // notifications/message this file sends — no error either side, the
+    // message just never arrives. See observability/mcpLog.ts.
+    {
+      capabilities: { logging: {} },
+    }
+  );
 
   server.registerResource(
     "sql-server-dmv-exec-requests",
@@ -60,6 +69,14 @@ export function createCoreOpsMcpServer(): McpServer {
       },
     },
     async ({ dmvName, databaseName }, extra) => {
+      const correlationId = crypto.randomUUID();
+      sendMcpLog(server, "info", "mcp_tool_invocation_started", {
+        correlationId,
+        tool: "read_sql_server_dmv",
+        dmvName,
+        databaseName: databaseName ?? null,
+      });
+
       const progressToken = extra._meta?.progressToken;
       // Progress notifications are opt-in per MCP spec: only build and pass a
       // callback when the caller actually attached a progressToken, so a client
@@ -78,7 +95,21 @@ export function createCoreOpsMcpServer(): McpServer {
                 },
               });
       try {
+        sendMcpLog(server, "info", "mcp_external_call_started", {
+          correlationId,
+          tool: "read_sql_server_dmv",
+          target: "sql_server_dmv",
+        });
+        const startedAt = Date.now();
         const { source, rows } = await readDmv({ dmvName, databaseName }, undefined, onAttempt);
+        sendMcpLog(server, "info", "mcp_external_call_finished", {
+          correlationId,
+          tool: "read_sql_server_dmv",
+          target: "sql_server_dmv",
+          durationMs: Date.now() - startedAt,
+          source,
+          rowCount: rows.length,
+        });
         return {
           content: [
             {
@@ -89,11 +120,22 @@ export function createCoreOpsMcpServer(): McpServer {
         };
       } catch (error) {
         if (error instanceof UnsupportedDmvError) {
+          sendMcpLog(server, "warning", "mcp_tool_denied", {
+            correlationId,
+            tool: "read_sql_server_dmv",
+            errorClass: error.name,
+            reason: error.message,
+          });
           return {
             isError: true,
             content: [{ type: "text", text: `UnsupportedDmvError: ${error.message}` }],
           };
         }
+        sendMcpLog(server, "error", "mcp_tool_error", {
+          correlationId,
+          tool: "read_sql_server_dmv",
+          errorClass: error instanceof Error ? error.name : "Error",
+        });
         throw error;
       }
     }
@@ -136,8 +178,30 @@ export function createCoreOpsMcpServer(): McpServer {
       },
     },
     async ({ queryName, reportPath }) => {
+      const correlationId = crypto.randomUUID();
+      sendMcpLog(server, "info", "mcp_tool_invocation_started", {
+        correlationId,
+        tool: "read_ssrs_execution_log",
+        queryName,
+        reportPath: reportPath ?? null,
+      });
+
       try {
+        sendMcpLog(server, "info", "mcp_external_call_started", {
+          correlationId,
+          tool: "read_ssrs_execution_log",
+          target: "ssrs_execution_log",
+        });
+        const startedAt = Date.now();
         const { source, rows } = await readSsrsExecutionLog({ queryName, reportPath });
+        sendMcpLog(server, "info", "mcp_external_call_finished", {
+          correlationId,
+          tool: "read_ssrs_execution_log",
+          target: "ssrs_execution_log",
+          durationMs: Date.now() - startedAt,
+          source,
+          rowCount: rows.length,
+        });
         return {
           content: [
             {
@@ -148,11 +212,22 @@ export function createCoreOpsMcpServer(): McpServer {
         };
       } catch (error) {
         if (error instanceof UnsupportedSsrsQueryError) {
+          sendMcpLog(server, "warning", "mcp_tool_denied", {
+            correlationId,
+            tool: "read_ssrs_execution_log",
+            errorClass: error.name,
+            reason: error.message,
+          });
           return {
             isError: true,
             content: [{ type: "text", text: `UnsupportedSsrsQueryError: ${error.message}` }],
           };
         }
+        sendMcpLog(server, "error", "mcp_tool_error", {
+          correlationId,
+          tool: "read_ssrs_execution_log",
+          errorClass: error instanceof Error ? error.name : "Error",
+        });
         throw error;
       }
     }
@@ -169,14 +244,22 @@ export function createCoreOpsMcpServer(): McpServer {
         targetDatabase: z.string().describe("Database to run the diagnostic query against."),
       },
     },
-    async ({ queryName, targetDatabase }) => ({
-      content: [
-        {
-          type: "text",
-          text: `NOT_IMPLEMENTED: run_diagnostic_query is a stub. Received queryName="${queryName}", targetDatabase="${targetDatabase}". No query was executed.`,
-        },
-      ],
-    })
+    async ({ queryName, targetDatabase }) => {
+      sendMcpLog(server, "info", "mcp_tool_invocation_started", {
+        correlationId: crypto.randomUUID(),
+        tool: "run_diagnostic_query",
+        queryName,
+        targetDatabase,
+      });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `NOT_IMPLEMENTED: run_diagnostic_query is a stub. Received queryName="${queryName}", targetDatabase="${targetDatabase}". No query was executed.`,
+          },
+        ],
+      };
+    }
   );
 
   return server;
