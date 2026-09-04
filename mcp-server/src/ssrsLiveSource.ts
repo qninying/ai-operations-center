@@ -121,7 +121,10 @@ async function runQuery(
 // exhausted), or CircuitOpenError (breaker open, no attempt made). Never returns a
 // partial/best-effort result. The caller (ssrsReader.ts) decides what to do with
 // any of these, typically falling back to fixture data.
-export async function querySsrsExecutionLog(input: ReadSsrsInput): Promise<SsrsExecutionLogRow[]> {
+export async function querySsrsExecutionLog(
+  input: ReadSsrsInput,
+  onAttempt?: (attempt: number, maxAttempts: number) => void
+): Promise<SsrsExecutionLogRow[]> {
   const config = readConnectionConfig();
 
   return withReliability(() => runQuery(input, config), {
@@ -130,5 +133,6 @@ export async function querySsrsExecutionLog(input: ReadSsrsInput): Promise<SsrsE
     baseDelayMs: BASE_DELAY_MS,
     maxDelayMs: MAX_DELAY_MS,
     circuitBreaker: ssrsCircuitBreaker,
+    onAttempt,
   });
 }

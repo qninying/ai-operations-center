@@ -101,7 +101,11 @@ function buildResult(
 
 export async function readSsrsExecutionLog(
   input: ReadSsrsInput,
-  liveSource: (input: ReadSsrsInput) => Promise<SsrsExecutionLogRow[]> = querySsrsExecutionLog
+  liveSource: (
+    input: ReadSsrsInput,
+    onAttempt?: (attempt: number, maxAttempts: number) => void
+  ) => Promise<SsrsExecutionLogRow[]> = querySsrsExecutionLog,
+  onAttempt?: (attempt: number, maxAttempts: number) => void
 ): Promise<SsrsReadResult> {
   if (!isSupportedSsrsQuery(input.queryName)) {
     throw new UnsupportedSsrsQueryError(input.queryName);
@@ -110,7 +114,10 @@ export async function readSsrsExecutionLog(
   const normalizedInput = normalizeInput(input);
 
   try {
-    const rows = await liveSource(normalizedInput);
+    // Same "only pass a second argument when a real callback exists" reasoning
+    // as dmvReader.ts's readDmv() -- an existing test's fake liveSource with no
+    // progress interest sees the exact same single-argument call it always has.
+    const rows = onAttempt ? await liveSource(normalizedInput, onAttempt) : await liveSource(normalizedInput);
     return buildResult("live", rows, normalizedInput);
   } catch (error) {
     if (!isKnownLiveSourceFailure(error)) {

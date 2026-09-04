@@ -42,11 +42,24 @@ function clientKey(req: IncomingMessage): string {
   return req.socket.remoteAddress ?? "unknown";
 }
 
-// Stateless mode (sessionIdGenerator: undefined), per ADR-001's own decision driver:
-// "if the RCA Agent or Execution Service scale to multiple replicas, each replica
-// needs to reach the *same* running Gateway concurrently" — a fresh server+transport
-// pair per request means any replica can answer any request, with no session
-// pinned to one process. Mirrors the MCP SDK's own stateless StreamableHTTP example.
+// Stateless mode (sessionIdGenerator: undefined), per ADR-001's own decision driver
+// and per docs/TRANSPORT_DECISION.md's own Q4 answer ("No — every call stands
+// alone") and Q3 ("if a client wants this deployed in their own environment, it
+// runs on more than one machine"): "if the RCA Agent or Execution Service scale to
+// multiple replicas, each replica needs to reach the *same* running Gateway
+// concurrently" — a fresh server+transport pair per request means any replica can
+// answer any request, with no session pinned to one process. Mirrors the MCP SDK's
+// own stateless StreamableHTTP example.
+//
+// The failure this avoids: a client's first request lands on replica A, which
+// (under a *stateful*, session-affine design) would hold that session's state in
+// its own memory; the client's very next request, load-balanced to replica B,
+// would find no such session there and fail or silently start a new one — a
+// sticky-session bug that only shows up once there's more than one replica, and
+// is invisible in any single-instance local test. No in-memory session map exists
+// anywhere in this request-handling chain (confirmed by grep across this file and
+// every module it imports, not just by inspection) specifically so that failure
+// mode structurally cannot occur, not merely so it's unlikely.
 async function handleMcpRequest(req: IncomingMessage, res: ServerResponse) {
   if (!verifyBearerToken(req.headers.authorization, MCP_API_TOKEN)) {
     logEvent({ level: "warn", event: "mcp_http_unauthorized", service: "mcp-http-server" });
@@ -118,5 +131,12 @@ const server = createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  logEvent({ level: "info", event: "mcp_http_server_started", service: "mcp-http-server", context: { port: PORT } });
+  // Explicit so an operator can tell the transport and state model from the
+  // logs alone, without reading source — per docs/TRANSPORT_DECISION.md.
+  logEvent({
+    level: "info",
+    event: "mcp_http_server_started",
+    service: "mcp-http-server",
+    context: { port: PORT, transport: "StreamableHTTP", stateModel: "stateless" },
+  });
 });

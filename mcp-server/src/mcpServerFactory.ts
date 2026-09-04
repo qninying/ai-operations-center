@@ -15,8 +15,12 @@ import { z } from "zod";
 import { readDmv, SUPPORTED_DMVS, UnsupportedDmvError } from "./dmvReader.js";
 import { readSsrsExecutionLog, SUPPORTED_SSRS_QUERIES, UnsupportedSsrsQueryError } from "./ssrsReader.js";
 import { sendMcpLog } from "./observability/mcpLog.js";
+import { makeProgressEmitter } from "./observability/mcpProgress.js";
 import { resolveWithinRoots, PathOutsideRootsError, NoRootsDeclaredError } from "./security/rootsEnforcement.js";
 import { readDiagnosticLogFile } from "./diagnosticLogReader.js";
+import { checkPostgresBackendBlocked } from "./pgBackendStatusSource.js";
+import { UpstreamTimeoutError } from "./reliability/withReliability.js";
+import { CircuitOpenError } from "./reliability/circuitBreaker.js";
 
 export function createCoreOpsMcpServer(): McpServer {
   const server = new McpServer(
@@ -88,23 +92,15 @@ export function createCoreOpsMcpServer(): McpServer {
         databaseName: databaseName ?? null,
       });
 
-      const progressToken = extra._meta?.progressToken;
-      // Progress notifications are opt-in per MCP spec: only build and pass a
-      // callback when the caller actually attached a progressToken, so a client
-      // that never asked for updates gets the exact same call path as before.
-      const onAttempt =
-        progressToken === undefined
-          ? undefined
-          : (attempt: number, maxAttempts: number) =>
-              void extra.sendNotification({
-                method: "notifications/progress",
-                params: {
-                  progressToken,
-                  progress: attempt,
-                  total: maxAttempts,
-                  message: `Querying ${dmvName} (attempt ${attempt} of ${maxAttempts})`,
-                },
-              });
+      // Real total: maxAttempts is withReliability's own actual retry cap, not
+      // a guess. null when the caller attached no progressToken -- every tool
+      // in this file shares this same opt-in emitter instead of building its
+      // own notification object inline, the way this one used to.
+      const progress = makeProgressEmitter(extra);
+      const onAttempt = progress
+        ? (attempt: number, maxAttempts: number) =>
+            progress.send(attempt, maxAttempts, `Querying ${dmvName} (attempt ${attempt} of ${maxAttempts})`)
+        : undefined;
       try {
         sendMcpLog(server, "info", "mcp_external_call_started", {
           correlationId,
@@ -195,7 +191,7 @@ export function createCoreOpsMcpServer(): McpServer {
           .describe("Optional report path to filter returned rows by, e.g. \"/Finance/MonthlyRevenue\"."),
       },
     },
-    async ({ queryName, reportPath }) => {
+    async ({ queryName, reportPath }, extra) => {
       const correlationId = crypto.randomUUID();
       sendMcpLog(server, "info", "mcp_tool_invocation_started", {
         correlationId,
@@ -204,6 +200,15 @@ export function createCoreOpsMcpServer(): McpServer {
         reportPath: reportPath ?? null,
       });
 
+      // This tool never had progress support at all before -- same real-total
+      // shape as read_sql_server_dmv now that querySsrsExecutionLog()/
+      // readSsrsExecutionLog() both accept onAttempt.
+      const progress = makeProgressEmitter(extra);
+      const onAttempt = progress
+        ? (attempt: number, maxAttempts: number) =>
+            progress.send(attempt, maxAttempts, `Querying ${queryName} (attempt ${attempt} of ${maxAttempts})`)
+        : undefined;
+
       try {
         sendMcpLog(server, "info", "mcp_external_call_started", {
           correlationId,
@@ -211,7 +216,9 @@ export function createCoreOpsMcpServer(): McpServer {
           target: "ssrs_execution_log",
         });
         const startedAt = Date.now();
-        const { source, rows } = await readSsrsExecutionLog({ queryName, reportPath });
+        const { source, rows } = onAttempt
+          ? await readSsrsExecutionLog({ queryName, reportPath }, undefined, onAttempt)
+          : await readSsrsExecutionLog({ queryName, reportPath });
         sendMcpLog(server, "info", "mcp_external_call_finished", {
           correlationId,
           tool: "read_ssrs_execution_log",
@@ -362,6 +369,284 @@ export function createCoreOpsMcpServer(): McpServer {
           errorClass: error instanceof Error ? error.name : "Error",
         });
         throw error;
+      }
+    }
+  );
+
+  // The one tool in this server that reasons rather than looks up. Every other
+  // tool here returns raw evidence for the CALLER to judge; this one asks the
+  // connected CLIENT's own model to make the judgment call, via real MCP
+  // sampling (sampling/createMessage) -- never a direct API call from this
+  // process. That split is deliberate: no API key, no model name, and no
+  // billing relationship belongs in this server at all -- both live entirely
+  // on the client side of the protocol boundary, same as any other MCP server
+  // that wants reasoning without owning a model subscription.
+  //
+  // Scoped to the two real evidence sources this server can itself observe
+  // (SQL Server blocking chains, SSRS failed report runs) -- the same sources
+  // read_sql_server_dmv/read_ssrs_execution_log already expose. Postgres,
+  // Cloud, and Docker incidents are real in the dashboard's own process but
+  // this MCP server has no plumbing to them, so this tool doesn't pretend to
+  // cover incidents it can't actually see.
+  server.registerTool(
+    "triage_active_incidents",
+    {
+      title: "Triage active incidents",
+      description:
+        "Fetches real SQL Server blocking-chain and SSRS failed-report evidence itself, then asks the connected client's own model (via MCP sampling) to judge which one is most urgent to look at first and why. Read-only: performs no write of any kind. Requires the client to support MCP sampling -- returns a clear, evidence-backed result (never empty, never a crash) if it doesn't or the request is declined.",
+      inputSchema: {},
+    },
+    async (_args, extra) => {
+      const correlationId = crypto.randomUUID();
+      sendMcpLog(server, "info", "mcp_tool_invocation_started", {
+        correlationId,
+        tool: "triage_active_incidents",
+      });
+
+      // This tool aggregates strictly more real work than either single-source
+      // tool above it -- both their fetches, plus a fetch-count phase of its
+      // own, plus the sampling wait -- so it's the one with the most progress
+      // ticks under any real network condition, not just when Azure happens to
+      // need retries.
+      const progress = makeProgressEmitter(extra);
+      const TOTAL_FETCHES = 2; // real: exactly the two evidence sources below, not a guess
+      let fetchesDone = 0;
+      const dmvOnAttempt = progress
+        ? (attempt: number, maxAttempts: number) =>
+            progress.send(attempt, maxAttempts, `Querying SQL Server DMV (attempt ${attempt} of ${maxAttempts})`)
+        : undefined;
+      const ssrsOnAttempt = progress
+        ? (attempt: number, maxAttempts: number) =>
+            progress.send(attempt, maxAttempts, `Querying SSRS ExecutionLog3 (attempt ${attempt} of ${maxAttempts})`)
+        : undefined;
+      function markFetchDone(label: string): void {
+        fetchesDone += 1;
+        progress?.send(fetchesDone, TOTAL_FETCHES, `Fetched ${label} evidence (${fetchesDone} of ${TOTAL_FETCHES} sources done)`);
+      }
+
+      // 1. Real data, fetched by this tool itself -- no model call involved yet.
+      // Same mcp_external_call_started/finished vocabulary read_sql_server_dmv
+      // and read_ssrs_execution_log already use for these exact two calls --
+      // this tool just makes both instead of one, so it logs both.
+      async function fetchWithLogging<T>(
+        target: "sql_server_dmv" | "ssrs_execution_log",
+        run: () => Promise<T>
+      ): Promise<T> {
+        sendMcpLog(server, "info", "mcp_external_call_started", { correlationId, tool: "triage_active_incidents", target });
+        const callStartedAt = Date.now();
+        try {
+          const value = await run();
+          sendMcpLog(server, "info", "mcp_external_call_finished", {
+            correlationId,
+            tool: "triage_active_incidents",
+            target,
+            durationMs: Date.now() - callStartedAt,
+          });
+          return value;
+        } catch (error) {
+          sendMcpLog(server, "error", "mcp_tool_error", {
+            correlationId,
+            tool: "triage_active_incidents",
+            target,
+            errorClass: error instanceof Error ? error.name : "Error",
+          });
+          throw error;
+        }
+      }
+
+      const dmvPromise = fetchWithLogging("sql_server_dmv", () =>
+        dmvOnAttempt ? readDmv({ dmvName: "sys.dm_exec_requests" }, undefined, dmvOnAttempt) : readDmv({ dmvName: "sys.dm_exec_requests" })
+      ).finally(() => markFetchDone("SQL Server"));
+      const ssrsPromise = fetchWithLogging("ssrs_execution_log", () =>
+        ssrsOnAttempt ? readSsrsExecutionLog({ queryName: "ExecutionLog3" }, undefined, ssrsOnAttempt) : readSsrsExecutionLog({ queryName: "ExecutionLog3" })
+      ).finally(() => markFetchDone("SSRS"));
+      const [dmvResult, ssrsResult] = await Promise.allSettled([dmvPromise, ssrsPromise]);
+      const blocked =
+        dmvResult.status === "fulfilled"
+          ? dmvResult.value.rows.filter((row) => row.blocking_session_id && row.blocking_session_id !== 0)
+          : [];
+      const failedReports = ssrsResult.status === "fulfilled" ? ssrsResult.value.rows : [];
+
+      if (blocked.length === 0 && failedReports.length === 0) {
+        sendMcpLog(server, "info", "mcp_tool_invocation_finished", {
+          correlationId,
+          tool: "triage_active_incidents",
+          outcome: "no_incidents",
+        });
+        return {
+          content: [
+            { type: "text", text: "No active SQL blocking sessions or failed SSRS report executions right now -- nothing to triage." },
+          ],
+        };
+      }
+
+      // 2. Client capability check, up front -- a clean, evidence-backed
+      // degraded result if this client never declared sampling support, not a
+      // failed request.
+      if (!server.server.getClientCapabilities()?.sampling) {
+        sendMcpLog(server, "warning", "mcp_sampling_unsupported", { correlationId, tool: "triage_active_incidents" });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `This client doesn't support MCP sampling, so no AI judgment could be made. Raw evidence: ${blocked.length} blocked SQL session(s), ${failedReports.length} failed SSRS report(s). Review manually.`,
+            },
+          ],
+        };
+      }
+
+      const evidenceText = [
+        ...blocked.map(
+          (row) =>
+            `SQL: session ${row.session_id} blocked by session ${row.blocking_session_id} on ${row.database_name}, waiting ${row.total_elapsed_time_ms}ms${row.wait_type ? ` (${row.wait_type})` : ""}.`
+        ),
+        ...failedReports.map(
+          (row) => `SSRS: report ${row.report_path} -- ${row.status}, run by ${row.user_name} at ${row.time_start}.`
+        ),
+      ].join("\n");
+
+      // Same mcp_external_call_started/finished vocabulary the fetches above
+      // and every other tool in this file use -- a sampling request is an
+      // external call too (to the client), it just doesn't get its own
+      // one-off event names.
+      sendMcpLog(server, "info", "mcp_external_call_started", { correlationId, tool: "triage_active_incidents", target: "mcp_sampling" });
+      // Genuinely unknown total: there's no way to know how long the client's
+      // model will take or how many tokens it'll return before it responds --
+      // createMessage() isn't streaming, so there's no real intermediate count
+      // to report either. One honest tick with no total, saying so plainly,
+      // rather than fabricating a percentage during a black-box wait.
+      progress?.send(1, undefined, "Waiting for the client's model to respond (no way to know how long this takes)");
+      const startedAt = Date.now();
+      try {
+        // <<< THE REQUEST LEAVES THIS PROCESS HERE. This is the one line in
+        // this server that ever asks for a model completion -- and it asks
+        // the CLIENT, over the already-connected MCP transport, not any AI
+        // provider directly. No API key, no model name: the client owns both
+        // and reports back which model it actually used in the result.
+        const result = await server.server.createMessage({
+          systemPrompt:
+            "You are triaging real, currently-active operations incidents for a DBA. Given the evidence, judge which single incident is most urgent to look at first and explain why in 2-3 sentences. Cite the specific evidence you're relying on. Do not invent evidence you weren't given.",
+          messages: [
+            {
+              role: "user",
+              content: { type: "text", text: `Current evidence:\n${evidenceText}\n\nWhich incident is most urgent, and why?` },
+            },
+          ],
+          maxTokens: 300,
+        });
+        const durationMs = Date.now() - startedAt;
+        sendMcpLog(server, "info", "mcp_external_call_finished", {
+          correlationId,
+          tool: "triage_active_incidents",
+          target: "mcp_sampling",
+          durationMs,
+          model: result.model,
+        });
+
+        const text = result.content.type === "text" ? result.content.text : "(client returned a non-text response)";
+        return { content: [{ type: "text", text }] };
+      } catch (error) {
+        // The client either doesn't truly support sampling despite declaring
+        // it, or a human declined the request (MCP's own human-in-the-loop
+        // expectation for sampling) -- either way, a real evidence-backed
+        // result, never a crash and never silence. Logged as mcp_tool_error
+        // (the same "error caught" event every other catch in this file
+        // uses, with the same stable-error-class requirement) even though,
+        // unlike those, this one deliberately does NOT rethrow -- the caught
+        // error becomes a graceful degraded result, not a fatal one.
+        const durationMs = Date.now() - startedAt;
+        sendMcpLog(server, "warning", "mcp_tool_error", {
+          correlationId,
+          tool: "triage_active_incidents",
+          target: "mcp_sampling",
+          durationMs,
+          errorClass: error instanceof Error ? error.name : "Error",
+        });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `The client declined or failed to sample a judgment (${error instanceof Error ? error.message : String(error)}). Raw evidence: ${blocked.length} blocked SQL session(s), ${failedReports.length} failed SSRS report(s). Review manually.`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  // Reads a real dev-postgres backend's current status by pid -- see
+  // pgBackendStatusSource.ts for the pooled connection, the bound
+  // parameterized query, and the timeout/retry/circuit-breaker wrapping.
+  // This registration's own job is narrower: never let a raw failure escape
+  // as a thrown error or leak host/credential detail to the caller.
+  server.registerTool(
+    "check_postgres_backend_blocked",
+    {
+      title: "Check Postgres backend blocked status",
+      description:
+        "Given a real Postgres backend process id (pid) on dev-postgres, reports whether it currently exists, what it's doing, and which other backend pids (if any) are blocking it. Read-only: performs no write of any kind.",
+      inputSchema: {
+        pid: z.number().int().positive().describe("The real Postgres backend process id to check."),
+      },
+    },
+    async ({ pid }, extra) => {
+      const correlationId = crypto.randomUUID();
+      sendMcpLog(server, "info", "mcp_tool_invocation_started", {
+        correlationId,
+        tool: "check_postgres_backend_blocked",
+        pid,
+      });
+
+      const progress = makeProgressEmitter(extra);
+      const onAttempt = progress
+        ? (attempt: number, maxAttempts: number) =>
+            progress.send(attempt, maxAttempts, `Checking backend ${pid} (attempt ${attempt} of ${maxAttempts})`)
+        : undefined;
+
+      sendMcpLog(server, "info", "mcp_external_call_started", {
+        correlationId,
+        tool: "check_postgres_backend_blocked",
+        target: "postgres_backend_status",
+      });
+      const startedAt = Date.now();
+      try {
+        const status = await checkPostgresBackendBlocked(pid, onAttempt);
+        sendMcpLog(server, "info", "mcp_external_call_finished", {
+          correlationId,
+          tool: "check_postgres_backend_blocked",
+          target: "postgres_backend_status",
+          durationMs: Date.now() - startedAt,
+          found: status.found,
+          blockedByCount: status.blockedBy.length,
+        });
+        return { content: [{ type: "text", text: JSON.stringify(status, null, 2) }] };
+      } catch (error) {
+        // Deliberately never the raw caught error/driver message here, in the
+        // log, or in what's returned -- a raw pg connection error can carry
+        // the real host/port (e.g. "connect ECONNREFUSED 127.0.0.1:5434").
+        // Only a stable, safe class name and a generic message cross this
+        // boundary, on both the log line and the response the caller sees.
+        const durationMs = Date.now() - startedAt;
+        let errorClass: string;
+        let publicMessage: string;
+        if (error instanceof UpstreamTimeoutError) {
+          errorClass = "TimeoutError";
+          publicMessage = `Checking backend ${pid} timed out.`;
+        } else if (error instanceof CircuitOpenError) {
+          errorClass = "UpstreamUnavailable";
+          publicMessage = "Postgres has failed repeatedly recently; not attempting another call right now.";
+        } else {
+          errorClass = "UpstreamUnavailable";
+          publicMessage = `Could not reach Postgres to check backend ${pid}.`;
+        }
+        sendMcpLog(server, "warning", "mcp_tool_error", {
+          correlationId,
+          tool: "check_postgres_backend_blocked",
+          target: "postgres_backend_status",
+          durationMs,
+          errorClass,
+        });
+        return { isError: true, content: [{ type: "text", text: `${errorClass}: ${publicMessage}` }] };
       }
     }
   );
