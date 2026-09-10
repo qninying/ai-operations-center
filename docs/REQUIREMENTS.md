@@ -212,17 +212,12 @@ The system must have a written, reviewable risk-scoping artifact, declaring
 deployment context, data types handled, capabilities, and risk tier,
 independent of the code.
 
-Status: proposed, not yet built. This information currently lives only
-implicitly in guardrail code (`sqlRemediationSafety.ts`, `abacPolicy.ts`), not
-anywhere a compliance reviewer could read without reading source.
-
-How to build it: a single `docs/AI-GOVERNANCE-PROFILE.md` stating system
-owner, deployment context (internal ops tool, not customer-facing), data
-types handled (operational telemetry, DB session metadata; explicitly state
-that PHI/PII is not currently in scope), capabilities (diagnose, recommend,
-execute-with-approval), and a stated risk tier with the reasoning behind it
-(elevated, because the system can execute infrastructure changes, even though
-every execution is approval-gated).
+Status: fulfilled directly — `docs/AI-GOVERNANCE-PROFILE.md`, no platform
+story assigned. States owner, deployment context (local dev stack, not
+production), data types handled (operational telemetry only, no PHI/PII,
+confirmed by search), the six real capabilities with their source files, and
+a stated risk tier (Elevated) with the actual reasoning for and against
+higher/lower, not just a label.
 
 Failure paths to handle: the artifact drifts from the actual code as new
 capabilities ship; it gets written once and never revisited.
