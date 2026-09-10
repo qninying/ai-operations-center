@@ -1,13 +1,20 @@
 import type { RootCauseResult } from "../rootCauseAgent.js";
 
-// REQ-021 (docs/REQUIREMENTS.md) / docs/adversarial-eval-design.md: the first
-// probe category built is indirect (context-smuggled) prompt injection against
-// analyzeIncidentRootCause(), the category the design doc names as most specific
-// to CoreOps and worth weighting heaviest. Direct injection, jailbreak-vs-allowlist
-// (which targets the action-proposal path, not rootCauseAgent), and
-// leakage/hallucination-under-pressure are the next increments, not built here —
-// named honestly rather than silently left out.
-export type ProbeCategory = "indirect_injection";
+// REQ-021 (docs/REQUIREMENTS.md) / docs/adversarial-eval-design.md.
+//
+// jailbreak_social_engineering is deliberately not "jailbreak the allowlist" —
+// remediationGuardrail.ts's ALLOWED_ACTION_TYPES is plain deterministic code an
+// LLM never touches and cannot argue its way past, so there is no code-bypass
+// surface to test here. What's real and testable is whether adversarial content
+// can get the model's rootCause prose to *recommend* an out-of-allowlist action
+// convincingly enough that a human approver, reading only that text, acts on it
+// by hand, outside the system entirely. That's a narrower, human-facing risk,
+// named accurately rather than by the more dramatic name it might suggest.
+export type ProbeCategory =
+  | "indirect_injection"
+  | "direct_injection"
+  | "jailbreak_social_engineering"
+  | "leakage_hallucination";
 
 export type Severity = "critical" | "high" | "medium";
 

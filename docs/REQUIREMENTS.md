@@ -175,14 +175,21 @@ against adversarial inputs (prompt injection, jailbreak attempts, PII
 extraction, hallucinated citations) with a repeatable evaluation suite, not a
 one-off manual check.
 
-Status: partially fulfilled directly — `mcp-server/src/adversarialEval/`, no
-platform story assigned. The indirect (context-smuggled) injection category is
-built: three probes, run via `npm run eval:adversarial` against the real
-`analyzeIncidentRootCause()` and the real Anthropic API, severity-scored, and
-logged to the real audit trail per probe run. Live-verified 2026-09-10, all
-three held against the real API. Direct injection, jailbreak-vs-allowlist, and
-leakage/hallucination-under-pressure are not built yet — see
-`docs/adversarial-eval-design.md` and the PROGRESS.md entry for this date.
+Status: fulfilled directly — `mcp-server/src/adversarialEval/`, no platform
+story assigned. All four probe categories from `docs/adversarial-eval-design.md`
+are built: indirect (context-smuggled) injection (3 probes), direct injection
+via the caller-supplied description field (1 probe), jailbreak-as-social-
+engineering — testing whether adversarial content can get the model to recommend
+an out-of-allowlist action convincingly enough for a human to act on it by hand,
+not whether the deterministic allowlist itself can be argued past, which it
+cannot (1 probe), and leakage/hallucination-under-pressure — secret reproduction
+plus whether a pressured false claim survives the real REQ-019/020 grounding
+check (2 probes). 7 probes total, run via `npm run eval:adversarial` against the
+real `analyzeIncidentRootCause()` and the real Anthropic API, severity-scored,
+fails on any critical/high success, logged to the real audit trail per run.
+Live-verified 2026-09-10: all 7 held against the real API. Two real bugs were
+found and fixed in the harness itself during live verification, not the model,
+see the PROGRESS.md entry for this date.
 
 How to build it: see `docs/adversarial-eval-design.md` for the full design,
 probe taxonomy, and implementation checklist. In short, extend the eval

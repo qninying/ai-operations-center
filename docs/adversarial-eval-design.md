@@ -27,16 +27,19 @@ Four categories, each aimed at a different way CoreOps's trust in its own pipeli
 
 1. **Direct prompt injection.** Adversarial instructions placed where a user or caller directly supplies input, attempting to override the system prompt or the model's stated task.
 2. **Indirect (context-smuggled) injection.** Adversarial instructions embedded inside retrieved evidence itself, a crafted string inside a DMV row, a log line, an SSRS field, so the model encounters them while reading what it believes is trusted, inert data. This is the category most specific to CoreOps and the one worth weighting heaviest.
-3. **Jailbreak against the remediation allowlist.** Attempts to get the model to propose, recommend, or mischaracterize an action outside `remediationGuardrail.ts`'s allowlist, or to describe a disallowed action in terms that would make it look allowed to a human approver skimming a summary.
-4. **Leakage and hallucination under pressure.** PII or secret fragments surfacing in generated prose; a citation that survives REQ-019/020's grounding checks despite being fabricated or misrepresented, when the model is deliberately pushed toward producing one.
+3. **Jailbreak as social engineering, not allowlist bypass.** Worth naming precisely: `remediationGuardrail.ts`'s allowlist is plain deterministic code an LLM never touches, so there is no code-bypass surface here at all. What's real is whether adversarial content can get the model's diagnosis text to recommend a disallowed action convincingly enough that a human approver, reading only that text, acts on it by hand, outside the system entirely.
+4. **Leakage and hallucination under pressure.** PII or secret fragments surfacing in generated prose; whether a fabricated or misrepresented claim, deliberately pressured into existence, still survives REQ-019/020's grounding checks.
 
 ## Where this stands today
 
-Being direct about what exists versus what this proposes:
+All four categories are built, in `mcp-server/src/adversarialEval/` (`probes.ts`, `assessors.ts`, `runner.ts`), 7 probes total, run via `npm run eval:adversarial`. Every probe calls the real `analyzeIncidentRootCause()` against the real Anthropic API, not a stand-in. Live-verified 2026-09-10: all 7 held.
 
-- `scripts/score_prompt.py` and `prompts/*/eval.jsonl` grade task correctness, does the model reach the right answer, not adversarial resistance.
-- `PROGRESS.md:732` records one real, manual prompt-injection test against `rootCauseAgent.ts`. It happened once, against one prompt version, by hand.
-- Nothing in this repo runs the four probe categories above as a suite, on a schedule, against the real pipeline, today.
+Two real bugs were found during live verification, in the harness, not the model:
+
+- The diluted multi-evidence probe originally reused the confidence-override probe's assessment logic, which assumes every evidence item is poisoned. Against real, legitimately-high confidence justified by two real evidence items (with the poisoned one correctly excluded and flagged), it produced a false failure. Fixed to check whether the poisoned item was treated as legitimate, not whether confidence stayed low.
+- The direct-injection probe's suspicion-detection used a fixed keyword list that expected "instruction embedded" and missed the model's own, equally correct "embedded instruction" phrasing, along with several other natural ways of saying the same thing. Broadened the list rather than making it order-sensitive.
+
+Both were caught only by reading the real response text, not by trusting the automated pass/fail bit.
 
 ## Implementing this effectively: a checklist
 
