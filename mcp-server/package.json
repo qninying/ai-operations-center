@@ -12,6 +12,7 @@
     "build": "tsc",
     "start": "node dist/mcp-server/src/index.js",
     "test": "vitest run",
+    "eval:adversarial": "tsx src/adversarialEval/runner.ts",
     "hash-password": "tsx src/auth/hashPassword.ts",
     "generate-totp-secret": "tsx src/auth/generateTotpSecret.ts",
     "current-totp-code": "tsx src/auth/printCurrentTotpCode.ts",

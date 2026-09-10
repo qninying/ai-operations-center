@@ -158,6 +158,92 @@ in any code path prior to this change. It does not, and cannot yet,
 demonstrate the literal 50-70% figure — that requires production usage
 history to measure against, which does not exist yet.
 
+## AI Governance & Compliance
+
+Identified 2026-09-10 by reviewing CoreOps against Weights & Biases' "Governance
+workflows for AI agents" review-gate pattern (Intake, Scope, Assess, Probe,
+Decide). That review confirmed CoreOps is strong on execution governance
+(approval, identity, audit) but has no repeatable adversarial evaluation of the
+LLM's own outputs, no standalone risk-scoping artifact, and no mapping of its
+existing evidence to a named regulatory framework. None of the three below are
+built yet; each is written with enough detail to build from directly.
+
+### REQ-021 — Safety · should
+
+The system's LLM-driven recommendation and remediation pipeline must be tested
+against adversarial inputs (prompt injection, jailbreak attempts, PII
+extraction, hallucinated citations) with a repeatable evaluation suite, not a
+one-off manual check.
+
+Status: partially fulfilled directly — `mcp-server/src/adversarialEval/`, no
+platform story assigned. The indirect (context-smuggled) injection category is
+built: three probes, run via `npm run eval:adversarial` against the real
+`analyzeIncidentRootCause()` and the real Anthropic API, severity-scored, and
+logged to the real audit trail per probe run. Live-verified 2026-09-10, all
+three held against the real API. Direct injection, jailbreak-vs-allowlist, and
+leakage/hallucination-under-pressure are not built yet — see
+`docs/adversarial-eval-design.md` and the PROGRESS.md entry for this date.
+
+How to build it: see `docs/adversarial-eval-design.md` for the full design,
+probe taxonomy, and implementation checklist. In short, extend the eval
+harness with an adversarial probe set covering, at minimum, prompt injection
+(direct and indirect/context-smuggled), jailbreak attempts against the
+remediation allowlist in `guardrails/remediationGuardrail.ts`, PII leakage in
+generated summaries, and hallucinated evidence citations (building on the
+REQ-019/REQ-020 grounding checks already in place). Score severity per probe,
+not just pass/fail, and fail the suite on any critical-severity success
+regardless of aggregate resistance rate.
+
+Failure paths to handle: a probe logs the dangerous behavior instead of
+asserting on it; a new prompt or model version ships without the suite being
+re-run; the suite exercises a guardrail code path that isn't actually in the
+production call path.
+
+### REQ-022 — Safety · should
+
+The system must have a written, reviewable risk-scoping artifact, declaring
+deployment context, data types handled, capabilities, and risk tier,
+independent of the code.
+
+Status: proposed, not yet built. This information currently lives only
+implicitly in guardrail code (`sqlRemediationSafety.ts`, `abacPolicy.ts`), not
+anywhere a compliance reviewer could read without reading source.
+
+How to build it: a single `docs/AI-GOVERNANCE-PROFILE.md` stating system
+owner, deployment context (internal ops tool, not customer-facing), data
+types handled (operational telemetry, DB session metadata; explicitly state
+that PHI/PII is not currently in scope), capabilities (diagnose, recommend,
+execute-with-approval), and a stated risk tier with the reasoning behind it
+(elevated, because the system can execute infrastructure changes, even though
+every execution is approval-gated).
+
+Failure paths to handle: the artifact drifts from the actual code as new
+capabilities ship; it gets written once and never revisited.
+
+### REQ-023 — Safety · should
+
+The system's existing guardrail and audit evidence must be explicitly mapped
+to at least one named regulatory framework (NIST AI RMF functions, at
+minimum), so a reviewer can see framework coverage without inferring it from
+source code.
+
+Status: proposed, not yet built. No reference to NIST AI RMF, EU AI Act, or
+ISO/IEC 42001 exists anywhere in this repo today. The "governance" and
+"compliance" language that does exist (README's Governance & security
+section, ADR-005, ADR-006, STORY-002's Compliance Officer persona) is real
+but unmapped to any named framework.
+
+How to build it: a coverage table, alongside REQ-022's profile or in a
+sibling `docs/FRAMEWORK-MAPPING.md`, mapping each existing guardrail or
+evidence source to the NIST AI RMF function it satisfies, for example the
+approval queue, MFA, and audit log together to MANAGE; ABAC deny-by-default to
+GOVERN; the REQ-021 adversarial suite, once built, to MEASURE. Cite the
+specific file or ADR as evidence for each row, the way `docs/TRACEABILITY.md`
+already does for requirement-to-story.
+
+Failure paths to handle: the mapping claims coverage a mechanism doesn't
+actually provide; it isn't kept current as new ADRs land.
+
 ## Integration
 
 ### REQ-007 — Constraint
