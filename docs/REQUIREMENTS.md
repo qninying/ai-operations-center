@@ -229,19 +229,14 @@ to at least one named regulatory framework (NIST AI RMF functions, at
 minimum), so a reviewer can see framework coverage without inferring it from
 source code.
 
-Status: proposed, not yet built. No reference to NIST AI RMF, EU AI Act, or
-ISO/IEC 42001 exists anywhere in this repo today. The "governance" and
-"compliance" language that does exist (README's Governance & security
-section, ADR-005, ADR-006, STORY-002's Compliance Officer persona) is real
-but unmapped to any named framework.
-
-How to build it: a coverage table, alongside REQ-022's profile or in a
-sibling `docs/FRAMEWORK-MAPPING.md`, mapping each existing guardrail or
-evidence source to the NIST AI RMF function it satisfies, for example the
-approval queue, MFA, and audit log together to MANAGE; ABAC deny-by-default to
-GOVERN; the REQ-021 adversarial suite, once built, to MEASURE. Cite the
-specific file or ADR as evidence for each row, the way `docs/TRACEABILITY.md`
-already does for requirement-to-story.
+Status: fulfilled directly — `docs/FRAMEWORK-MAPPING.md`, no platform story
+assigned. Maps real evidence to all four NIST AI RMF functions (GOVERN, MAP,
+MEASURE, MANAGE), each row cites a specific file or ADR, not an abstract
+claim. GOVERN is explicitly marked partial, honestly — it's substantially a
+process function, matching the same caveat the W&B toolkit that prompted this
+review states about its own GOVERN coverage. EU AI Act / ISO 42001 mapping is
+explicitly out of scope, REQ-023 asked for NIST AI RMF "at minimum," not a
+broader claim.
 
 Failure paths to handle: the mapping claims coverage a mechanism doesn't
 actually provide; it isn't kept current as new ADRs land.

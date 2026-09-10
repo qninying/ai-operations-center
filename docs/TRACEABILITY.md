@@ -28,6 +28,6 @@ none, because it is context rather than work.
 | REQ-020 | Safety | should | _(fulfilled directly — `mcp-server/src/evidenceGroundingCheck.ts` + `rootCauseAgent.ts`, no platform story assigned)_ |
 | REQ-021 | Safety | should | _(fulfilled directly — `mcp-server/src/adversarialEval/`, all 4 probe categories, no platform story assigned)_ |
 | REQ-022 | Safety | should | _(fulfilled directly — `docs/AI-GOVERNANCE-PROFILE.md`, no platform story assigned)_ |
-| REQ-023 | Safety | should | _(proposed, not yet built — see REQUIREMENTS.md)_ |
+| REQ-023 | Safety | should | _(fulfilled directly — `docs/FRAMEWORK-MAPPING.md`, no platform story assigned)_ |
 
 ✅ Every must-have requirement is fulfilled by at least one story.
