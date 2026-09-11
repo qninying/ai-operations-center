@@ -16,6 +16,17 @@ const blockedDmvRow = {
   database_name: "OpsWarehouse",
 };
 
+// Returns every mock it registers so a test that needs to reconfigure one
+// source across ticks (queryPgActivity.mockResolvedValue(...) etc.) mutates
+// the SAME instance vi.doMock already wired in, instead of calling vi.doMock
+// a second time for that module. A real bug was found and fixed here: two
+// vi.doMock() calls for the same module path before the one dynamic import()
+// raced non-deterministically over which factory the import actually used,
+// causing an intermittent (~30% of runs) failure in the Postgres-recurrence
+// test below — confirmed by instrumenting queryPgActivity.mock.calls.length,
+// which read 0 on every failing run (the test's own local mock was never
+// actually called; the module was still using this function's rejecting
+// default from a prior, unrelated registration) and 1/2/3 on passing runs.
 function mockAllSources(overrides: {
   dmvRows?: unknown[];
   dmvSource?: "live" | "fallback";
@@ -26,30 +37,34 @@ function mockAllSources(overrides: {
   pgRows?: unknown[];
   pgUnreachable?: boolean;
 }) {
-  vi.doMock("./dmvReader.js", () => ({
-    readDmv: vi.fn().mockResolvedValue({ source: overrides.dmvSource ?? "fallback", rows: overrides.dmvRows ?? [] }),
-  }));
-  vi.doMock("./ssrsReader.js", () => ({
-    readSsrsExecutionLog: vi
-      .fn()
-      .mockResolvedValue({ source: overrides.ssrsSource ?? "fallback", rows: overrides.ssrsRows ?? [] }),
-  }));
-  vi.doMock("./cloudBlobSource.js", () => ({
-    queryLiveCloudBlob: vi.fn().mockResolvedValue(overrides.cloudRecords ?? []),
-  }));
-  vi.doMock("./supersetHealthSource.js", () => ({
-    checkSupersetHealth: overrides.supersetHealthy === false
+  const readDmv = vi
+    .fn()
+    .mockResolvedValue({ source: overrides.dmvSource ?? "fallback", rows: overrides.dmvRows ?? [] });
+  vi.doMock("./dmvReader.js", () => ({ readDmv }));
+
+  const readSsrsExecutionLog = vi
+    .fn()
+    .mockResolvedValue({ source: overrides.ssrsSource ?? "fallback", rows: overrides.ssrsRows ?? [] });
+  vi.doMock("./ssrsReader.js", () => ({ readSsrsExecutionLog }));
+
+  const queryLiveCloudBlob = vi.fn().mockResolvedValue(overrides.cloudRecords ?? []);
+  vi.doMock("./cloudBlobSource.js", () => ({ queryLiveCloudBlob }));
+
+  const checkSupersetHealth =
+    overrides.supersetHealthy === false
       ? vi.fn().mockRejectedValue(new Error("unreachable"))
-      : vi.fn().mockResolvedValue(undefined),
-  }));
-  vi.doMock("./pgActivitySource.js", () => ({
-    queryPgActivity: overrides.pgUnreachable
-      ? vi.fn().mockRejectedValue(new Error("unreachable"))
-      : vi.fn().mockResolvedValue(overrides.pgRows ?? []),
-  }));
+      : vi.fn().mockResolvedValue(undefined);
+  vi.doMock("./supersetHealthSource.js", () => ({ checkSupersetHealth }));
+
+  const queryPgActivity = overrides.pgUnreachable
+    ? vi.fn().mockRejectedValue(new Error("unreachable"))
+    : vi.fn().mockResolvedValue(overrides.pgRows ?? []);
+  vi.doMock("./pgActivitySource.js", () => ({ queryPgActivity }));
+
   const notifyOperators = vi.fn().mockResolvedValue(undefined);
   vi.doMock("./notificationService.js", () => ({ notifyOperators }));
-  return { notifyOperators };
+
+  return { readDmv, readSsrsExecutionLog, queryLiveCloudBlob, checkSupersetHealth, queryPgActivity, notifyOperators };
 }
 
 describe("incidentFeedService", () => {
@@ -150,10 +165,8 @@ describe("incidentFeedService", () => {
   });
 
   it("one source failing (Cloud unreachable) does not prevent other sources' real incidents from surfacing", async () => {
-    mockAllSources({ dmvRows: [blockedDmvRow] }); // cloudRecords omitted -> queryLiveCloudBlob mocked to resolve []
-    vi.doMock("./cloudBlobSource.js", () => ({
-      queryLiveCloudBlob: vi.fn().mockRejectedValue(new Error("CloudSourceUnavailableError")),
-    }));
+    const { queryLiveCloudBlob } = mockAllSources({ dmvRows: [blockedDmvRow] });
+    queryLiveCloudBlob.mockRejectedValue(new Error("CloudSourceUnavailableError"));
     const { startIncidentFeed, getRevealedIncidents } = await import("./incidentFeedService.js");
 
     const handle = startIncidentFeed();
@@ -208,9 +221,7 @@ describe("incidentFeedService", () => {
   });
 
   it("a resolved Postgres-unreachable incident (fixed, non-timestamped id, like Docker's) can recur once dev-postgres comes back and then goes down again", async () => {
-    mockAllSources({ pgUnreachable: true });
-    const queryPgActivity = vi.fn().mockRejectedValue(new Error("unreachable"));
-    vi.doMock("./pgActivitySource.js", () => ({ queryPgActivity }));
+    const { queryPgActivity } = mockAllSources({ pgUnreachable: true });
     const { startIncidentFeed, getRevealedIncidents, markResolved } = await import("./incidentFeedService.js");
 
     const handle = startIncidentFeed();
@@ -234,20 +245,20 @@ describe("incidentFeedService", () => {
   });
 
   it("Postgres unreachable replaces a stale active block incident — the container down is the one real problem to report", async () => {
-    const queryPgActivity = vi.fn().mockResolvedValue([
-      {
-        pid: 4821,
-        state: "active",
-        query: "UPDATE orders SET status = 'shipped' WHERE id = 1;",
-        query_start: "2026-08-27T22:00:00Z",
-        wait_event_type: "Lock",
-        datname: "orders",
-        backend_type: "client backend",
-        blocked_by: [4790],
-      },
-    ]);
-    mockAllSources({});
-    vi.doMock("./pgActivitySource.js", () => ({ queryPgActivity }));
+    const { queryPgActivity } = mockAllSources({
+      pgRows: [
+        {
+          pid: 4821,
+          state: "active",
+          query: "UPDATE orders SET status = 'shipped' WHERE id = 1;",
+          query_start: "2026-08-27T22:00:00Z",
+          wait_event_type: "Lock",
+          datname: "orders",
+          backend_type: "client backend",
+          blocked_by: [4790],
+        },
+      ],
+    });
     const { startIncidentFeed, getRevealedIncidents } = await import("./incidentFeedService.js");
 
     const handle = startIncidentFeed();
@@ -266,9 +277,7 @@ describe("incidentFeedService", () => {
   });
 
   it("a resolved Docker incident (fixed, non-timestamped id) can recur once the underlying condition clears and then fails again", async () => {
-    mockAllSources({});
-    const checkSupersetHealth = vi.fn().mockRejectedValue(new Error("unreachable"));
-    vi.doMock("./supersetHealthSource.js", () => ({ checkSupersetHealth }));
+    const { checkSupersetHealth } = mockAllSources({ supersetHealthy: false });
     const { startIncidentFeed, getRevealedIncidents, markResolved } = await import("./incidentFeedService.js");
 
     const handle = startIncidentFeed();
@@ -294,9 +303,7 @@ describe("incidentFeedService", () => {
   });
 
   it("an active SQL incident whose block clears on its own leaves the feed without a manual markResolved", async () => {
-    mockAllSources({ dmvRows: [blockedDmvRow] });
-    const readDmv = vi.fn().mockResolvedValue({ source: "fallback", rows: [blockedDmvRow] });
-    vi.doMock("./dmvReader.js", () => ({ readDmv }));
+    const { readDmv } = mockAllSources({ dmvRows: [blockedDmvRow] });
     const { startIncidentFeed, getRevealedIncidents } = await import("./incidentFeedService.js");
 
     const handle = startIncidentFeed();
@@ -313,9 +320,7 @@ describe("incidentFeedService", () => {
   });
 
   it("a source that merely fails to check this tick does not get its still-real incidents pruned", async () => {
-    mockAllSources({ dmvRows: [blockedDmvRow] });
-    const readDmv = vi.fn().mockResolvedValue({ source: "fallback", rows: [blockedDmvRow] });
-    vi.doMock("./dmvReader.js", () => ({ readDmv }));
+    const { readDmv } = mockAllSources({ dmvRows: [blockedDmvRow] });
     const { startIncidentFeed, getRevealedIncidents } = await import("./incidentFeedService.js");
 
     const handle = startIncidentFeed();
