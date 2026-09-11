@@ -4,6 +4,8 @@ import { analyzeIncidentRootCause } from "./rootCauseAgent.js";
 import type { EvidenceItem, Incident, RootCauseResult } from "./rootCauseAgent.js";
 import { checkEvidenceGrounding } from "./evidenceGroundingCheck.js";
 import type { GroundingResult } from "./evidenceGroundingCheck.js";
+import { checkSuspicion } from "./suspicionCheck.js";
+import type { SuspicionResult } from "./suspicionCheck.js";
 import { logEvent } from "./observability/logger.js";
 import { recordSystemEvent } from "./observability/auditWrite.js";
 import type { AuditLog } from "../../guardrails/auditLog.js";
@@ -95,7 +97,7 @@ export async function generateRecommendation(
   incidentId: string,
   incidentDescription: string,
   options: GenerateRecommendationOptions = {}
-): Promise<RootCauseResult & { grounding: GroundingResult }> {
+): Promise<RootCauseResult & { grounding: GroundingResult; suspicion: SuspicionResult }> {
   const queryFn = options.queryFn ?? queryLiveDmv;
   const analyzeFn = options.analyzeFn ?? analyzeIncidentRootCause;
 
@@ -137,5 +139,6 @@ export async function generateRecommendation(
   const incident: Incident = { id: incidentId, description: incidentDescription, evidence };
   const result = await analyzeFn(incident);
   const grounding = checkEvidenceGrounding(evidence, result.evidenceIdsUsed, result.claims);
-  return { ...result, grounding };
+  const suspicion = checkSuspicion(result);
+  return { ...result, grounding, suspicion };
 }

@@ -29,5 +29,6 @@ none, because it is context rather than work.
 | REQ-021 | Safety | should | _(fulfilled directly — `mcp-server/src/adversarialEval/`, all 4 probe categories, no platform story assigned)_ |
 | REQ-022 | Safety | should | _(fulfilled directly — `docs/AI-GOVERNANCE-PROFILE.md`, no platform story assigned)_ |
 | REQ-023 | Safety | should | _(fulfilled directly — `docs/FRAMEWORK-MAPPING.md`, no platform story assigned)_ |
+| REQ-024 | Safety | should | _(fulfilled directly — `mcp-server/src/suspicionCheck.ts`, no platform story assigned)_ |
 
 ✅ Every must-have requirement is fulfilled by at least one story.

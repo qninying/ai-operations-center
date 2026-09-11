@@ -241,6 +241,39 @@ broader claim.
 Failure paths to handle: the mapping claims coverage a mechanism doesn't
 actually provide; it isn't kept current as new ADRs land.
 
+### REQ-024 — Safety · should
+
+The system's live recommendation pipeline must carry a runtime signal for
+suspected manipulation in the model's own output, not only detect it
+retroactively inside an offline eval suite.
+
+Status: fulfilled directly — `mcp-server/src/suspicionCheck.ts`, no platform
+story assigned. Extracted the keyword-based suspicion heuristic
+(`mentionsSuspicion`, `SUSPICION_MARKERS`) that previously only ran inside
+`adversarialEval/assessors.ts` for offline probe grading into a shared, pure,
+deterministic `checkSuspicion(result)`, and wired it into all three live
+recommendation paths (`recommendationService.ts`, `cloudRecommendationService.ts`,
+`correlatedRecommendationService.ts`) alongside the existing REQ-019/020
+grounding check. Attach-only/informational for now, mirroring how `grounding`
+itself is treated today — no change to `evaluateEscalation()` or the HITL
+queue — consistent with ADR-008/ADR-009's prior rejection of keyword-scanning
+as a live blocking gate; this uses the same keyword logic only as a
+detection/logging signal, not a gate.
+
+How to build it: see PROGRESS.md's entry for this date. Built via an
+explorer → reviewer → editor subagent chain (Explore + general-purpose
+substitutes, since the repo's own `.claude/agents/explorer.md`,
+`reviewer.md`, `editor.md` definitions don't register mid-session). The
+reviewer pass caught two real defects in the plan before any code was
+written: `assessors.ts` needed to re-export `mentionsSuspicion` so
+`probes.ts`'s existing import kept compiling, and all three services'
+declared return types needed an explicit `suspicion` field or `tsc --noEmit`
+would fail.
+
+Failure paths to handle: the marker list drifts if edited in one place and
+not the other; the attach-only signal ships in the API response but is never
+actually surfaced to a human reviewer, so it goes unused in practice.
+
 ## Integration
 
 ### REQ-007 — Constraint
