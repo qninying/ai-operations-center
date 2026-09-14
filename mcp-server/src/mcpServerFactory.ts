@@ -21,6 +21,18 @@ import { readDiagnosticLogFile } from "./diagnosticLogReader.js";
 import { checkPostgresBackendBlocked } from "./pgBackendStatusSource.js";
 import { UpstreamTimeoutError } from "./reliability/withReliability.js";
 import { CircuitOpenError } from "./reliability/circuitBreaker.js";
+import { TriageJudgmentCache, buildTriageKey } from "./triageDedupCache.js";
+
+// Deliberately module-level, not inside createCoreOpsMcpServer(): that
+// function returns a fresh McpServer on every call in the HTTP transport's
+// stateless mode (see this file's own header comment above), so a cache
+// stored inside it would never survive between requests. Known, accepted
+// limitation: this cache is per-process, not shared across replicas behind a
+// load balancer -- a second pod can still re-sample evidence a first pod
+// already judged. Acceptable for now (closing the dedup gap doesn't require
+// adding a new external dependency); worth revisiting if this ever needs to
+// stay consistent across a multi-replica deployment.
+const triageJudgmentCache = new TriageJudgmentCache();
 
 export function createCoreOpsMcpServer(): McpServer {
   const server = new McpServer(
@@ -480,21 +492,13 @@ export function createCoreOpsMcpServer(): McpServer {
         };
       }
 
-      // 2. Client capability check, up front -- a clean, evidence-backed
-      // degraded result if this client never declared sampling support, not a
-      // failed request.
-      if (!server.server.getClientCapabilities()?.sampling) {
-        sendMcpLog(server, "warning", "mcp_sampling_unsupported", { correlationId, tool: "triage_active_incidents" });
-        return {
-          content: [
-            {
-              type: "text",
-              text: `This client doesn't support MCP sampling, so no AI judgment could be made. Raw evidence: ${blocked.length} blocked SQL session(s), ${failedReports.length} failed SSRS report(s). Review manually.`,
-            },
-          ],
-        };
-      }
-
+      // Built here, before either the capability check or the sampling call,
+      // so every return path below -- unsupported, declined/failed, and
+      // success -- shows the same raw evidence a human needs to check the
+      // judgment against, not just a count. Closes an open governance gap
+      // from the AI Employee Charter (Article IV/V, 2026-09-13): a
+      // successful sampling call used to return judgment text ALONE, with
+      // nothing forcing a human to see what it was judging from.
       const evidenceText = [
         ...blocked.map(
           (row) =>
@@ -504,6 +508,42 @@ export function createCoreOpsMcpServer(): McpServer {
           (row) => `SSRS: report ${row.report_path} -- ${row.status}, run by ${row.user_name} at ${row.time_start}.`
         ),
       ].join("\n");
+
+      // Two calls are "the same input" only if this key matches exactly; any
+      // real change in the evidence produces a different key and a fresh
+      // judgment, never a stale one. See triageDedupCache.ts.
+      const triageKey = buildTriageKey(blocked, failedReports);
+      const cached = triageJudgmentCache.get(triageKey);
+      if (cached) {
+        sendMcpLog(server, "info", "mcp_triage_cache_hit", {
+          correlationId,
+          tool: "triage_active_incidents",
+          cachedAt: new Date(cached.computedAt).toISOString(),
+        });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `${cached.judgmentText}\n\n---\nRaw evidence used for this judgment:\n${cached.evidenceText}\n\n(Cached: this evidence is unchanged since a judgment was made at ${new Date(cached.computedAt).toISOString()} -- not re-sampled.)`,
+            },
+          ],
+        };
+      }
+
+      // 2. Client capability check, up front -- a clean, evidence-backed
+      // degraded result if this client never declared sampling support, not a
+      // failed request.
+      if (!server.server.getClientCapabilities()?.sampling) {
+        sendMcpLog(server, "warning", "mcp_sampling_unsupported", { correlationId, tool: "triage_active_incidents" });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `This client doesn't support MCP sampling, so no AI judgment could be made.\n\nRaw evidence:\n${evidenceText}\n\nReview manually.`,
+            },
+          ],
+        };
+      }
 
       // Same mcp_external_call_started/finished vocabulary the fetches above
       // and every other tool in this file use -- a sampling request is an
@@ -543,8 +583,13 @@ export function createCoreOpsMcpServer(): McpServer {
           model: result.model,
         });
 
-        const text = result.content.type === "text" ? result.content.text : "(client returned a non-text response)";
-        return { content: [{ type: "text", text }] };
+        const judgmentText = result.content.type === "text" ? result.content.text : "(client returned a non-text response)";
+        triageJudgmentCache.set(triageKey, { judgmentText, evidenceText, computedAt: Date.now() });
+        return {
+          content: [
+            { type: "text", text: `${judgmentText}\n\n---\nRaw evidence used for this judgment:\n${evidenceText}` },
+          ],
+        };
       } catch (error) {
         // The client either doesn't truly support sampling despite declaring
         // it, or a human declined the request (MCP's own human-in-the-loop
@@ -566,7 +611,7 @@ export function createCoreOpsMcpServer(): McpServer {
           content: [
             {
               type: "text",
-              text: `The client declined or failed to sample a judgment (${error instanceof Error ? error.message : String(error)}). Raw evidence: ${blocked.length} blocked SQL session(s), ${failedReports.length} failed SSRS report(s). Review manually.`,
+              text: `The client declined or failed to sample a judgment (${error instanceof Error ? error.message : String(error)}).\n\nRaw evidence:\n${evidenceText}\n\nReview manually.`,
             },
           ],
         };
