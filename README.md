@@ -139,6 +139,17 @@ server, not just unit-tested. Current counts: **334 tests passing** — 264 in
   drops to single-source and calls it complete); live-verified against the
   real current state of this deployment, where both sources are genuinely
   unavailable for two different real reasons.
+- Semantic dedup for `triage_active_incidents` (`mcp-server/src/triageSemanticCache.ts`):
+  evidence text is embedded locally (`@huggingface/transformers`, no paid API) and
+  checked against a real **vector database** — a dedicated `pgvector`-backed
+  Postgres instance (`mcp-server/dev-vector-db/`) — so a near-duplicate incident
+  (same underlying issue, slightly different wording or values) reuses a recent
+  judgment instead of triggering a fresh AI call. Sits on top of an exact-match
+  cache for byte-identical evidence; entirely optional at runtime (`PG_VECTOR_HOST`
+  unset disables it with zero behavior change). Live-verified against a real
+  running container: a genuine near-duplicate matched at cosine distance 0.0047,
+  a genuinely different incident correctly did not match. See
+  [ADR-015](docs/ADR-015-triage-semantic-cache-pgvector.md).
 
 **Interfaces**
 - `dashboard.html` — the primary operations dashboard, `apiFetch()`-wrapped so
