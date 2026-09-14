@@ -21,7 +21,9 @@ import { readDiagnosticLogFile } from "./diagnosticLogReader.js";
 import { checkPostgresBackendBlocked } from "./pgBackendStatusSource.js";
 import { UpstreamTimeoutError } from "./reliability/withReliability.js";
 import { CircuitOpenError } from "./reliability/circuitBreaker.js";
-import { TriageJudgmentCache, buildTriageKey } from "./triageDedupCache.js";
+import { TriageJudgmentCache, buildTriageKey, TRIAGE_CACHE_TTL_MS } from "./triageDedupCache.js";
+import { embedText } from "./embeddingModel.js";
+import { findSemanticMatch, storeSemanticEntry, type SemanticCacheConfig } from "./triageSemanticCache.js";
 
 // Deliberately module-level, not inside createCoreOpsMcpServer(): that
 // function returns a fresh McpServer on every call in the HTTP transport's
@@ -33,6 +35,21 @@ import { TriageJudgmentCache, buildTriageKey } from "./triageDedupCache.js";
 // adding a new external dependency); worth revisiting if this ever needs to
 // stay consistent across a multi-replica deployment.
 const triageJudgmentCache = new TriageJudgmentCache();
+
+// ADR-015: the semantic (embedding-similarity) layer on top of the exact-key
+// cache above. Entirely optional -- PG_VECTOR_HOST unset means this feature
+// never runs at all: no model load, no connection attempt, no behavior
+// change from before this existed. Read once at module load, same pattern
+// pgRemediationExecutor.ts's PG_DEMO_* constants use.
+const PG_VECTOR_HOST = process.env.PG_VECTOR_HOST;
+const PG_VECTOR_PORT = Number(process.env.PG_VECTOR_PORT ?? 5435);
+const PG_VECTOR_DATABASE = process.env.PG_VECTOR_DATABASE ?? "triage_vectors";
+const PG_VECTOR_USER = process.env.PG_VECTOR_USER ?? "app";
+const PG_VECTOR_PASSWORD = process.env.PG_VECTOR_PASSWORD ?? "app";
+
+const semanticCacheConfig: SemanticCacheConfig | null = PG_VECTOR_HOST
+  ? { host: PG_VECTOR_HOST, port: PG_VECTOR_PORT, database: PG_VECTOR_DATABASE, user: PG_VECTOR_USER, password: PG_VECTOR_PASSWORD }
+  : null;
 
 export function createCoreOpsMcpServer(): McpServer {
   const server = new McpServer(
@@ -545,6 +562,43 @@ export function createCoreOpsMcpServer(): McpServer {
         };
       }
 
+      // ADR-015: the semantic layer. Only attempted when PG_VECTOR_HOST is
+      // configured, and never allowed to break the tool if it fails -- this
+      // is a best-effort optimization sitting in front of the real sampling
+      // call below, which is a perfectly good fallback on its own. Any
+      // failure here (model load, connection, timeout, circuit open) is
+      // logged and swallowed, never rethrown.
+      let evidenceEmbedding: number[] | null = null;
+      if (semanticCacheConfig) {
+        try {
+          evidenceEmbedding = await embedText(evidenceText);
+          const match = await findSemanticMatch(semanticCacheConfig, evidenceEmbedding, TRIAGE_CACHE_TTL_MS);
+          if (match) {
+            sendMcpLog(server, "info", "mcp_triage_cache_hit_semantic", {
+              correlationId,
+              tool: "triage_active_incidents",
+              cachedAt: new Date(match.computedAt).toISOString(),
+              distance: match.distance,
+            });
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `${match.judgmentText}\n\n---\nEvidence this judgment was actually based on (semantically similar, not identical, to what you asked about -- cosine distance ${match.distance.toFixed(3)}):\n${match.evidenceText}\n\n---\nCurrent evidence you asked about:\n${evidenceText}\n\n(Semantically matched from a judgment made at ${new Date(match.computedAt).toISOString()} -- not re-sampled. Review both evidence blocks above; if they don't look equivalent to you, treat this as stale and ask again.)`,
+                },
+              ],
+            };
+          }
+        } catch (error) {
+          sendMcpLog(server, "warning", "mcp_triage_semantic_unavailable", {
+            correlationId,
+            tool: "triage_active_incidents",
+            errorClass: error instanceof Error ? error.constructor.name : "Error",
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
       // Same mcp_external_call_started/finished vocabulary the fetches above
       // and every other tool in this file use -- a sampling request is an
       // external call too (to the client), it just doesn't get its own
@@ -585,6 +639,24 @@ export function createCoreOpsMcpServer(): McpServer {
 
         const judgmentText = result.content.type === "text" ? result.content.text : "(client returned a non-text response)";
         triageJudgmentCache.set(triageKey, { judgmentText, evidenceText, computedAt: Date.now() });
+        if (semanticCacheConfig && evidenceEmbedding) {
+          try {
+            await storeSemanticEntry(semanticCacheConfig, {
+              cacheKey: triageKey,
+              embedding: evidenceEmbedding,
+              judgmentText,
+              evidenceText,
+              computedAt: Date.now(),
+            });
+          } catch (error) {
+            sendMcpLog(server, "warning", "mcp_triage_semantic_store_failed", {
+              correlationId,
+              tool: "triage_active_incidents",
+              errorClass: error instanceof Error ? error.constructor.name : "Error",
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
         return {
           content: [
             { type: "text", text: `${judgmentText}\n\n---\nRaw evidence used for this judgment:\n${evidenceText}` },

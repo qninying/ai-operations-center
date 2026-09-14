@@ -1,0 +1,19 @@
+# A dedicated Postgres+pgvector instance for the triage_active_incidents
+# semantic dedup cache (ADR-015) -- deliberately separate from dev-postgres/
+# (a simulated remediation TARGET, ADR-013) and dev-superset/'s verify-db (a
+# SQL Lab query target). This container holds this app's own internal state,
+# not a system CoreOps monitors or remediates; sharing a container across
+# those different purposes was already ruled out once (see dev-postgres/'s
+# own header comment) and the same reasoning applies here.
+services:
+  triage-vector-db:
+    image: pgvector/pgvector:pg16
+    container_name: coreops-dev-vector-db
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: triage_vectors
+    ports:
+      - "5435:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
