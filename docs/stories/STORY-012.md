@@ -80,21 +80,30 @@ actual run, not a hypothetical description of what would happen.
 Tick each box as it genuinely passes. Ticking something you have not actually
 verified against the real deployed system only misleads you.
 
-- [ ] Given a commit lands on `main`, when the deploy pipeline runs, then a
+- [x] Given a commit lands on `main`, when the deploy pipeline runs, then a
       git-SHA-tagged image is built, the full test suite gates the deploy,
       and the resulting instance is reachable at a real public URL, not
-      `localhost`.
-- [ ] Given the production instance is running, when `GET /healthz` (or
+      `localhost`. Verified 2026-09-16: run `35150181955`, `curl -sf
+      https://coreops.fly.dev/health` → `200` from outside the host.
+- [x] Given the production instance is running, when `GET /healthz` (or
       equivalent) is queried from outside the host, then it honestly reports
       process, DB, and Anthropic API reachability, using this repo's existing
-      live/fallback tagging convention.
-- [ ] Given a deliberately broken build is deployed, when the health check
+      live/fallback tagging convention. Verified 2026-09-16: `curl -sf
+      https://coreops.fly.dev/health/dependencies` → SQL Server honestly
+      reported `"source":"fallback"` (no real SQL Server exists for this Fly
+      VM to reach), `anthropic.configured: true`.
+- [x] Given a deliberately broken build is deployed, when the health check
       detects it, then the system is rolled back to the last known-good
       git-SHA-tagged image and traffic is fully recovered, the whole drill
-      timed and written up in `docs/INCIDENT-DRILL-001.md`.
-- [ ] Trust: no secret (API key, session secret, TOTP seed, DB credential)
+      timed and written up in `docs/INCIDENT-DRILL-001.md`. Verified
+      2026-09-16, live: see `docs/INCIDENT-DRILL-001.md` for the full timed
+      run (6m14s total downtime, 1m31s from failure-confirmed to recovered).
+- [x] Trust: no secret (API key, session secret, TOTP seed, DB credential)
       appears in the Dockerfile, the built image, a commit, or a log line
-      anywhere in this story's work.
+      anywhere in this story's work. Verified 2026-09-16 via `git grep`
+      across tracked files for real secret patterns — none found; all real
+      values were set directly via `fly secrets set`, never through this
+      session or the repo.
 - [ ] Given a different engineer with no prior context on this repo, when
       they read `docs/DEPLOYMENT.md` alone, then they can deploy a new
       version and execute a rollback without asking you a question.
