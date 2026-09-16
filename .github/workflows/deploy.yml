@@ -102,6 +102,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      # flyctl deploy reads fly.toml from the working directory; without this
+      # checkout the deploy job has an empty workspace and flyctl fails with
+      # "the config for your app is missing an app name" even though fly.toml
+      # has one, because there is no fly.toml here at all without this step.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Resolve image tag
         id: resolve
         run: |
