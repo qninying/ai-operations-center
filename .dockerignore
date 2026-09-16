@@ -1,0 +1,27 @@
+# Keeps the build context small and, more importantly, keeps anything
+# gitignored (secrets, runtime data) from ever reaching a Docker layer.
+node_modules
+**/node_modules
+dist
+**/dist
+mcp-server/data
+mcp-server/dev-postgres
+mcp-server/dev-superset
+mcp-server/dev-vector-db
+mcp-server/sample-logs
+.git
+.github
+.claude
+.colaberry
+docs
+project-blueprint
+artifacts
+command-center
+coreops-dependency-map
+prompts
+scripts
+*.md
+.env
+.env.*
+!.env.example
+.DS_Store

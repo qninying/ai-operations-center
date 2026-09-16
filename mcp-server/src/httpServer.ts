@@ -53,6 +53,7 @@ import { isDemoModeEnabled } from "./demoModeGate.js";
 import { notifyOperators } from "./notificationService.js";
 import { generateTotpCode } from "./auth/totp.js";
 import { startIncidentFeed, getRevealedIncidents, markResolved } from "./incidentFeedService.js";
+import { checkDependencyHealth } from "./healthCheck.js";
 
 // Thin HTTP transport for R2's DMV read path, alongside the existing stdio MCP
 // transport in index.ts. Both call the same readDmv() orchestrator — this file adds
@@ -320,7 +321,22 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (req.method === "GET" && url.pathname === "/health") {
+    // Liveness only: the process is up and can answer a request at all.
+    // Deliberately synchronous and dependency-free: this is what a deploy
+    // platform's fast, frequent poller should hit (see fly.toml), so it must
+    // never block on SQL Server, Anthropic, or anything else that can be slow
+    // or down. See GET /health/dependencies for the honest readiness signal.
     sendJson(res, 200, { status: "ok" });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/health/dependencies") {
+    // REQ-025/026 (STORY-012): readiness, not liveness. Reports what this
+    // instance can actually reach right now, using the same live/fallback
+    // tagging convention as every other real data path in this repo, never a
+    // separate, health-specific notion of truth. See healthCheck.ts.
+    const report = await checkDependencyHealth();
+    sendJson(res, 200, report);
     return;
   }
 

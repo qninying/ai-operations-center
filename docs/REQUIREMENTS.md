@@ -274,6 +274,29 @@ Failure paths to handle: the marker list drifts if edited in one place and
 not the other; the attach-only signal ships in the API response but is never
 actually surfaced to a human reviewer, so it goes unused in practice.
 
+## Production Deployment & Operations
+
+Added 2026-09-15, self-scoped as `docs/stories/STORY-012.md`: a fifth release
+outside the platform's original plan, the same way REQ-021 through REQ-024
+were. Every requirement above this point has been provable against a server
+running on `localhost`. Neither of these two can be: they require a real,
+internet-reachable instance and a rollback exercised against an actual live
+failure, not a unit test.
+
+### REQ-025: Constraint · must
+
+The system must run in a real, internet-reachable production environment,
+built and deployed through a reproducible pipeline, not a developer's laptop.
+
+Fulfilled by: STORY-012
+
+### REQ-026: Safety · must
+
+The system must support a live-verified rollback from a bad production
+deploy, with recovery bounded and measured, not merely claimed.
+
+Fulfilled by: STORY-012
+
 ## Integration
 
 ### REQ-007 — Constraint

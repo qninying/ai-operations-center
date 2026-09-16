@@ -1,0 +1,131 @@
+name: Deploy to production
+
+# STORY-012 (REQ-025/REQ-026): the reproducible pipeline this repo's production
+# instance actually runs through, with no manual `fly deploy` from a laptop.
+# The full test suite is a hard gate: a red build never reaches production, and
+# never gets an image pushed at all.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: >-
+          Existing image tag to redeploy without rebuilding (a rollback: the
+          git SHA of the last known-good build). Leave empty for a normal
+          build-and-deploy of the current commit.
+        required: false
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    if: ${{ github.event.inputs.image_tag == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: "mcp-server: install"
+        working-directory: mcp-server
+        run: npm ci
+
+      - name: "mcp-server: typecheck"
+        working-directory: mcp-server
+        run: npx tsc --noEmit
+
+      - name: "mcp-server: test"
+        working-directory: mcp-server
+        run: npm test
+
+      - name: "guardrails: install"
+        working-directory: guardrails
+        run: npm ci
+
+      - name: "guardrails: test"
+        working-directory: guardrails
+        run: npm test
+
+      - name: "frontend: install"
+        working-directory: frontend
+        run: npm ci
+
+      - name: "frontend: test"
+        working-directory: frontend
+        run: npm test
+
+      - name: "frontend: build"
+        working-directory: frontend
+        run: npm run build
+
+  build-and-push:
+    needs: [test]
+    if: ${{ always() && github.event.inputs.image_tag == '' && (needs.test.result == 'success') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.tag.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: tag
+        run: echo "sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+  deploy:
+    needs: [build-and-push]
+    if: ${{ always() && !cancelled() && (needs.build-and-push.result == 'success' || github.event.inputs.image_tag != '') }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Resolve image tag
+        id: resolve
+        run: |
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ needs.build-and-push.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # Deploys a pinned, already-built image by reference, the same command
+      # for a normal deploy and a rollback (docs/DEPLOYMENT.md), so there is
+      # exactly one deploy code path to trust, not a second "rollback mode"
+      # that only gets exercised during an actual incident.
+      # bluegreen, not immediate: Fly stands up the new release's machines
+      # alongside the current ones, waits for fly.toml's [[http_service.checks]]
+      # (GET /health) to pass, and only then cuts traffic over, automatically
+      # aborting and leaving the old release serving if the new one never
+      # goes healthy. This is what makes "only promote traffic after a health
+      # check passes" (STORY-012) true of every deploy, not just a rollback.
+      - run: >
+          flyctl deploy
+          --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.resolve.outputs.tag }}
+          --strategy bluegreen
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

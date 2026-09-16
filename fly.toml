@@ -1,0 +1,46 @@
+# STORY-012 (REQ-025). Created by `fly launch --no-deploy` and then hand-edited;
+# see docs/DEPLOYMENT.md for the full deploy/rollback runbook this file supports.
+# `app` is filled in by `fly launch` for your own Fly org; do not guess a value
+# here before that's run once.
+app = ""
+primary_region = "iad"
+
+[build]
+
+[env]
+  PORT = "8787"
+  # SESSION_COOKIE_SECURE must be "true" here: this is a real HTTPS deployment,
+  # not http://localhost. Every other required var (AUTH_USERNAME,
+  # AUTH_PASSWORD_HASH, MFA_TOTP_SECRET, ANTHROPIC_API_KEY, ...) is a secret and
+  # deliberately absent from this file; see .env.example and docs/DEPLOYMENT.md
+  # for how to set each one with `fly secrets set`, never committed here.
+  SESSION_COOKIE_SECURE = "true"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "GET"
+    path = "/health"
+    protocol = "http"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+# ADR-005's audit trail (guardrails/auditLog.ts, persisted to
+# mcp-server/data/audit-log.jsonl) must survive a deploy, not reset to empty on
+# every release. Create the volume once (see docs/DEPLOYMENT.md) before the
+# first deploy that mounts it: `fly deploy` fails fast if this section
+# references a volume that doesn't exist yet, which is the intended guardrail
+# against silently deploying with no persistence at all.
+[mounts]
+  source = "coreops_data"
+  destination = "/app/mcp-server/data"

@@ -53,3 +53,20 @@ system rather than a part of it.
 - **[STORY-009](stories/STORY-009.md)** — Implement incident escalation based on confidence thresholds _(waits on STORY-008)_
 - **[STORY-010](stories/STORY-010.md)** — Notify operators of autonomous actions _(waits on STORY-009)_
 - **[STORY-011](stories/STORY-011.md)** — Implement rollback capabilities for low-risk tasks _(waits on STORY-009)_
+
+## r5 · Dev to Prod: Production Deployment & Operational Readiness (self-scoped)
+
+Added after the platform's original 5-release plan was written; no `STORY-012`
+id exists in `.colaberry/plan.json`, so this release tracks in these docs only,
+the same way REQ-019 through REQ-024 do (see `docs/REQUIREMENTS.md`).
+
+**Goal:** Take CoreOps off the developer's laptop and run it as a real,
+internet-reachable production service, with a rollback that has actually been
+exercised against a live failure, not just a capability that exists in code.
+**Done when you can show:** A real production URL, a health check answered
+from outside the host, and a timed incident/rollback drill with a written
+postmortem.
+
+- **[STORY-012](stories/STORY-012.md)**: Deploy CoreOps to a real production
+  environment and prove you can operate it _(waits on STORY-001, STORY-002,
+  STORY-009, STORY-011)_

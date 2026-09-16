@@ -30,5 +30,7 @@ none, because it is context rather than work.
 | REQ-022 | Safety | should | _(fulfilled directly — `docs/AI-GOVERNANCE-PROFILE.md`, no platform story assigned)_ |
 | REQ-023 | Safety | should | _(fulfilled directly — `docs/FRAMEWORK-MAPPING.md`, no platform story assigned)_ |
 | REQ-024 | Safety | should | _(fulfilled directly — `mcp-server/src/suspicionCheck.ts`, no platform story assigned)_ |
+| REQ-025 | Constraint | must | STORY-012 _(self-scoped, no `.colaberry/plan.json` id; see STORY-012)_ |
+| REQ-026 | Safety | must | STORY-012 _(self-scoped, no `.colaberry/plan.json` id; see STORY-012)_ |
 
 ✅ Every must-have requirement is fulfilled by at least one story.
