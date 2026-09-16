@@ -123,15 +123,25 @@ jobs:
       # for a normal deploy and a rollback (docs/DEPLOYMENT.md), so there is
       # exactly one deploy code path to trust, not a second "rollback mode"
       # that only gets exercised during an actual incident.
-      # bluegreen, not immediate: Fly stands up the new release's machines
-      # alongside the current ones, waits for fly.toml's [[http_service.checks]]
-      # (GET /health) to pass, and only then cuts traffic over, automatically
-      # aborting and leaving the old release serving if the new one never
-      # goes healthy. This is what makes "only promote traffic after a health
-      # check passes" (STORY-012) true of every deploy, not just a rollback.
+      # rolling, not bluegreen: bluegreen needs two machines to simultaneously
+      # claim the same Fly volume, which Fly does not support -- confirmed live,
+      # `flyctl deploy --strategy bluegreen` on this app fails outright with
+      # "failed_precondition: volume already claimed", every time, not
+      # intermittently. This is a hard platform constraint (bluegreen and
+      # canary both refuse to run against a volume-mounted app), not a bug to
+      # route around, so bluegreen was never viable here once ADR-005's audit
+      # trail volume existed. rolling still waits for fly.toml's
+      # [[http_service.checks]] (GET /health) to pass before completing the
+      # release, and fails the deploy (leaving the prior image's release as
+      # the last successful one) if it doesn't -- but because this app runs a
+      # single machine (min_machines_running = 1), rolling tears the old
+      # machine down before the new one is confirmed healthy, so there is a
+      # real, brief window of unavailability during every deploy that
+      # bluegreen's overlap would have avoided. Documented honestly rather
+      # than silently narrowing what "health-gated" means for this app.
       - run: >
           flyctl deploy
           --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.resolve.outputs.tag }}
-          --strategy bluegreen
+          --strategy rolling
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

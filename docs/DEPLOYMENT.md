@@ -54,9 +54,17 @@ Registry (`ghcr.io`), image tagged with the deploying commit's short git SHA.
 Push to `main`. `.github/workflows/deploy.yml` runs the full test suite
 (`mcp-server`, `guardrails`, `frontend`) as a gate, builds the image, tags it
 `ghcr.io/<owner>/ai-operations-center:<short-sha>`, and deploys it to Fly with
-`--strategy bluegreen`. The new release's machines must pass `fly.toml`'s
-`GET /health` check before traffic ever moves to them; a release that never
-goes healthy is aborted automatically and the previous one keeps serving.
+`--strategy rolling`. The new machine must pass `fly.toml`'s `GET /health`
+check before the release completes; a machine that never goes healthy fails
+the deploy, leaving the last successful image as the running release.
+**Not bluegreen:** this app mounts a Fly volume for the ADR-005 audit trail,
+and Fly volumes can only be claimed by one machine at a time — bluegreen (and
+canary) need two machines running concurrently, so both fail outright against
+a volume-mounted app (`failed_precondition: volume already claimed`, every
+time, confirmed live). With `min_machines_running = 1`, rolling means the old
+machine is torn down before the new one is confirmed healthy, so there is a
+real, brief window of unavailability on every deploy that bluegreen's
+overlap would have avoided.
 
 To watch a deploy: `fly logs`. To confirm it's live:
 ```
@@ -79,7 +87,7 @@ a previous successful run's logs, or `git log --oneline`), leave the branch as
 
 **Directly, if GitHub Actions itself is unavailable:**
 ```
-fly deploy --image ghcr.io/<owner>/ai-operations-center:<known-good-sha> --strategy bluegreen
+fly deploy --image ghcr.io/<owner>/ai-operations-center:<known-good-sha> --strategy rolling
 ```
 
 Either way, confirm recovery the same way as a normal deploy: `curl` `/health`
@@ -89,8 +97,8 @@ live/fallback state of SQL Server and whether Anthropic is configured.
 ## Health checks
 
 - `GET /health`: liveness only, no dependency calls. This is what `fly.toml`'s
-  `[[http_service.checks]]` polls, and what gates a bluegreen deploy's
-  traffic cutover.
+  `[[http_service.checks]]` polls, and what gates whether a rolling deploy's
+  new machine is accepted as the release.
 - `GET /health/dependencies`: readiness. Reports SQL Server as `live` or
   `fallback` (this app's existing tagging convention; fallback is an honest
   degraded-but-serving state, not a failure) and whether `ANTHROPIC_API_KEY`
