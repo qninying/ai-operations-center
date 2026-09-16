@@ -1,8 +1,6 @@
 # STORY-012 (REQ-025). Created by `fly launch --no-deploy` and then hand-edited;
 # see docs/DEPLOYMENT.md for the full deploy/rollback runbook this file supports.
-# `app` is filled in by `fly launch` for your own Fly org; do not guess a value
-# here before that's run once.
-app = ""
+app = "coreops"
 primary_region = "iad"
 
 [build]
