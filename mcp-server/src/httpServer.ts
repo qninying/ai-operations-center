@@ -321,13 +321,12 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (req.method === "GET" && url.pathname === "/health") {
-    // INCIDENT-DRILL-001 (STORY-012/REQ-026): deliberately broken for a real,
-    // timed rollback drill. No test in this repo asserts on this route's
-    // status code, so this passes the CI test gate and only gets caught by
-    // Fly's deploy-time health check -- which is the point of the drill.
-    // Revert this block to `sendJson(res, 200, { status: "ok" })` immediately
-    // after the drill; do not let this reach a second deploy.
-    sendJson(res, 500, { status: "error" });
+    // Liveness only: the process is up and can answer a request at all.
+    // Deliberately synchronous and dependency-free: this is what a deploy
+    // platform's fast, frequent poller should hit (see fly.toml), so it must
+    // never block on SQL Server, Anthropic, or anything else that can be slow
+    // or down. See GET /health/dependencies for the honest readiness signal.
+    sendJson(res, 200, { status: "ok" });
     return;
   }
 
