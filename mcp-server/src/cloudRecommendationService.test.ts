@@ -21,6 +21,7 @@ function fakeRootCause(): RootCauseResult {
     confidence: 80,
     evidenceIdsUsed: ["cloud:SSIS:2026-08-19T00:00:00Z:0"],
     insufficientEvidence: false,
+    claims: [],
   };
 }
 
@@ -123,13 +124,27 @@ describe("generateCloudRecommendation", () => {
     });
 
     const successEntries = auditLog.forCorrelationId("incident-7");
-    expect(successEntries).toHaveLength(1);
+    expect(successEntries).toHaveLength(2);
     expect(successEntries[0]).toMatchObject({
       entryType: "system_event",
       event: "cloud_recommendation_data_access",
       outcome: "success",
       actor: "cloudRecommendationService",
       correlationId: "incident-7",
+    });
+    // AI Trust and Risk Review, 2026-09-15: the diagnosis itself is now
+    // persisted for every recommendation, not only when it escalates.
+    expect(successEntries[1]).toMatchObject({
+      entryType: "system_event",
+      event: "cloud_recommendation_diagnosis",
+      outcome: "success",
+      actor: "cloudRecommendationService",
+      correlationId: "incident-7",
+      context: expect.objectContaining({
+        rootCause: "SSIS package load degraded by upstream cloud storage latency",
+        confidence: 80,
+        claims: [],
+      }),
     });
 
     await generateCloudRecommendation("incident-8", "desc", {

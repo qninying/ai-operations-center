@@ -25,6 +25,7 @@ function fakeRootCause(): RootCauseResult {
     confidence: 85,
     evidenceIdsUsed: ["sql:sys.dm_exec_requests:61:0"],
     insufficientEvidence: false,
+    claims: [],
   };
 }
 
@@ -105,13 +106,29 @@ describe("generateRecommendation", () => {
     });
 
     const successEntries = auditLog.forCorrelationId("incident-6");
-    expect(successEntries).toHaveLength(1);
+    expect(successEntries).toHaveLength(2);
     expect(successEntries[0]).toMatchObject({
       entryType: "system_event",
       event: "recommendation_data_access",
       outcome: "success",
       actor: "recommendationService",
       correlationId: "incident-6",
+    });
+    // AI Trust and Risk Review, 2026-09-15: the diagnosis itself (rootCause,
+    // confidence, claims) is now persisted for every recommendation, not only
+    // when it escalates -- this is the fix for that gap.
+    expect(successEntries[1]).toMatchObject({
+      entryType: "system_event",
+      event: "recommendation_diagnosis",
+      outcome: "success",
+      actor: "recommendationService",
+      correlationId: "incident-6",
+      context: expect.objectContaining({
+        rootCause: "Blocking chain on session 61",
+        confidence: 85,
+        evidenceIdsUsed: ["sql:sys.dm_exec_requests:61:0"],
+        claims: [],
+      }),
     });
 
     await generateRecommendation("incident-7", "desc", {

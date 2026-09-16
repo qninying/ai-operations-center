@@ -39,6 +39,7 @@ function fakeRootCause(): RootCauseResult {
     confidence: 85,
     evidenceIdsUsed: ["sql:sys.dm_exec_requests:61:0", "ssrs:/Finance/MonthlyRevenue:2026-08-24T08:12:03Z:0"],
     insufficientEvidence: false,
+    claims: [],
   };
 }
 
@@ -194,11 +195,26 @@ describe("generateCorrelatedRecommendation — REQ-017", () => {
     });
 
     const entries = auditLog.forCorrelationId("incident-8");
-    expect(entries).toHaveLength(2);
+    expect(entries).toHaveLength(3);
     expect(entries.every((e) => e.entryType === "system_event" && e.outcome === "success")).toBe(true);
-    expect(entries.map((e) => (e.entryType === "system_event" ? e.context.source : undefined)).sort()).toEqual(
+
+    const dataAccessEntries = entries.filter((e) => e.entryType === "system_event" && e.event === "correlated_recommendation_data_access");
+    expect(dataAccessEntries.map((e) => (e.entryType === "system_event" ? e.context.source : undefined)).sort()).toEqual(
       ["sql-server", "ssrs"].sort()
     );
+
+    // AI Trust and Risk Review, 2026-09-15: the diagnosis itself is now
+    // persisted for every recommendation, not only when it escalates.
+    const diagnosisEntries = entries.filter((e) => e.entryType === "system_event" && e.event === "correlated_recommendation_diagnosis");
+    expect(diagnosisEntries).toHaveLength(1);
+    expect(diagnosisEntries[0]).toMatchObject({
+      context: expect.objectContaining({
+        rootCause: "Blocking chain on session 61 coincides with a stalled report render",
+        confidence: 85,
+        claims: [],
+        partialCorrelation: false,
+      }),
+    });
 
     await generateCorrelatedRecommendation("incident-9", "desc", {
       dmvQueryFn: vi.fn().mockRejectedValue(new LiveSourceUnavailableError(["SQLSERVER_HOST"])),

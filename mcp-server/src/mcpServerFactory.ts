@@ -24,6 +24,7 @@ import { CircuitOpenError } from "./reliability/circuitBreaker.js";
 import { TriageJudgmentCache, buildTriageKey, TRIAGE_CACHE_TTL_MS } from "./triageDedupCache.js";
 import { embedText } from "./embeddingModel.js";
 import { findSemanticMatch, storeSemanticEntry, type SemanticCacheConfig } from "./triageSemanticCache.js";
+import { redactSecrets } from "./evidenceRedaction.js";
 
 // Deliberately module-level, not inside createCoreOpsMcpServer(): that
 // function returns a fresh McpServer on every call in the HTTP transport's
@@ -516,15 +517,24 @@ export function createCoreOpsMcpServer(): McpServer {
       // from the AI Employee Charter (Article IV/V, 2026-09-13): a
       // successful sampling call used to return judgment text ALONE, with
       // nothing forcing a human to see what it was judging from.
-      const evidenceText = [
-        ...blocked.map(
-          (row) =>
-            `SQL: session ${row.session_id} blocked by session ${row.blocking_session_id} on ${row.database_name}, waiting ${row.total_elapsed_time_ms}ms${row.wait_type ? ` (${row.wait_type})` : ""}.`
-        ),
-        ...failedReports.map(
-          (row) => `SSRS: report ${row.report_path} -- ${row.status}, run by ${row.user_name} at ${row.time_start}.`
-        ),
-      ].join("\n");
+      // Redacted before it's shown to a human, embedded, or persisted to the
+      // pgvector cache below: these rows come straight from live DMV/SSRS
+      // query results, and while today's fields are structured telemetry, not
+      // free text, redacting here is the same cheap defense-in-depth as
+      // rootCauseAgent.ts's buildPrompt() -- see AI Trust and Risk Review,
+      // 2026-09-15, and evidenceRedaction.ts for why this is a pipeline
+      // control rather than a behavioral check on model output.
+      const evidenceText = redactSecrets(
+        [
+          ...blocked.map(
+            (row) =>
+              `SQL: session ${row.session_id} blocked by session ${row.blocking_session_id} on ${row.database_name}, waiting ${row.total_elapsed_time_ms}ms${row.wait_type ? ` (${row.wait_type})` : ""}.`
+          ),
+          ...failedReports.map(
+            (row) => `SSRS: report ${row.report_path} -- ${row.status}, run by ${row.user_name} at ${row.time_start}.`
+          ),
+        ].join("\n")
+      );
 
       // Two calls are "the same input" only if this key matches exactly; any
       // real change in the evidence produces a different key and a fresh

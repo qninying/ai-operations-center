@@ -46,6 +46,7 @@ import { TotpVerifier } from "./auth/totp.js";
 import { findAuthenticatedUser, DirectoryUser } from "./auth/userDirectory.js";
 import { SessionStore } from "./auth/sessionStore.js";
 import { serializeSessionCookie, clearSessionCookie, parseSessionCookie } from "./auth/cookies.js";
+import { checkBackupApproverConfig } from "./auth/backupApproverConfig.js";
 import { resolveStaticFilePath, mimeTypeFor } from "./staticFiles.js";
 import { RateLimiter } from "./rateLimiter.js";
 import { isDemoModeEnabled } from "./demoModeGate.js";
@@ -110,6 +111,31 @@ const BACKUP_APPROVER_TOTP_SECRET = process.env.BACKUP_APPROVER_TOTP_SECRET;
 const backupApproverConfigured = Boolean(
   BACKUP_APPROVER_USERNAME && BACKUP_APPROVER_PASSWORD_HASH && BACKUP_APPROVER_TOTP_SECRET
 );
+
+// AI Trust and Risk Review, 2026-09-15: the all-or-nothing check above can't
+// distinguish "deliberately single-operator" from "tried to configure a backup
+// approver and got it half-right" -- both silently fall back to the same
+// non-functional "sre-oncall" placeholder below, with nothing telling the
+// operator their escalation path has no real second human behind it. A warning,
+// not a fail-fast throw: an unconfigured backup approver is a legitimate,
+// supported deployment shape, so startup must not become fatal over it.
+const backupApproverConfig = checkBackupApproverConfig({
+  username: BACKUP_APPROVER_USERNAME,
+  passwordHash: BACKUP_APPROVER_PASSWORD_HASH,
+  totpSecret: BACKUP_APPROVER_TOTP_SECRET,
+});
+if (backupApproverConfig.status === "partial") {
+  logEvent({
+    level: "warn",
+    event: "backup_approver_partially_configured",
+    context: {
+      missingVars: backupApproverConfig.missingVars,
+      message:
+        "BACKUP_APPROVER_* is partially set -- falling back to single-operator mode. " +
+        "The second-approver escalation path has no real second human until all three vars are set.",
+    },
+  });
+}
 
 const directoryUsers: DirectoryUser[] = [
   { username: AUTH_USERNAME, passwordHash: AUTH_PASSWORD_HASH, totpVerifier, kind: "primary" },

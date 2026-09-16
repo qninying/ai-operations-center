@@ -245,5 +245,26 @@ export async function generateCorrelatedRecommendation(
   const result = await analyzeFn(incident);
   const grounding = checkEvidenceGrounding(incident.evidence, result.evidenceIdsUsed, result.claims);
   const suspicion = checkSuspicion(result);
+
+  // AI Trust and Risk Review, 2026-09-15: same fix as recommendationService.ts --
+  // written unconditionally, not only on escalation, so every diagnosis this
+  // function produces is reconstructable from the audit trail.
+  recordSystemEvent(
+    options.auditLog,
+    "correlatedRecommendationService",
+    "correlated_recommendation_diagnosis",
+    "success",
+    {
+      rootCause: result.rootCause,
+      confidence: result.confidence,
+      evidenceIdsUsed: result.evidenceIdsUsed,
+      claims: result.claims,
+      grounded: grounding.grounded,
+      partialCorrelation: unavailableSources.length > 0,
+      unavailableSources,
+    },
+    incidentId
+  );
+
   return { ...result, partialCorrelation: unavailableSources.length > 0, unavailableSources, grounding, suspicion };
 }

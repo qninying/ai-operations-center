@@ -5,6 +5,7 @@ import { withReliability } from "./reliability/withReliability.js";
 import { logEvent } from "./observability/logger.js";
 import type { Incident, RootCauseResult } from "./rootCauseAgent.js";
 import { readConfidenceThreshold } from "./confidenceThresholds.js";
+import { claudeApiBudget } from "./claudeApiBudget.js";
 
 // STORY-004 / REQ-010: "gather additional diagnostics when confidence is below 80%."
 // Deliberately a separate file from rootCauseAgent.ts (already 200 lines; a second
@@ -144,10 +145,11 @@ async function defaultCallModel(prompt: string): Promise<string> {
   return textBlock.text;
 }
 
-// Throws MissingApiKeyError (checked before any attempt, never retried),
-// UpstreamTimeoutError / UpstreamCallFailedError / CircuitOpenError (from
-// withReliability — covers "diagnostics not gathered"), or MalformedResponseError
-// (covers "incorrect diagnostics presented"). Every call logs exactly one event,
+// Throws MissingApiKeyError or ClaudeApiBudgetExceededError (both checked before
+// any attempt, never retried — see claudeApiBudget.ts), UpstreamTimeoutError /
+// UpstreamCallFailedError / CircuitOpenError (from withReliability — covers
+// "diagnostics not gathered"), or MalformedResponseError (covers "incorrect
+// diagnostics presented"). Every call logs exactly one event,
 // whether or not anything was actually gathered — covers "Trust: all diagnostics
 // gathering is logged" as a property of every invocation, not just successful ones.
 export async function gatherAdditionalDiagnostics(
@@ -169,6 +171,14 @@ export async function gatherAdditionalDiagnostics(
     throw new MissingApiKeyError();
   }
   const modelFn = callModel ?? defaultCallModel;
+
+  // AI Trust and Risk Review, 2026-09-15: same shared-budget check as
+  // rootCauseAgent.ts, checked once before the retry loop, not inside
+  // defaultCallModel -- see claudeApiBudget.ts and rootCauseAgent.ts's own
+  // comment on this same pattern for why.
+  if (!callModel) {
+    claudeApiBudget.checkAndRecord();
+  }
 
   const text = await withReliability(() => modelFn(buildPrompt(incident, rootCause)), {
     timeoutMs: TIMEOUT_MS,

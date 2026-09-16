@@ -140,5 +140,29 @@ export async function generateRecommendation(
   const result = await analyzeFn(incident);
   const grounding = checkEvidenceGrounding(evidence, result.evidenceIdsUsed, result.claims);
   const suspicion = checkSuspicion(result);
+
+  // AI Trust and Risk Review, 2026-09-15: previously only escalationService.ts
+  // (confidence below the escalation threshold) ever wrote rootCause/claims to
+  // the durable audit trail. For the majority, non-escalated path that leads to
+  // most real human approvals, only recommendation_data_access's {rowCount} was
+  // recorded above -- a reviewer could reconstruct who approved what and when,
+  // but not what Claude actually said or why. Written unconditionally here, not
+  // only on escalation, so every diagnosis this function produces is
+  // reconstructable from the audit trail regardless of how confident it was.
+  recordSystemEvent(
+    options.auditLog,
+    "recommendationService",
+    "recommendation_diagnosis",
+    "success",
+    {
+      rootCause: result.rootCause,
+      confidence: result.confidence,
+      evidenceIdsUsed: result.evidenceIdsUsed,
+      claims: result.claims,
+      grounded: grounding.grounded,
+    },
+    incidentId
+  );
+
   return { ...result, grounding, suspicion };
 }
