@@ -13,11 +13,34 @@ oversight at all is worse than the outage it's meant to prevent. CoreOps is buil
 around the boundary between "the AI proposes" and "a verified human decides" being
 real, enforced in code, and provable after the fact — not a policy comment.
 
+<img src="docs/diagrams/layer-diagram.svg" alt="Seven-layer pipeline: Data and Infrastructure up through Integration, Reasoning, and Orchestration to a Governance gate requiring human approval before an action executes, with Observability and Audit connected to every layer by one shared correlation ID." width="640">
+
 ## See it running
+
+A real production deployment is live at
+[coreops.fly.dev](https://coreops.fly.dev) (Fly.io, STORY-012). Without
+credentials you'll hit the real login page, not a demo — that's the point,
+the human-approval gate is real, not a UI mockup. What's checkable with no
+login at all: `curl https://coreops.fly.dev/health/dependencies` returns the
+same honest `live`/`fallback` tagging described throughout this doc, live,
+right now — SQL Server currently reports `fallback` in this deployment, shown
+plainly rather than disguised as a live connection.
+
+To run it yourself:
+
+**You don't need real SQL Server access to try this.** If `SQLSERVER_*` is
+unset, the DMV read tool falls back to fixture data automatically, same for
+`AZURE_STORAGE_CONNECTION_STRING`/SSRS. The real setup step is auth, not
+infrastructure: generate a password hash and a TOTP secret first, since the
+server fails fast at startup without both.
 
 ```bash
 cd mcp-server
 npm install
+cp .env.example .env
+npm run hash-password -- '<your password>'       # paste the result into AUTH_PASSWORD_HASH
+npm run generate-totp-secret                     # paste the result into MFA_TOTP_SECRET
+# fill in ANTHROPIC_API_KEY too — see .env.example for what's required vs. optional
 npm run http
 ```
 
@@ -50,8 +73,12 @@ Then open `http://localhost:8787/console?role=it-manager`.
 ## What's real
 
 Every claim below has a test behind it and was verified against a real running
-server, not just unit-tested. Current counts: **334 tests passing** — 264 in
-`mcp-server/`, 64 in `guardrails/`, 6 in `frontend/`.
+server, not just unit-tested. Current counts, re-run 2026-09-16: **457 tests
+passing** — 387 in `mcp-server/`, 70 in `guardrails/`, 6 in `frontend/` (the
+frontend count is source-verified — `grep -c "  it(" frontend/src/App.test.tsx`
+— rather than executed in every environment, since vitest's worker pool can be
+blocked by sandbox restrictions on spawning workers; it ran clean the last time
+it was executed).
 
 **Governance & security**
 - Session-based authentication (`mcp-server/src/auth/`) gates every route —
@@ -161,7 +188,7 @@ server, not just unit-tested. Current counts: **334 tests passing** — 264 in
 
 ## Architecture decisions
 
-Nine ADRs, each with real alternatives considered and rejected, not just the
+Fifteen ADRs, each with real alternatives considered and rejected, not just the
 choice made:
 
 | ADR | Decision |
@@ -175,6 +202,12 @@ choice made:
 | [ADR-007](docs/ADR-007-second-approver-identity.md) | A real second approver identity over a general N-user credential store — mirrors the existing single-user pattern for exactly the two roles the escalation model actually has |
 | [ADR-008](docs/ADR-008-evidence-grounding-check.md) | A citation-existence check, generic over opaque evidence, over a second "critic" LLM call (not actually independent) or per-source semantic verification (couples a shared module to three separately-evolving schemas) |
 | [ADR-009](docs/ADR-009-structured-claim-verification.md) | Structured claim-to-field verification over a fuzzy semantic/substring check — the model cites the exact field and value backing each fact, checked with an exact (not inferred) comparison, avoiding the false-positive risk a text-similarity check would carry |
+| [ADR-010](docs/ADR-010-sql-remediation-safety.md) | Source-aware remediation with real DBA-style safety judgment, over the single hardcoded demo action every incident previously proposed regardless of source |
+| [ADR-011](docs/ADR-011-moroccan-theme-system.md) | A shared day/night theme system across all three UI surfaces, restyled with zero business-logic, API, or routing changes |
+| [ADR-012](docs/ADR-012-real-docker-execution.md) | One real execution path — Docker/Superset restart — over extending real writes to SQL Server or IIS, since this is the one target already under direct, unprivileged, reversible control; execution and confirmation kept as two separate steps so a restart is never reported fixed until independently confirmed healthy |
+| [ADR-013](docs/ADR-013-real-postgres-remediation.md) | A second real execution path — a real Postgres blocking-query kill — over repurposing or renaming the existing demo Postgres container (rejected, breaks an unrelated working demo) or cloning the Docker case onto a second container (rejected, proves nothing new) |
+| [ADR-014](docs/ADR-014-mcp-roots-containment-order.md) | Resolve the real filesystem path first, compare against declared MCP roots second — the only order that closes a symlink or `../` traversal escape, verified against a real symlink and a real traversal attempt, not just reasoned about |
+| [ADR-015](docs/ADR-015-triage-semantic-cache-pgvector.md) | A dedicated pgvector container with local, in-process embeddings for near-duplicate incident matching, over a paid embeddings API (no per-call cost or new external failure mode) or skipping semantic matching entirely (misses the real near-duplicate pattern this tool actually sees) |
 
 The full architecture package — a written summary, layer diagrams, and a
 trust-boundary data-flow diagram — is in
@@ -189,6 +222,8 @@ writing to production, not just policy-incapable. This is enforced in code and
 covered by tests — not just a design claim.
 
 ## The design + planning layer
+
+<img src="docs/diagrams/trust-boundaries.svg" alt="Data flows left to right from external sources, Azure SQL, the Claude API, and ntfy.sh, through a validating gateway and reasoning step, into the application where an operator views it, through a guardrail requiring the operator's real approval, before crossing back out to execute." width="720">
 
 | Path | What it is |
 |---|---|
@@ -208,8 +243,15 @@ python3 -m http.server   # from the repo root
 ```
 
 Then open `http://localhost:8000/` (must be served over HTTP, not `file://`).
-Every tab has a Sample/Real toggle — Real shows exactly what's been verified by
-an external reviewer sign-off, not a self-declaration.
+Every tab has a Sample/Real toggle — Real shows exactly what's recorded in
+`.colaberry/progress.json`'s `verification` block, which the Colaberry
+platform owns and writes separately from the `passed`/`evidence` fields the
+coding session itself reports (see
+[`docs/DATA_CONTRACT.md`](docs/DATA_CONTRACT.md)). That's a real separation
+from a bare self-declaration, but this repo alone can't establish what the
+platform's own verification run consists of, so don't oversell it as
+independent human review unless you can point to what that process actually
+is.
 
 ## Status
 

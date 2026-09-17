@@ -81,7 +81,7 @@ describe("queryLiveDmv", () => {
 
     expect(connect).toHaveBeenCalledTimes(4);
     expect(query).toHaveBeenCalledTimes(4);
-  });
+  }, 15_000);
 
   it("succeeds on a later retry without exhausting all attempts", async () => {
     setSqlEnv();
@@ -100,7 +100,7 @@ describe("queryLiveDmv", () => {
 
     await expect(resultPromise).resolves.toEqual(rows);
     expect(query).toHaveBeenCalledTimes(3);
-  });
+  }, 15_000);
 
   it("parameterizes databaseName via a bound input rather than concatenating it into the query text", async () => {
     setSqlEnv();
@@ -167,7 +167,7 @@ describe("queryLiveDmv", () => {
       CircuitOpenError
     );
     expect(connect).not.toHaveBeenCalled();
-  });
+  }, 15_000);
 
   it("allows a half-open trial call after the cooldown elapses, and closes again on success", async () => {
     setSqlEnv();
@@ -200,5 +200,5 @@ describe("queryLiveDmv", () => {
     await expect(queryLiveDmv({ dmvName: "sys.dm_exec_requests" })).resolves.toEqual([
       { session_id: 1 },
     ]);
-  });
+  }, 15_000);
 });

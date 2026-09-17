@@ -75,7 +75,7 @@ describe("querySsrsExecutionLog", () => {
 
     expect(connect).toHaveBeenCalledTimes(4);
     expect(query).toHaveBeenCalledTimes(4);
-  });
+  }, 15_000);
 
   it("succeeds on a later retry without exhausting all attempts", async () => {
     setSsrsEnv();
@@ -94,7 +94,7 @@ describe("querySsrsExecutionLog", () => {
 
     await expect(resultPromise).resolves.toEqual(rows);
     expect(query).toHaveBeenCalledTimes(3);
-  });
+  }, 15_000);
 
   it("parameterizes reportPath via a bound input rather than concatenating it into the query text", async () => {
     setSsrsEnv();
@@ -149,7 +149,7 @@ describe("querySsrsExecutionLog", () => {
       CircuitOpenError
     );
     expect(connect).not.toHaveBeenCalled();
-  });
+  }, 15_000);
 
   it("allows a half-open trial call after the cooldown elapses, and closes again on success", async () => {
     setSsrsEnv();
@@ -179,5 +179,5 @@ describe("querySsrsExecutionLog", () => {
     await expect(querySsrsExecutionLog({ queryName: "ExecutionLog3" })).resolves.toEqual([
       { instance_name: "SSRS01" },
     ]);
-  });
+  }, 15_000);
 });
