@@ -92,6 +92,17 @@ built as part of this drill — named here honestly as the next real
 hardening step, per this repo's own Failure-First Design convention, rather
 than treated as already solved because the manual rollback worked once.
 
+**Update, 2026-09-17 — this gap is now closed.** `.github/workflows/deploy.yml`'s
+`deploy` job has a `Page operator on deploy failure` step (`if: failure()`)
+that fires exactly when `flyctl deploy` exits non-zero, POSTing to the same
+`ntfy.sh` topic `notifyOperators()` already uses in-app — one channel, not a
+second one to separately watch. See `docs/DEPLOYMENT.md`'s "Who to page"
+section for the operational detail, including the separate GitHub Actions
+`NTFY_TOPIC` secret this requires (the CI runner can't read the Fly app's
+own env). Left as a dated update here rather than rewritten into the
+original recommendation above, since that paragraph is an honest record of
+what this drill actually found on 2026-09-16, not what's true today.
+
 ## Raw evidence
 
 ```

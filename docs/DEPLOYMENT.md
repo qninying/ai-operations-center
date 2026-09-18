@@ -118,3 +118,21 @@ authentication story (`docs/ADR-007-second-approver-identity.md`): the app
 owner is the only on-call. There is no second responder configured for this
 production instance yet, a real gap for anything beyond a portfolio deploy,
 named here honestly rather than implied away.
+
+The operator no longer has to be watching to find out a deploy failed.
+`INCIDENT-DRILL-001` found that a rolling deploy whose health check never
+passes just leaves the broken machine running and unreachable — nothing
+paged anyone, so "brief window of unavailability" only held because the
+operator happened to be online. `.github/workflows/deploy.yml`'s `deploy`
+job now has a `Page operator on deploy failure` step (`if: failure()`) that
+fires exactly when `flyctl deploy` exits non-zero: a push to `ntfy.sh` on the
+same `NTFY_TOPIC` the app's own `notifyOperators()` already uses (see
+`mcp-server/.env.example`), so it's one channel to watch, not two. This
+requires an `NTFY_TOPIC` **GitHub Actions repository secret** — set
+separately from the Fly-side `NTFY_TOPIC` app secret, same value, since the
+CI runner has no access to the running app's environment
+(`gh secret set NTFY_TOPIC` or the repo's Settings → Secrets → Actions UI).
+Without that secret set, the paging step itself shows as a failed step in
+the Actions run (`curl -f` against `ntfy.sh/` with an empty topic segment)
+rather than silently sending nothing — check that step if a real deploy
+failure ever goes unpaged.
