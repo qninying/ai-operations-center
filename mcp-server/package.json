@@ -4,6 +4,9 @@
   "description": "CoreOps MCP Tool Gateway — read-only stdio MCP server exposing SQL Server DMV data to AI agents.",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "main": "dist/mcp-server/src/index.js",
   "scripts": {
     "dev": "tsx src/index.ts",

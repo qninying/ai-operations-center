@@ -4,6 +4,9 @@
   "description": "R4 safety guardrails — pure, deterministic pre-execution checks for remediation actions.",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run"
