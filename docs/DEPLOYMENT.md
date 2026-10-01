@@ -130,9 +130,22 @@ about itself proves nothing about whether it's reachable from the outside.
 
 ## Rollback
 
-Two ways, both landing on the exact same `flyctl deploy --image ...` code path
-the normal deploy job uses. There is no separate, rarely-exercised "rollback
-mode" to distrust during a real incident.
+**Automatic, as of 2026-10-01 (INCIDENT-DRILL-001's closed recommendation):**
+the `deploy` job captures the currently-running image *before* attempting a
+new one. If the new deploy fails its health check, the job automatically
+redeploys that captured previous image, no human action required to restore
+service. You still get paged either way (`ntfy.sh`, same `NTFY_TOPIC`
+channel), but the message differs: a successful auto-rollback says so and
+tells you your latest commit is not live; a failed auto-rollback (or nothing
+to roll back to) escalates to "manual intervention required now" with the
+exact command below. Verified against a real failing deploy, not assumed —
+see `docs/INCIDENT-DRILL-001.md`'s addendum for the run ID and raw evidence.
+
+**Manual, for when auto-rollback itself fails or you need to target a
+specific older version deliberately** (not just "whatever was running a
+moment ago") — both paths land on the exact same `flyctl deploy --image ...`
+code path the normal deploy job uses, so there is no separate, rarely-
+exercised "rollback mode" to distrust during a real incident:
 
 **From GitHub Actions (recommended: keeps the pipeline as the one path that
 touches production):** Actions → "Deploy to production" → **Run workflow**,

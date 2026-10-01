@@ -108,6 +108,22 @@ jobs:
       # has one, because there is no fly.toml here at all without this step.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # Captured before attempting the new deploy, not derived afterward --
+      # whatever is running right now is by definition the last version that
+      # passed its own health check, so it is the correct auto-rollback
+      # target if the new deploy below fails. `fly image show` reads the app
+      # name from fly.toml, same as the deploy step, so there is no
+      # hardcoded app name to drift out of sync.
+      - name: Capture currently-running image (auto-rollback target)
+        id: previous
+        run: |
+          TAG=$(flyctl image show --json | jq -r '.[0].Tag // empty')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
       - name: Resolve image tag
         id: resolve
         run: |
@@ -117,12 +133,9 @@ jobs:
             echo "tag=${{ needs.build-and-push.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-
       # Deploys a pinned, already-built image by reference, the same command
-      # for a normal deploy and a rollback (docs/DEPLOYMENT.md), so there is
-      # exactly one deploy code path to trust, not a second "rollback mode"
-      # that only gets exercised during an actual incident.
+      # for a normal deploy and a manual rollback (docs/DEPLOYMENT.md), so
+      # there is exactly one deploy code path to trust.
       # rolling, not bluegreen: bluegreen needs two machines to simultaneously
       # claim the same Fly volume, which Fly does not support -- confirmed live,
       # `flyctl deploy --strategy bluegreen` on this app fails outright with
@@ -139,9 +152,27 @@ jobs:
       # real, brief window of unavailability during every deploy that
       # bluegreen's overlap would have avoided. Documented honestly rather
       # than silently narrowing what "health-gated" means for this app.
-      - run: >
+      - name: Deploy new image
+        id: deploy_new
+        run: >
           flyctl deploy
           --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.resolve.outputs.tag }}
+          --strategy rolling
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # Automates the one human action the operator used to have to perform
+      # by hand after being paged: redeploy the last known-good image. Only
+      # attempted once -- if this also fails, no further automatic retries
+      # (an unbounded auto-rollback loop is its own incident), the page below
+      # escalates instead. Skipped if there was no previous image to roll
+      # back to (e.g. the very first deploy of a brand-new app).
+      - name: Auto-rollback to the previous image
+        id: auto_rollback
+        if: failure() && steps.deploy_new.outcome == 'failure' && steps.previous.outputs.tag != ''
+        run: >
+          flyctl deploy
+          --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.previous.outputs.tag }}
           --strategy rolling
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -152,30 +183,37 @@ jobs:
       # unavailability" only held because the operator happened to be
       # watching. This step is that page. Reuses the exact channel
       # notifyOperators() already uses for in-app autonomous actions (ntfy.sh,
-      # same NTFY_TOPIC value, now also stored as a GitHub Actions secret
-      # since this runs in CI, outside the app process) rather than inventing
-      # a second alerting mechanism. `if: failure()` fires only when the
-      # `flyctl deploy` step above actually failed -- a healthy deploy sends
-      # nothing.
+      # same NTFY_TOPIC value, also stored as a GitHub Actions secret since
+      # this runs in CI, outside the app process). `if: failure()` fires
+      # whenever any earlier step in this job failed -- a healthy deploy
+      # sends nothing.
       #
       # Previously built and reverted (2026-09-17, commit 8c21a3d -> ea93b60)
-      # because the NTFY_TOPIC Actions secret had never actually been set,
-      # leaving this step wired to send a notification to nowhere -- a false
-      # safety net is worse than an honestly-open gap. Re-applied 2026-10-01
-      # (INCIDENT-002) with the secret actually set first, and verified end
-      # to end with a real failing deploy before being trusted: see
-      # docs/INCIDENT-DRILL-001.md's 2026-10-01 addendum for the live test
-      # evidence (run ID, exact curl result, confirmed ntfy.sh delivery).
+      # because the NTFY_TOPIC Actions secret had never actually been set.
+      # Re-applied 2026-10-01 (INCIDENT-002) with the secret actually set
+      # first, verified end to end with a real failing deploy. Extended the
+      # same day to report auto-rollback's own outcome (see
+      # docs/INCIDENT-DRILL-001.md's addendum) rather than always telling the
+      # operator to run a command that auto-rollback may have already run.
       - name: Page operator on deploy failure
         if: failure()
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           IMAGE_TAG: ${{ steps.resolve.outputs.tag }}
+          PREVIOUS_TAG: ${{ steps.previous.outputs.tag }}
+          ROLLBACK_OUTCOME: ${{ steps.auto_rollback.outcome }}
         run: |
-          MESSAGE="flyctl deploy failed for image tag ${IMAGE_TAG} on ${{ github.repository }}.
-          Run: ${RUN_URL}
-          The new machine did not pass its health check and the release did not promote. Roll back per docs/DEPLOYMENT.md: gh workflow run deploy.yml --ref main -f image_tag=<last-known-good-sha>"
+          if [ "${ROLLBACK_OUTCOME}" = "success" ]; then
+            MESSAGE="flyctl deploy failed for image tag ${IMAGE_TAG} on ${{ github.repository }}, and was auto-rolled-back to the previous image (${PREVIOUS_TAG}), which is now live again.
+            Run: ${RUN_URL}
+            Your latest commit is NOT live -- confirm with: curl -sf https://coreops.fly.dev/health/dependencies
+            Fix the build, then re-push to retry."
+          else
+            MESSAGE="URGENT: flyctl deploy failed for image tag ${IMAGE_TAG} on ${{ github.repository }}, AND auto-rollback to ${PREVIOUS_TAG} also failed (or had nothing to roll back to). No automatic recovery happened -- manual intervention required now.
+            Run: ${RUN_URL}
+            Roll back per docs/DEPLOYMENT.md: gh workflow run deploy.yml --ref main -f image_tag=<last-known-good-sha>"
+          fi
           curl -sf -X POST "https://ntfy.sh/${NTFY_TOPIC}" \
             -H "Title: CoreOps: deploy_failed" \
             -H "Priority: urgent" \
