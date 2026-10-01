@@ -121,3 +121,86 @@ GitHub Actions runs: broken deploy
 [`35158821088`](https://github.com/qninying/ai-operations-center/actions/runs/35158821088)
 (succeeded), cleanup redeploy of the reverted fix (succeeded, triggered by
 commit `b379485`).
+
+## Addendum, 2026-10-01: the paging recommendation above, actually tested
+
+The "Recommendation this drill produced" section above was first built on
+2026-09-17 (commit `8c21a3d`) and reverted 14 minutes later (`ea93b60`) with
+no reason recorded at the time — a real process failure in its own right,
+caught and named honestly during INCIDENT-002
+(`docs/INCIDENT-002-sql-server-connectivity.md`). The actual reason,
+reconstructed from that commit's own notes: the step depended on an
+`NTFY_TOPIC` GitHub Actions secret that was never set, so it would have
+posted to nowhere — reverting an unverifiable safety net was the right call,
+it just needed to be re-done properly instead of left open indefinitely.
+
+**How this was actually verified, not assumed:**
+
+1. Set a real `NTFY_TOPIC` GitHub Actions secret (confirmed present via
+   `gh secret list`, value never exposed in any log or session).
+2. Re-applied the paging step to `.github/workflows/deploy.yml` (commit
+   `172e223`), validated with `ruby -ryaml -e "YAML.load_file(...)"` before
+   pushing — same method that caught a real YAML bug in the original 2026-09-17
+   attempt.
+3. Triggered a **deliberately failing** deploy via `gh workflow run deploy.yml
+   --ref main -f image_tag=deliberately-nonexistent-tag-for-paging-test` — a
+   tag that cannot exist in the registry, so `flyctl deploy` fails at the
+   image-fetch step, before ever touching the running machine. This is safer
+   than this drill's original method (a real broken health check): it proves
+   the same `if: failure()` path with zero real downtime.
+4. Read the run's own logs
+   ([`36910224762`](https://github.com/qninying/ai-operations-center/actions/runs/36910224762))
+   directly, not assumed from the step turning green: `flyctl deploy` failed
+   with `Could not find image "...deliberately-nonexistent-tag-for-paging-test"`,
+   exit code 1; the paging step then ran and its `curl` returned ntfy.sh's own
+   API response confirming real delivery: `{"id":"CuwMkW1WOwBF","event":"message","title":"CoreOps: deploy_failed",...}`
+   — a message ID from ntfy.sh's server is independent proof of delivery, not
+   just proof the `curl` command exited zero.
+5. Confirmed from outside the host, before and after, that production itself
+   was unaffected: `curl -sf https://coreops.fly.dev/health/dependencies`
+   showed `"source": "live"` throughout, uptime climbing continuously across
+   the test with no interruption.
+
+This closes the gap the original drill found: a failed deploy now pages the
+operator automatically, verified against a real failure, not inferred from
+the YAML looking correct.
+
+## Addendum, 2026-10-01 (same day): automating the one remaining manual step
+
+The addendum above still left one human action after the page: run the
+rollback command. Automated that too (commit `731dcdb`) — the `deploy` job
+now captures the currently-running image *before* attempting a new one, and
+on failure automatically redeploys that captured image, with the page
+reporting which actually happened rather than always asking for a manual
+command.
+
+**How this was actually verified, not assumed:**
+
+1. Recorded the running image tag before the test:
+   `fly image show --json` → `731dcdbac43a`.
+2. Triggered another deliberately-failing deploy — a new bad tag,
+   `deliberately-bad-tag-for-autorollback-test` — via the same
+   `gh workflow run` method as the first addendum.
+3. Watched the job's own step list, not just its final status: `Deploy new
+   image` failed, `Auto-rollback to the previous image` then ran and
+   succeeded, `Page operator on deploy failure` ran last
+   ([`36913419056`](https://github.com/qninying/ai-operations-center/actions/runs/36913419056)).
+4. Read the raw logs to confirm the rollback was a genuine Fly deployment, not
+   a no-op: `Machine 8de50dfe11d358 reached started state`, `Checking health
+   of machine 8de50dfe11d358`, `✔ Machine 8de50dfe11d358 is now in a good
+   state`.
+5. Confirmed the page sent the correct branch of its message (success, not
+   escalation) by reading the actual env values logged for that step —
+   `ROLLBACK_OUTCOME: success`, `PREVIOUS_TAG: 731dcdbac43a` — and ntfy.sh's
+   own delivery confirmation: `{"id":"wKo3Plda9K8E",...,"message":"...
+   auto-rolled-back to the previous image (731dcdbac43a), which is now live
+   again...",...}`.
+6. Confirmed after the test, from outside the host: `fly image show --json`
+   showed `731dcdbac43a` running again (the correct tag, not the bad one),
+   and `curl -sf https://coreops.fly.dev/health/dependencies` showed
+   `"source": "live"`.
+
+This closes the second half of the original drill's recommendation: a failed
+deploy now recovers itself, with no human action required to restore
+service, and the human is told which outcome actually happened rather than
+given a generic instruction.
