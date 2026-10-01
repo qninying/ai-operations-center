@@ -38,12 +38,67 @@ Registry (`ghcr.io`), image tagged with the deploying commit's short git SHA.
    ```
    Never put a real value in `fly.toml` or a GitHub Actions file; both are
    committed source.
-5. Generate a Fly deploy token and add it to this GitHub repo's
+
+   **If you want live SQL Server data instead of the fixture fallback**
+   (optional — fallback is an honest, fully-supported degraded state, not a
+   failure; see "Health checks" below), also set the four SQL Server secrets,
+   pulling straight from your local `.env` so the values never pass through
+   your shell history or a chat session:
+   ```
+   cd mcp-server
+   for VAR in SQLSERVER_HOST SQLSERVER_DATABASE SQLSERVER_USER SQLSERVER_PASSWORD; do
+     fly secrets set "$VAR=$(grep "^$VAR=" .env | cut -d= -f2-)"
+   done
+   ```
+   **This step was missed on the first real deploy** (STORY-012's original
+   acceptance check correctly verified fallback as honest, but nobody actually
+   set these four secrets afterward) and it is easy to miss again: the app
+   degrades to fixture data silently on missing config, with no error anywhere
+   telling you the secrets were never set. If `GET /health/dependencies`
+   reports `fallback` and you expected `live`, check `fly secrets list` for
+   these four names before debugging anything else.
+
+   Same pattern for Azure Blob Storage (STORY-007), if you want the cloud
+   diagnostics path live too:
+   ```
+   for VAR in AZURE_STORAGE_CONNECTION_STRING AZURE_STORAGE_CONTAINER; do
+     fly secrets set "$VAR=$(grep "^$VAR=" .env | cut -d= -f2-)"
+   done
+   ```
+5. **If your SQL Server has its own firewall** (true of Azure SQL Database,
+   and most real SQL Server deployments) — setting the secrets above is not
+   enough on its own. Fly's default outbound IPs are not stable, so there is
+   nothing fixed to allowlist until you allocate one:
+   ```
+   fly ips allocate-egress --app <your-app-name> -r <your fly.toml region>
+   fly ips list --app <your-app-name>
+   ```
+   This costs $3.60/mo per IPv4 address and applies to already-running
+   machines automatically after a short delay — no redeploy needed. Then add
+   the resulting IPv4 address to your SQL Server's firewall as a single-IP
+   rule (Azure SQL: server resource → Networking → Firewall rules; `az sql
+   server firewall-rule create --start-ip-address <ip> --end-ip-address <ip>`
+   for the CLI equivalent). A wide allowlisted range is not a substitute for
+   this — allowlist the one real IP.
+
+   **A firewall-looking symptom can actually be something else entirely.**
+   If `nc -zv -w 10 <sql-host> 1433` succeeds from a given machine but this
+   app's own queries still hang for much longer than its configured
+   timeouts, that is not a network/firewall problem — it is almost certainly
+   Node resolving the hostname via a dead IPv6 route and hanging in DNS
+   resolution before the driver's own timeout timer ever starts (`nc`
+   defaults to IPv4 and connects instantly; Node's default resolver tries
+   AAAA first). This is already fixed process-wide in
+   `mcp-server/src/httpServer.ts` (`setDefaultResultOrder("ipv4first")`), so
+   it should not recur here — noted so the next person who sees this exact
+   "reachable by `nc`, unreachable by the app" mismatch doesn't have to
+   re-derive the diagnosis from scratch.
+6. Generate a Fly deploy token and add it to this GitHub repo's
    **Settings → Secrets and variables → Actions** as `FLY_API_TOKEN`:
    ```
    fly tokens create deploy
    ```
-6. After the first successful image push, GitHub defaults the new
+7. After the first successful image push, GitHub defaults the new
    `ghcr.io/<owner>/ai-operations-center` package to **private**. Fly needs to
    pull it: either make the package **public** (Package settings →
    Change visibility), simplest for a single-operator deploy like this one, or
