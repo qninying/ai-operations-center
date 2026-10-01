@@ -24,6 +24,10 @@ function makeRows(count: number): DmvExecRequestRow[] {
 }
 
 describe("readDmv", () => {
+  beforeEach(() => {
+    vi.mocked(logEvent).mockClear();
+  });
+
   it("returns live rows tagged source: live on success (happy path)", async () => {
     const liveSource = vi.fn().mockResolvedValue(makeRows(2));
     const result = await readDmv({ dmvName: "sys.dm_exec_requests" }, liveSource);
@@ -44,6 +48,30 @@ describe("readDmv", () => {
     const result = await readDmv({ dmvName: "sys.dm_exec_requests" }, liveSource);
     expect(result.source).toBe("fallback");
     expect(result.rows).toEqual(dmExecRequestsFixture.slice(0, 15));
+  });
+
+  it("logs the real underlying error before falling back, not just that it fell back", async () => {
+    const liveSource = vi.fn().mockRejectedValue(new LiveSourceUnavailableError(["SQLSERVER_HOST"]));
+    await readDmv({ dmvName: "sys.dm_exec_requests" }, liveSource);
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "warn",
+        event: "dmv_live_source_failed",
+        context: expect.objectContaining({
+          dmvName: "sys.dm_exec_requests",
+          errorClass: "LiveSourceUnavailableError",
+          message: expect.stringContaining("SQLSERVER_HOST"),
+        }),
+      })
+    );
+  });
+
+  it("does not log dmv_live_source_failed on an unrecognized error (it rejects instead of falling back)", async () => {
+    const liveSource = vi.fn().mockRejectedValue(new Error("something unrelated broke"));
+    await expect(readDmv({ dmvName: "sys.dm_exec_requests" }, liveSource)).rejects.toThrow();
+    expect(logEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ event: "dmv_live_source_failed" })
+    );
   });
 
   it("falls back to fixture data when the live query fails after retries are exhausted", async () => {

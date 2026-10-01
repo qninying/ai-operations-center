@@ -127,6 +127,24 @@ export async function readDmv(
     if (!isKnownLiveSourceFailure(error)) {
       throw error;
     }
+    // Found live (2026-10-01): this fallback used to be silent about *why* the
+    // live source failed — fine for a genuinely unreachable remote server, but
+    // it meant a real bug (missing secrets, a DNS resolution hang, a stale
+    // firewall rule) looked identical to expected degraded behavior in every
+    // log. Logging the real error here before falling back is what makes a
+    // "why is this in fallback" incident diagnosable from `fly logs` alone,
+    // instead of requiring a local reproduction from scratch.
+    const err = error as { name?: string; message?: string; cause?: unknown };
+    logEvent({
+      level: "warn",
+      event: "dmv_live_source_failed",
+      context: {
+        dmvName: input.dmvName,
+        errorClass: err.name ?? "UnknownError",
+        message: err.message ?? String(error),
+        cause: err.cause instanceof Error ? err.cause.message : err.cause ?? null,
+      },
+    });
     return buildResult("fallback", readFixture(normalizedInput), normalizedInput);
   }
 }
