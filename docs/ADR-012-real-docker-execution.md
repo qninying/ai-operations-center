@@ -71,3 +71,112 @@ means a container-down event correctly *replaces* any active blocking-query
 incident as the one real problem to report, the same way Docker's single fixed id
 already works — covered by a new test (`incidentFeedService.test.ts`) asserting
 exactly that replacement, not just the detection in isolation.
+
+## Addendum (2026-10-03): a second target, pointed at prod
+
+A real gap, named honestly rather than left implicit: everything above only ever
+worked when `mcp-server` itself runs locally, on the same machine as the Docker
+daemon and the two dev containers. The production instance at `coreops.fly.dev`
+has no Docker daemon and can't reach a laptop's `localhost` — so the live-demo
+incident capability this ADR describes has never actually been exercised against
+the real deployed app, only against a local dev server.
+
+**Decision: add a second target, not replace the first.** `DEMO_TARGET` (default
+`"local"`, unset changes nothing) switches `pgActivitySource.ts`,
+`supersetHealthSource.ts`, and `dockerExecutor.ts` to point at Fly-hosted
+`dev-postgres`/`dev-superset` sidecar apps on Fly's private 6PN network instead
+of `localhost` — see `mcp-server/src/demoTargetConfig.ts`, the single module
+all three now resolve host/URL/restart-target through, so they can't drift
+against each other the way two independent copies of this logic would.
+
+**Restart goes through the Fly Machines API, not `execFile("docker", ...)`.**
+`mcp-server/src/flyMachinesExecutor.ts` is the prod counterpart to this ADR's
+local `docker restart` call — a plain authenticated `POST .../machines/<id>/restart`
+against Fly's REST API, wrapped in the same `withReliability` timeout/single-
+attempt shape as the local path. `dockerExecutor.ts`'s `restartContainerAndConfirm`
+branches on which `RestartTarget` it was given; the restart-then-poll-health
+structure, and the `{ attempted, confirmedHealthy, waitedMs }` return contract,
+are identical either way — callers in `httpServer.ts` needed zero changes.
+
+**Two tokens, not one.** `fly tokens create deploy` only ever scopes to a single
+app (`-a <app>` is not repeatable), so there is no single-token way to cover both
+sidecar apps — `FLY_DEV_POSTGRES_API_TOKEN` and `FLY_DEV_SUPERSET_API_TOKEN` are
+separate, each scoped to just its own app. This is a real new credential either
+way, unlike local `docker restart`'s "no credential at all" — the exact
+blast-radius argument this ADR's original Decision section makes for Docker does
+not transfer automatically to a Fly API token, which is why each one is scoped
+as narrowly as Fly's own tooling allows rather than issued as one broad token.
+
+**Not done in this addendum:** the two Fly apps have not actually been
+provisioned, and no real token/machine ID has been generated or deployed —
+this addendum covers the code-side switch only (unit-tested: `demoTargetConfig.test.ts`,
+`flyMachinesExecutor.test.ts`, and new `DEMO_TARGET=prod` cases in
+`dockerExecutor.test.ts`, 408/408 passing, `tsc --noEmit` clean). Provisioning the
+actual Fly apps, generating the two scoped tokens, and live-verifying a real
+restart against them is a separate, deliberate next step — a real infra change
+and a real new paid resource, not bundled into this code change.
+
+## Addendum (2026-10-03, same day): provisioned for real, with one genuine open finding
+
+`dev-postgres` and `dev-superset` are now real, running Fly apps (region `iad`,
+matching `coreops`), each a single machine (`postgres:16-alpine`,
+`apache/superset:latest`), deployed via `fly deploy --image ...` with a
+`fly.toml` `[[services]]` block rather than a bare `fly machines run` —
+necessary, not cosmetic: a bare machine's raw per-machine 6PN address
+(`<app>.internal`) only answers if the process inside binds a reachable
+interface for that path, and the first real test against both apps got
+"connection refused" from a sibling app every time, networking confirmed
+fine (`nc`/DNS both correct). The actual fix was `fly ips allocate-v6
+--private` (a flycast private address) plus the `[[services]]`/`[[services.ports]]`
+block, then reaching each sidecar via **`<app>.flycast`, not `<app>.internal`**
+— flycast is the proxied private address Fly's own edge translates through;
+`.internal` is the raw unproxied machine-to-machine path and was never going
+to work here. `demoTargetConfig.ts`'s env vars (`PG_PROD_HOST`,
+`SUPERSET_PROD_URL`) are just strings, so this didn't need a code change —
+only the value set on coreops's secrets (`dev-postgres.flycast`,
+`http://dev-superset.flycast:8088`).
+
+A second real issue, also found live: `dev-superset`'s first machine (512MB)
+had its gunicorn worker OOM-killed in a loop (confirmed in `fly logs -a
+dev-superset`: repeated `Out of memory: Killed process ... (gunicorn)`, one
+cycle severe enough to reboot the whole VM) — Superset's default worker
+needs more than 512MB to boot stably. Resized to 2048MB (`fly machine update
+... --vm-memory 2048`); no further OOM after that.
+
+**Verified for real, each independently, not inferred from "it deployed":**
+- Raw TCP reachability, sidecar-to-sidecar and from `coreops` itself, to both
+  `.flycast` addresses (`nc -zv`, exit 0).
+- The exact Postgres connection `pgActivitySource.ts` makes (same host, port,
+  database, user, password), run from inside `coreops` via an inline Node
+  script, not simulated: `SUCCESS [{"?column?":1}]`.
+- The exact Superset health check `supersetHealthSource.ts` makes, same way:
+  `SUCCESS OK`.
+- The real restart mechanism `flyMachinesExecutor.ts` uses: called
+  `POST .../apps/dev-postgres/machines/<id>/restart` directly against Fly's
+  live API with the real scoped token — `{"ok":true}`, HTTP 200 — then
+  confirmed in `dev-postgres`'s own logs that Postgres genuinely shut down
+  and restarted (not a no-op): `database system is shut down` followed by a
+  fresh `database system is ready to accept connections` with a new
+  timestamp, and the machine's `LAST UPDATED` field changed accordingly.
+
+**A genuine open finding, not yet resolved:** with `DEMO_TARGET=prod` live on
+`coreops`'s own secrets, the production incident feed's `postgres` and
+`docker` (Superset) source checks have been failing continuously
+(`CircuitOpenError`) since shortly after the redeploy, for several minutes
+with no self-recovery observed, **despite the underlying connection working**
+exactly as the three direct tests above prove. Root cause not fully isolated
+live: `incidentFeedService.ts`'s two catch blocks (`discoverDockerIncidents`,
+`discoverPostgresIncidents`) log only `errorClass`, never the underlying
+`message`/`cause` — the exact gap `dmvReader.ts` already had fixed earlier
+this session, not yet applied here, which made this genuinely undiagnosable
+from logs alone. The leading theory, from reading `withReliability.ts`
+directly: `checkAvailability()` is re-checked on every retry attempt inside
+one call, so a half-open trial that fails for any real reason reopens the
+breaker *mid-call*, and the next attempt's `CircuitOpenError` is what
+propagates outward — masking the real failure as "circuit open" indefinitely
+rather than surfacing the actual cause once. Not fixed in this addendum: it's
+pre-existing reliability-layer code, not part of today's change, and
+touching it is a deliberate separate decision, not bundled in here.
+Restarting `coreops` itself (which would reset the in-memory breaker and
+might simply resolve this) was not done either — a production machine
+restart is outside what this session took without the user's own call on it.

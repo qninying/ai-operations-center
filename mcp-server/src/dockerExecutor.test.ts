@@ -155,3 +155,97 @@ describe("restartPostgresContainer", () => {
     expect(connect).toHaveBeenCalledTimes(3);
   });
 });
+
+// DEMO_TARGET=prod: the same two restart functions, but pointed at the
+// Fly-hosted sidecar apps instead of local Docker. docker's execFile must
+// never be called on this path — restartFlyMachine (mocked via global.fetch,
+// since it's a plain POST under the hood) is the only thing that runs.
+describe("restartSupersetContainer / restartPostgresContainer under DEMO_TARGET=prod", () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    process.env.DEMO_TARGET = "prod";
+    process.env.FLY_DEV_SUPERSET_APP = "dev-superset";
+    process.env.FLY_DEV_SUPERSET_MACHINE_ID = "machine-superset-1";
+    process.env.FLY_DEV_POSTGRES_APP = "dev-postgres";
+    process.env.FLY_DEV_POSTGRES_MACHINE_ID = "machine-postgres-1";
+    process.env.FLY_DEV_SUPERSET_API_TOKEN = "fo1_superset-token";
+    process.env.FLY_DEV_POSTGRES_API_TOKEN = "fo1_postgres-token";
+    process.env.SUPERSET_PROD_URL = "http://dev-superset.internal:8088";
+    process.env.PG_PROD_HOST = "dev-postgres.internal";
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.resetModules();
+    for (const key of [
+      "DEMO_TARGET",
+      "FLY_DEV_SUPERSET_APP",
+      "FLY_DEV_SUPERSET_MACHINE_ID",
+      "FLY_DEV_POSTGRES_APP",
+      "FLY_DEV_POSTGRES_MACHINE_ID",
+      "FLY_DEV_SUPERSET_API_TOKEN",
+      "FLY_DEV_POSTGRES_API_TOKEN",
+      "SUPERSET_PROD_URL",
+      "PG_PROD_HOST",
+    ]) {
+      delete process.env[key];
+    }
+  });
+
+  it("restartSupersetContainer: calls the Fly Machines API, never execFile, and polls the prod health URL", async () => {
+    const execFile = vi.fn((_cmd, _args, callback) => callback(null));
+    vi.doMock("node:child_process", () => ({ execFile }));
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 } as Response);
+    const { restartSupersetContainer } = await import("./dockerExecutor.js");
+
+    const outcome = await restartSupersetContainer();
+
+    expect(outcome).toEqual({ attempted: true, confirmedHealthy: true, waitedMs: 0 });
+    expect(execFile).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.machines.dev/v1/apps/dev-superset/machines/machine-superset-1/restart",
+      { method: "POST", headers: { Authorization: "Bearer fo1_superset-token" } }
+    );
+    expect(global.fetch).toHaveBeenCalledWith("http://dev-superset.internal:8088/health");
+  });
+
+  it("restartSupersetContainer: a failed Fly restart call raises FlyMachineRestartFailedError, never polls health", async () => {
+    const execFile = vi.fn((_cmd, _args, callback) => callback(null));
+    vi.doMock("node:child_process", () => ({ execFile }));
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, text: async () => "boom" } as Response);
+    const { restartSupersetContainer } = await import("./dockerExecutor.js");
+    const { FlyMachineRestartFailedError } = await import("./flyMachinesExecutor.js");
+
+    await expect(restartSupersetContainer()).rejects.toThrow(FlyMachineRestartFailedError);
+    expect(execFile).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("restartPostgresContainer: calls the Fly Machines API for dev-postgres's own app/machine, never execFile", async () => {
+    const execFile = vi.fn((_cmd, _args, callback) => callback(null));
+    vi.doMock("node:child_process", () => ({ execFile }));
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 } as Response);
+    const connect = vi.fn().mockResolvedValue(undefined);
+    const query = vi.fn().mockResolvedValue({ rows: [{ "?column?": 1 }] });
+    const end = vi.fn().mockResolvedValue(undefined);
+    const Client = vi.fn(function MockClient() {
+      return { connect, query, end };
+    });
+    vi.doMock("pg", () => ({ default: { Client } }));
+    const { restartPostgresContainer } = await import("./dockerExecutor.js");
+
+    const outcome = await restartPostgresContainer();
+
+    expect(outcome).toEqual({ attempted: true, confirmedHealthy: true, waitedMs: 0 });
+    expect(execFile).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.machines.dev/v1/apps/dev-postgres/machines/machine-postgres-1/restart",
+      { method: "POST", headers: { Authorization: "Bearer fo1_postgres-token" } }
+    );
+    expect(connect).toHaveBeenCalled();
+  });
+});

@@ -1,5 +1,6 @@
 import { CircuitBreaker } from "./reliability/circuitBreaker.js";
 import { withReliability } from "./reliability/withReliability.js";
+import { getSupersetHealthUrl } from "./demoTargetConfig.js";
 
 // Docker-sourced incident: is the dev-superset stack (mcp-server/dev-superset/,
 // Superset + Postgres) actually reachable. Mirrors dmvLiveSource.ts/
@@ -15,8 +16,6 @@ import { withReliability } from "./reliability/withReliability.js";
 // Unlike the other three sources, "unreachable" here IS the incident, not just
 // "can't check this source" — this module has no fixture-fallback concept.
 
-const SUPERSET_URL = "http://localhost:8088";
-
 const TIMEOUT_MS = 10_000;
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 500;
@@ -30,8 +29,8 @@ const supersetCircuitBreaker = new CircuitBreaker({
 
 export class SupersetUnavailableError extends Error {
   readonly errorClass = "SupersetUnavailableError" as const;
-  constructor(cause: unknown) {
-    super(`Could not reach Superset at ${SUPERSET_URL}: ${cause instanceof Error ? cause.message : String(cause)}`);
+  constructor(url: string, cause: unknown) {
+    super(`Could not reach Superset at ${url}: ${cause instanceof Error ? cause.message : String(cause)}`);
     this.name = "SupersetUnavailableError";
     this.cause = cause;
   }
@@ -40,18 +39,21 @@ export class SupersetUnavailableError extends Error {
 // A connection-level failure (container down, port unreachable) throws Node's
 // raw fetch TypeError before any HTTP response exists — translated into the
 // typed error here, same fix verify-live-pattern.ts needed for the same reason.
+// Resolves getSupersetHealthUrl() fresh per call, not at module load, so a
+// DEMO_TARGET switch takes effect without restarting the process.
 async function fetchHealth(): Promise<Response> {
+  const url = getSupersetHealthUrl();
   try {
-    return await fetch(`${SUPERSET_URL}/health`);
+    return await fetch(`${url}/health`);
   } catch (error) {
-    throw new SupersetUnavailableError(error);
+    throw new SupersetUnavailableError(url, error);
   }
 }
 
 async function checkOnce(): Promise<void> {
   const res = await fetchHealth();
   if (!res.ok) {
-    throw new SupersetUnavailableError(new Error(`Superset /health responded with HTTP ${res.status}`));
+    throw new SupersetUnavailableError(getSupersetHealthUrl(), new Error(`Superset /health responded with HTTP ${res.status}`));
   }
 }
 

@@ -2,6 +2,13 @@ import { execFile } from "node:child_process";
 import pg from "pg";
 import { withReliability } from "./reliability/withReliability.js";
 import { readPgDemoConfig } from "./pgActivitySource.js";
+import {
+  getPostgresRestartTarget,
+  getSupersetHealthUrl,
+  getSupersetRestartTarget,
+  type RestartTarget,
+} from "./demoTargetConfig.js";
+import { restartFlyMachine } from "./flyMachinesExecutor.js";
 
 // The one real, privileged execution path in this codebase — everything else
 // (SQL, SSRS, Cloud) stays ADR-010's honest stand-in. Docker-controlled local
@@ -10,11 +17,14 @@ import { readPgDemoConfig } from "./pgActivitySource.js";
 // Two targets share this mechanism — dev-superset (ADR-012) and dev-postgres
 // (added for the same reason: a real "unreachable" incident deserves a real
 // restart, not a stand-in, same confined-blast-radius argument as Superset's).
-// See docs/ADR-012-real-docker-execution.md.
+// A second pair of these same two targets, pointed at the Fly-hosted sidecar
+// apps instead of local Docker, is resolved per-call via demoTargetConfig.ts's
+// DEMO_TARGET switch (default "local", unchanged behavior unless set to "prod")
+// and executed via flyMachinesExecutor.ts instead of execFile. See
+// docs/ADR-012-real-docker-execution.md.
 
 export const SUPERSET_CONTAINER_NAME = "coreops-dev-superset";
 export const POSTGRES_CONTAINER_NAME = "coreops-dev-postgres";
-const SUPERSET_HEALTH_URL = "http://localhost:8088/health";
 
 const RESTART_TIMEOUT_MS = 15_000;
 const HEALTH_CONFIRM_TIMEOUT_MS = 45_000;
@@ -57,7 +67,7 @@ function runDockerRestart(containerName: string): Promise<void> {
 // probe avoids tripping (or being blocked by) that shared breaker.
 async function isSupersetHealthyOnce(): Promise<boolean> {
   try {
-    const res = await fetch(SUPERSET_HEALTH_URL);
+    const res = await fetch(`${getSupersetHealthUrl()}/health`);
     return res.ok;
   } catch {
     return false;
@@ -68,7 +78,9 @@ async function isSupersetHealthyOnce(): Promise<boolean> {
 // above, applied to Postgres: a direct connect-and-query, not queryPgActivity()
 // (which shares pgActivitySource.ts's own circuit breaker with the incident
 // feed's regular polling). Reuses readPgDemoConfig() so this and
-// pgActivitySource.ts can't silently drift on connection parameters.
+// pgActivitySource.ts can't silently drift on connection parameters — that
+// function is itself DEMO_TARGET-aware (demoTargetConfig.ts), so this probe
+// automatically points at the same place the regular incident-feed query does.
 async function isPostgresReachableOnce(): Promise<boolean> {
   const client = new pg.Client(readPgDemoConfig());
   try {
@@ -82,20 +94,31 @@ async function isPostgresReachableOnce(): Promise<boolean> {
   }
 }
 
+async function performRestart(target: RestartTarget): Promise<void> {
+  if (target.kind === "local") {
+    try {
+      await withReliability(() => runDockerRestart(target.containerName), {
+        timeoutMs: RESTART_TIMEOUT_MS,
+        maxRetries: 0,
+        baseDelayMs: 0,
+        maxDelayMs: 0,
+      });
+    } catch (error) {
+      throw new DockerRestartFailedError(target.containerName, error);
+    }
+    return;
+  }
+  // target.kind === "fly" — restartFlyMachine throws its own typed
+  // FlyMachineRestartFailedError; not re-wrapped as DockerRestartFailedError,
+  // since this genuinely isn't a docker command failing.
+  await restartFlyMachine(target.appName, target.machineId, target.apiToken);
+}
+
 async function restartContainerAndConfirm(
-  containerName: string,
+  target: RestartTarget,
   isHealthyOnce: () => Promise<boolean>
 ): Promise<DockerRestartOutcome> {
-  try {
-    await withReliability(() => runDockerRestart(containerName), {
-      timeoutMs: RESTART_TIMEOUT_MS,
-      maxRetries: 0,
-      baseDelayMs: 0,
-      maxDelayMs: 0,
-    });
-  } catch (error) {
-    throw new DockerRestartFailedError(containerName, error);
-  }
+  await performRestart(target);
 
   const start = Date.now();
   let confirmedHealthy = false;
@@ -111,9 +134,9 @@ async function restartContainerAndConfirm(
 }
 
 export function restartSupersetContainer(): Promise<DockerRestartOutcome> {
-  return restartContainerAndConfirm(SUPERSET_CONTAINER_NAME, isSupersetHealthyOnce);
+  return restartContainerAndConfirm(getSupersetRestartTarget(SUPERSET_CONTAINER_NAME), isSupersetHealthyOnce);
 }
 
 export function restartPostgresContainer(): Promise<DockerRestartOutcome> {
-  return restartContainerAndConfirm(POSTGRES_CONTAINER_NAME, isPostgresReachableOnce);
+  return restartContainerAndConfirm(getPostgresRestartTarget(POSTGRES_CONTAINER_NAME), isPostgresReachableOnce);
 }

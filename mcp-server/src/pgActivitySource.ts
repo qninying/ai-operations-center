@@ -1,18 +1,19 @@
 import pg from "pg";
 import { CircuitBreaker } from "./reliability/circuitBreaker.js";
 import { withReliability } from "./reliability/withReliability.js";
+import { getPostgresConnectionTarget } from "./demoTargetConfig.js";
 
 // Real Postgres introspection for the ADR-013 blocking-query scenario. No
 // fixture-fallback concept — unlike dmvReader.ts's remote, sometimes-legitimately-
 // unreachable SQL Server, dev-postgres/ is a fully local, fully-controlled dev
-// container, matching supersetHealthSource.ts's same reasoning for Docker.
+// container (or, under DEMO_TARGET=prod, the Fly-hosted equivalent — see
+// demoTargetConfig.ts), matching supersetHealthSource.ts's same reasoning for
+// Docker.
 //
 // Read-only: this module only ever runs the SELECT below. The one write this
 // feature performs lives exclusively in pgRemediationExecutor.ts — see
 // readOnlyGuard.test.ts's confined-write guard.
 
-const PG_HOST = process.env.PG_DEMO_HOST ?? "localhost";
-const PG_PORT = Number(process.env.PG_DEMO_PORT ?? 5434);
 const PG_DATABASE = process.env.PG_DEMO_DATABASE ?? "orders";
 const PG_USER = process.env.PG_DEMO_USER ?? "app";
 const PG_PASSWORD = process.env.PG_DEMO_PASSWORD ?? "app";
@@ -56,11 +57,12 @@ const ACTIVITY_QUERY = `
 
 // Exported so dockerExecutor.ts's real-restart health probe for dev-postgres
 // can reuse the exact same connection parameters rather than maintaining a
-// second, driftable copy of PG_HOST/PORT/DATABASE/USER/PASSWORD.
+// second, driftable copy. host/port come from demoTargetConfig.ts's
+// DEMO_TARGET switch (local container vs. Fly sidecar); database/user/password
+// stay the same demo credentials either way.
 export function readPgDemoConfig(): pg.ClientConfig {
   return {
-    host: PG_HOST,
-    port: PG_PORT,
+    ...getPostgresConnectionTarget(),
     database: PG_DATABASE,
     user: PG_USER,
     password: PG_PASSWORD,
