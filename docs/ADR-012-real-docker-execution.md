@@ -159,24 +159,35 @@ needs more than 512MB to boot stably. Resized to 2048MB (`fly machine update
   fresh `database system is ready to accept connections` with a new
   timestamp, and the machine's `LAST UPDATED` field changed accordingly.
 
-**A genuine open finding, not yet resolved:** with `DEMO_TARGET=prod` live on
-`coreops`'s own secrets, the production incident feed's `postgres` and
-`docker` (Superset) source checks have been failing continuously
-(`CircuitOpenError`) since shortly after the redeploy, for several minutes
-with no self-recovery observed, **despite the underlying connection working**
-exactly as the three direct tests above prove. Root cause not fully isolated
-live: `incidentFeedService.ts`'s two catch blocks (`discoverDockerIncidents`,
-`discoverPostgresIncidents`) log only `errorClass`, never the underlying
-`message`/`cause` — the exact gap `dmvReader.ts` already had fixed earlier
-this session, not yet applied here, which made this genuinely undiagnosable
-from logs alone. The leading theory, from reading `withReliability.ts`
-directly: `checkAvailability()` is re-checked on every retry attempt inside
-one call, so a half-open trial that fails for any real reason reopens the
-breaker *mid-call*, and the next attempt's `CircuitOpenError` is what
-propagates outward — masking the real failure as "circuit open" indefinitely
-rather than surfacing the actual cause once. Not fixed in this addendum: it's
-pre-existing reliability-layer code, not part of today's change, and
-touching it is a deliberate separate decision, not bundled in here.
-Restarting `coreops` itself (which would reset the in-memory breaker and
-might simply resolve this) was not done either — a production machine
-restart is outside what this session took without the user's own call on it.
+**A real mistake in this session's own process, caught and corrected, not
+left in the record wrong:** the secrets above (`DEMO_TARGET=prod` etc.) were
+set on `coreops` *before* this change's code was actually deployed there —
+`fly secrets set` triggers a redeploy, but of whatever image was already
+built, which at that point still pre-dated `DEMO_TARGET` entirely. That old
+code doesn't read any of these new env vars; it was still hardcoded to
+`localhost`, which of course has nothing listening on it in production — the
+same "always unreachable" state this feature has had since STORY-012, not a
+new regression. Polling that against the live incident feed produced a
+continuous `CircuitOpenError` stream, and a live `withReliability.ts` read
+produced a plausible-looking theory (`checkAvailability()` re-checked on
+every retry attempt, masking a real per-call failure as "circuit open"
+indefinitely) that was **written into this document and committed** before
+being re-checked against the actual new code. It was wrong. Once the code
+itself was pushed (commit `dc416eb`) and the resulting deploy
+(`37156137973`) actually went live, `postgres` and `docker` both show
+continuous `"outcome":"success"` in `coreops`'s own logs — no circuit-breaker
+bug, just stale code polling a target that was never going to answer.
+Corrected here rather than left standing, per this repo's own "log every
+test" convention: a conclusion drawn from testing the wrong artifact is a
+real process failure worth naming, the same as INCIDENT-002's and the
+rollback-paging correction's own honestly-recorded mistakes.
+
+**Confirmed working end-to-end, for real, after the correct code was live:**
+`coreops`'s own incident feed polling `dev-postgres.flycast`/
+`dev-superset.flycast` through the real `DEMO_TARGET=prod` code path,
+continuously, with zero failures observed across the post-deploy
+observation window (`"source":"postgres","outcome":"success","rowCount":5`
+and `"source":"docker","outcome":"success"` on every ~3s poll). Combined with
+the direct tests above (raw reachability, exact-call replication, and a real
+Fly Machines API restart), this is now a genuinely live-verified second
+target, not an inferred one.
