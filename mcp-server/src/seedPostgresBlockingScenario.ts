@@ -1,5 +1,6 @@
 import "./loadEnv.js";
 import pg from "pg";
+import { getPostgresConnectionTarget } from "./demoTargetConfig.js";
 
 // Demo/dev tooling only — deliberately creates real Postgres blocking scenarios
 // against dev-postgres/'s orders-db, so the ADR-013 remediation flow has real
@@ -38,8 +39,12 @@ import pg from "pg";
 // OTHER, still-valid scenario's connections as collateral damage even though
 // nobody had approved it. A real remediation kill on one scenario must never
 // affect the other.
-const PG_HOST = process.env.PG_DEMO_HOST ?? "localhost";
-const PG_PORT = Number(process.env.PG_DEMO_PORT ?? 5434);
+//
+// host/port come from demoTargetConfig.ts's DEMO_TARGET switch (ADR-012's
+// addendum) — same local-vs-prod resolution pgActivitySource.ts's own
+// readPgDemoConfig() uses, so running this script inside coreops itself
+// (which already has DEMO_TARGET=prod set) seeds a real blocking scenario
+// against the live dev-postgres Fly sidecar, not an unreachable localhost.
 const PG_DATABASE = process.env.PG_DEMO_DATABASE ?? "orders";
 const PG_USER = process.env.PG_DEMO_USER ?? "app";
 const PG_PASSWORD = process.env.PG_DEMO_PASSWORD ?? "app";
@@ -60,8 +65,7 @@ const SCENARIOS: Scenario[] = [
 
 function readConfig(): pg.ClientConfig {
   return {
-    host: PG_HOST,
-    port: PG_PORT,
+    ...getPostgresConnectionTarget(),
     database: PG_DATABASE,
     user: PG_USER,
     password: PG_PASSWORD,
