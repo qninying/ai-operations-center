@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>CoreOps — Demo Day slides</title>
+<title>CoreOps Demo Day slides</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root {
@@ -13,6 +13,7 @@
     --muted: #8993a8;
     --accent: #5b7cfa;
     --green: #34d399;
+    --amber: #fbbf24;
     --red: #f87171;
     --mono: ui-monospace, 'SF Mono', Consolas, monospace;
   }
@@ -23,15 +24,17 @@
     font-family: -apple-system, 'Segoe UI', system-ui, Arial, sans-serif;
     overflow: hidden;
   }
+  :focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   .deck { height: 100vh; width: 100vw; position: relative; }
   .slide {
     position: absolute; inset: 0;
     display: none;
     flex-direction: column;
     justify-content: center;
-    padding: 8vh 10vw;
+    padding: 7vh 9vw 12vh;
     opacity: 0;
     transition: opacity .25s ease;
+    overflow-y: auto;
   }
   .slide.active { display: flex; opacity: 1; }
   .eyebrow {
@@ -39,34 +42,53 @@
     color: var(--accent); font-weight: 700; margin-bottom: 18px;
   }
   h1 { font-size: clamp(36px, 5vw, 64px); line-height: 1.1; margin: 0 0 20px; font-weight: 800; }
-  h2 { font-size: clamp(28px, 3.6vw, 44px); line-height: 1.15; margin: 0 0 24px; font-weight: 800; }
-  p.lede { font-size: clamp(18px, 2vw, 24px); color: var(--muted); line-height: 1.5; max-width: 46em; margin: 0 0 8px; }
-  .tagline { font-size: clamp(18px, 2vw, 22px); color: var(--muted); max-width: 40em; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 32px; }
+  h2 { font-size: clamp(26px, 3.3vw, 42px); line-height: 1.15; margin: 0 0 20px; font-weight: 800; }
+  p.lede { font-size: clamp(17px, 1.9vw, 23px); color: var(--muted); line-height: 1.5; max-width: 46em; margin: 0 0 8px; }
+  .tagline { font-size: clamp(18px, 2vw, 22px); color: var(--muted); max-width: 40em; line-height: 1.5; }
+  .live {
+    display: inline-flex; align-items: center; gap: 10px; margin-top: 28px;
+    font-family: var(--mono); font-size: 15px; color: var(--green);
+    border: 1px solid rgba(52,211,153,.35); background: rgba(52,211,153,.08);
+    padding: 8px 14px; border-radius: 8px; align-self: flex-start;
+  }
+  .live::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 24px; }
+  .grid.three { grid-template-columns: repeat(3, 1fr); }
   .card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
-    padding: 26px 28px;
+    padding: 22px 24px;
   }
   .card .label {
     font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
     font-weight: 700; margin-bottom: 10px;
   }
-  .card .value { font-size: clamp(20px, 2.4vw, 26px); font-weight: 700; line-height: 1.35; }
-  .stat-row { display: flex; gap: 24px; margin-top: 36px; flex-wrap: wrap; }
-  .stat { min-width: 180px; }
-  .stat .num { font-size: clamp(40px, 5vw, 56px); font-weight: 800; color: var(--accent); font-family: var(--mono); }
-  .stat .cap { font-size: 15px; color: var(--muted); margin-top: 4px; }
+  .card .value { font-size: clamp(17px, 1.9vw, 22px); font-weight: 600; line-height: 1.4; }
+  .card ul { margin: 0; padding-left: 1.1em; font-size: clamp(15px, 1.5vw, 18px); line-height: 1.5; }
+  .card li { margin-bottom: 6px; }
+  .card.warn { border-color: rgba(251,191,36,.4); }
+  .card.warn .label { color: var(--amber); }
+  .stat-row { display: flex; gap: 36px; margin-top: 24px; flex-wrap: wrap; }
+  .stat { min-width: 170px; }
+  .stat .num { font-size: clamp(38px, 4.6vw, 54px); font-weight: 800; color: var(--accent); font-family: var(--mono); }
+  .stat .cap { font-size: 15px; color: var(--muted); margin-top: 4px; max-width: 16em; line-height: 1.4; }
   .principle {
-    font-size: clamp(20px, 2.4vw, 28px); font-style: italic; line-height: 1.5;
-    border-left: 4px solid var(--accent); padding-left: 24px; margin: 28px 0; max-width: 42em;
+    font-size: clamp(19px, 2.2vw, 26px); font-style: italic; line-height: 1.5;
+    border-left: 4px solid var(--accent); padding-left: 24px; margin: 24px 0 0; max-width: 42em;
   }
-  .badge-row { display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap; }
+  .badge-row { display: flex; gap: 10px; margin-top: 26px; flex-wrap: wrap; }
   .badge {
-    font-family: var(--mono); font-size: 13px; padding: 8px 14px; border-radius: 8px;
+    font-family: var(--mono); font-size: 13px; padding: 8px 12px; border-radius: 8px;
     border: 1px solid var(--border); color: var(--muted);
   }
   .badge.green { color: var(--green); border-color: rgba(52,211,153,.35); background: rgba(52,211,153,.08); }
-  .foot { position: absolute; bottom: 5vh; left: 10vw; right: 10vw; display: flex; justify-content: space-between; align-items: center; }
+  .badge.amber { color: var(--amber); border-color: rgba(251,191,36,.35); background: rgba(251,191,36,.08); }
+  .note { font-size: 13px; color: var(--muted); margin-top: 18px; max-width: 60em; line-height: 1.5; }
+  table.timeline { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: clamp(14px, 1.45vw, 17px); }
+  table.timeline th, table.timeline td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.45; }
+  table.timeline th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+  table.timeline td:first-child { font-family: var(--mono); color: var(--accent); white-space: nowrap; }
+  code { font-family: var(--mono); font-size: .92em; }
+  .foot { position: absolute; bottom: 4vh; left: 9vw; right: 9vw; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
   .repo { font-family: var(--mono); font-size: 14px; color: var(--muted); }
   .counter { font-family: var(--mono); font-size: 14px; color: var(--muted); }
   .nav {
@@ -77,97 +99,169 @@
     width: 44px; height: 44px; border-radius: 10px; font-size: 18px; cursor: pointer;
   }
   .nav button:hover { border-color: var(--accent); }
+  @media (max-width: 760px) {
+    .grid, .grid.three { grid-template-columns: 1fr; }
+    .slide { justify-content: flex-start; padding: 6vh 16px 14vh; }
+    .foot { left: 16px; right: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .slide { transition: none; } }
   @media print {
-    .nav { display: none; }
-    .slide { position: relative; display: flex !important; opacity: 1 !important; page-break-after: always; height: 100vh; }
+    html, body { overflow: visible; height: auto; }
+    .nav, .foot { display: none; }
+    .deck { height: auto; }
+    .slide { position: relative; display: flex !important; opacity: 1 !important; page-break-after: always; break-after: page; height: 100vh; overflow: visible; }
   }
 </style>
 </head>
 <body>
-<div class="deck" id="deck">
+<main class="deck" id="deck" aria-label="CoreOps Demo Day slides">
 
-  <section class="slide active">
+  <section class="slide active" aria-label="Slide 1, title">
     <span class="eyebrow">Demo Day</span>
     <h1>CoreOps</h1>
-    <p class="tagline">An AI operations platform for SQL Server, SSIS, and SSRS —
+    <p class="tagline">An AI operations platform for SQL Server, SSIS, and SSRS,
       with a governed, human-approval execution model.</p>
+    <span class="live">Live in production · coreops.fly.dev</span>
   </section>
 
-  <section class="slide">
+  <section class="slide" aria-label="Slide 2, problem">
     <span class="eyebrow">Problem</span>
     <h2>Troubleshooting is slow, manual, and scattered across systems.</h2>
-    <p class="lede">Database Administrators and Ops teams spend hours every week
-      correlating failures across SQL Server, SSIS packages, and SSRS reports by
-      hand — by the time an issue is found, it's already cost real time.</p>
+    <p class="lede">Database administrators and ops teams correlate failures across
+      SQL Server, SSIS packages, and SSRS reports by hand. A job fails at 2am, a report
+      comes back empty at 8am, and the next hour goes to reconstructing what happened
+      from a dozen different tools.</p>
+    <div class="stat-row">
+      <div class="stat">
+        <div class="num">~20 hrs</div>
+        <div class="cap">a week spent troubleshooting, from JIRA time logged on troubleshooting tickets</div>
+      </div>
+    </div>
   </section>
 
-  <section class="slide">
+  <section class="slide" aria-label="Slide 3, solution">
     <span class="eyebrow">Solution</span>
-    <h2>Monitor, troubleshoot, and remediate — with a human always in the loop.</h2>
+    <h2>Monitor, diagnose, and remediate, with a human always in the loop.</h2>
     <div class="grid">
       <div class="card">
         <div class="label">What it does</div>
-        <div class="value">Monitors, troubleshoots, and remediates issues across
-          SQL Server, SSIS packages, and SSRS reports.</div>
+        <ul>
+          <li>Reads live SQL Server DMVs, SSRS execution logs, cloud and Postgres signals</li>
+          <li>Uses Claude to explain the likely root cause, citing only evidence it was actually given</li>
+          <li>Proposes a source-specific fix, checked against fixed safety rules first</li>
+          <li>Runs nothing until an authenticated human approves, then confirms the outcome independently</li>
+        </ul>
       </div>
       <div class="card">
         <div class="label">Who it's for</div>
-        <div class="value">Database Administrators and Ops teams.</div>
+        <div class="value">Database administrators and ops teams.</div>
+        <div class="label" style="margin-top:20px">What it can really change today</div>
+        <ul>
+          <li>End a blocking Postgres session</li>
+          <li>Restart a demo service container through Fly.io's API</li>
+          <li>SQL Server, SSRS, and cloud fixes: real recommendation, simulated execution, labelled as simulated everywhere</li>
+        </ul>
       </div>
     </div>
     <p class="principle">No action is ever taken without authenticated human approval.</p>
   </section>
 
-  <section class="slide">
+  <section class="slide" aria-label="Slide 4, proof">
     <span class="eyebrow">Proof</span>
-    <h2>The number it moves — backed by evidence, not a claim.</h2>
+    <h2>Backed by evidence you can check, not a claim.</h2>
     <div class="stat-row">
       <div class="stat">
-        <div class="num">~20 hrs</div>
-        <div class="cap">saved per week in troubleshooting time</div>
+        <div class="num">484</div>
+        <div class="cap">tests (408 + 70 run and passing on 2026-10-03, plus 6 frontend)</div>
       </div>
       <div class="stat">
-        <div class="num">284</div>
-        <div class="cap">tests passing</div>
+        <div class="num">15</div>
+        <div class="cap">architecture decision records, each naming the options rejected</div>
       </div>
       <div class="stat">
-        <div class="num">3.67/4</div>
-        <div class="cap">trust posture score, up from 2.4</div>
+        <div class="num">3.83/4</div>
+        <div class="cap">trust posture score, up from 2.4 (self-assessed, rescored 2026-10-03)</div>
       </div>
     </div>
     <div class="badge-row">
-      <span class="badge green">✓ session-based auth + real MFA, live-verified</span>
-      <span class="badge green">✓ audit trail survives a restart, and never grows unbounded</span>
-      <span class="badge green">✓ 3 real vulnerabilities found and fixed</span>
+      <span class="badge green">✓ deployed on Fly.io with a gated CI/CD pipeline</span>
+      <span class="badge green">✓ failed deploys roll back automatically, verified 2026-10-01</span>
+      <span class="badge green">✓ real Postgres session kill, confirmed by a separate re-query</span>
+      <span class="badge green">✓ MFA login and a second approver with working escalation</span>
+      <span class="badge green">✓ audit trail survives a restart and rotates, never deletes</span>
+      <span class="badge green">✓ evidence grounding check on every AI recommendation</span>
     </div>
+    <p class="note">Check it yourself, no login needed: <code>curl https://coreops.fly.dev/health/dependencies</code></p>
   </section>
 
-  <section class="slide">
+  <section class="slide" aria-label="Slide 5, running in production">
+    <span class="eyebrow">Running in production</span>
+    <h2>Things broke. Each one is written up.</h2>
+    <table class="timeline">
+      <thead><tr><th scope="col">Date</th><th scope="col">What happened</th><th scope="col">What changed</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>2026-09-16</td>
+          <td>Blue-green deploys turned out to be incompatible with the audit trail's persistent volume</td>
+          <td>Switched to rolling deploys, and documented the brief unavailability window that trade-off accepts</td>
+        </tr>
+        <tr>
+          <td>2026-09-16</td>
+          <td><strong>INCIDENT-DRILL-001:</strong> broke the health check on purpose. CI passed it, and the deploy health gate caught it</td>
+          <td>Rolled back. Healthy 1m31s after the failed deploy was reported. Found that rolling deploys don't revert by themselves</td>
+        </tr>
+        <tr>
+          <td>2026-10-01</td>
+          <td><strong>INCIDENT-002:</strong> production couldn't reach SQL Server. Four separate causes, each hiding the next</td>
+          <td>Fixed all four, including Node resolving the host through a dead IPv6 route. SQL Server now reports <code>live</code></td>
+        </tr>
+        <tr>
+          <td>2026-10-01</td>
+          <td><strong>INCIDENT-003:</strong> an invalid AI key that the health check reported as fine</td>
+          <td>Rotated the key. Named the gap: the check confirms the key is set, not that it works</td>
+        </tr>
+        <tr>
+          <td>2026-10-01</td>
+          <td>Paging and automated rollback added to the deploy pipeline</td>
+          <td>Tested against a real failing deploy. One bounded rollback attempt, then a page to a human</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="slide" aria-label="Slide 6, next steps">
     <span class="eyebrow">Next steps</span>
     <h2>What's real today, and what's next.</h2>
     <div class="grid">
       <div class="card">
-        <div class="label">Built</div>
-        <div class="value">Real auth with MFA, a second real approver
-          identity with working escalation, a durable, self-rotating
-          audit trail, a network-facing MCP tool gateway, SSRS report
-          monitoring, an audited error-handling path, 7 documented
-          architecture decisions.</div>
+        <div class="label">Built and verified</div>
+        <ul>
+          <li>Production deployment with automated, tested rollback</li>
+          <li>Live SQL Server connection in production</li>
+          <li>Two real, reversible execution paths with independent confirmation</li>
+          <li>Fixed DBA safety rules that refuse risky kills (system, long-running, chained blockers)</li>
+          <li>MFA, a second approver, and a durable, rotating audit trail</li>
+          <li>Network MCP gateway, adversarial eval harness, NIST AI RMF mapping</li>
+        </ul>
       </div>
-      <div class="card">
-        <div class="label">Next</div>
-        <div class="value">Restoring the live SQL Server connection
-          once the current quota resets — the one remaining gap.</div>
+      <div class="card warn">
+        <div class="label">Next, and still open</div>
+        <ul>
+          <li>Make the health check prove the AI key works, not just that it's set (INCIDENT-003)</li>
+          <li>Turn on live SSRS data in production (one missing setting), the last gap keeping Provenance below the top band</li>
+          <li>Have a second engineer deploy and roll back from the runbook alone, which is still untested</li>
+          <li>Extend real execution beyond two paths, but only where the reversibility case holds</li>
+        </ul>
       </div>
     </div>
-    <p class="repo" style="margin-top:32px;">github.com/qninying/ai-operations-center</p>
+    <p class="repo" style="margin-top:28px;">github.com/qninying/ai-operations-center · coreops.fly.dev</p>
   </section>
 
-  <div class="foot">
+  <div class="foot" aria-hidden="true">
     <span class="repo"></span>
-    <span class="counter" id="counter">1 / 5</span>
+    <span class="counter" id="counter">1 / 6</span>
   </div>
-</div>
+</main>
 
 <div class="nav">
   <button id="prev" aria-label="Previous slide">‹</button>
@@ -187,8 +281,11 @@
   document.getElementById('next').onclick = () => show(i + 1);
   document.getElementById('prev').onclick = () => show(i - 1);
   window.addEventListener('keydown', (e) => {
-    if (['ArrowRight', ' ', 'PageDown'].includes(e.key)) show(i + 1);
-    if (['ArrowLeft', 'PageUp'].includes(e.key)) show(i - 1);
+    if (e.target.tagName === 'BUTTON' && e.key === ' ') return;
+    if (['ArrowRight', ' ', 'PageDown'].includes(e.key)) { show(i + 1); e.preventDefault(); }
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) { show(i - 1); e.preventDefault(); }
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End') show(slides.length - 1);
   });
 </script>
 </body>
