@@ -66,4 +66,50 @@ describe("checkDependencyHealth", () => {
 
     expect(readDmvFn).toHaveBeenCalledTimes(2);
   });
+
+  // INCIDENT-003: "configured" alone already caused one real incident (a key
+  // present but rejected by Anthropic looked identical to a working one). These
+  // cover the fix: reporting the real outcome of the last actual call, not a
+  // second, spend-generating probe call made here.
+  it("reports lastCallOutcome: null when no real Anthropic call has happened yet this process", async () => {
+    const readDmvFn = vi.fn().mockResolvedValue({ source: "live", rows: [] } satisfies DmvReadResult);
+
+    const report = await checkDependencyHealth({ readDmvFn, anthropicKeyPresent: true, anthropicReachability: null });
+
+    expect(report.anthropic.lastCallOutcome).toBeNull();
+    expect(report.anthropic.lastCallAt).toBeNull();
+    expect(report.anthropic.lastCallErrorClass).toBeUndefined();
+  });
+
+  it("reports a real successful call's outcome, configured true and a genuinely working key look identical no longer", async () => {
+    const readDmvFn = vi.fn().mockResolvedValue({ source: "live", rows: [] } satisfies DmvReadResult);
+
+    const report = await checkDependencyHealth({
+      readDmvFn,
+      anthropicKeyPresent: true,
+      anthropicReachability: { outcome: "success", at: "2026-10-04T12:00:00.000Z" },
+    });
+
+    expect(report.anthropic.configured).toBe(true);
+    expect(report.anthropic.lastCallOutcome).toBe("success");
+    expect(report.anthropic.lastCallAt).toBe("2026-10-04T12:00:00.000Z");
+  });
+
+  it("reports a real failed call honestly even while configured stays true — the exact INCIDENT-003 gap", async () => {
+    const readDmvFn = vi.fn().mockResolvedValue({ source: "live", rows: [] } satisfies DmvReadResult);
+
+    const report = await checkDependencyHealth({
+      readDmvFn,
+      anthropicKeyPresent: true,
+      anthropicReachability: {
+        outcome: "failure",
+        at: "2026-10-04T12:00:00.000Z",
+        errorClass: "AuthenticationError",
+      },
+    });
+
+    expect(report.anthropic.configured).toBe(true);
+    expect(report.anthropic.lastCallOutcome).toBe("failure");
+    expect(report.anthropic.lastCallErrorClass).toBe("AuthenticationError");
+  });
 });

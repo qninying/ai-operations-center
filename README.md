@@ -156,6 +156,17 @@ it was executed).
   (`mcp-server/src/ssrsReader.ts`, querying `ExecutionLog3`), and the pattern
   itself has been live-verified against a real running open-source system
   (Apache Superset — see `mcp-server/dev-superset/`), not just mocks.
+- The Docker/Postgres incident-and-restart capability above now has a second,
+  real target: `DEMO_TARGET=prod` (`mcp-server/src/demoTargetConfig.ts`)
+  points the same detection and restart code at `dev-postgres`/`dev-superset`
+  deployed as their own Fly apps, reached over Fly's private network (via
+  `.flycast`, not `.internal` — a real routing distinction found live, see
+  ADR-012's second addendum), restarted through the real Fly Machines API
+  (`mcp-server/src/flyMachinesExecutor.ts`) instead of a local `docker
+  restart`. Fully additive: unset, nothing about the original local-only
+  behavior changes. Live-verified against the actual deployed production
+  instance, not just unit-tested: a real stop/restart cycle for both targets,
+  watched end to end in `coreops`'s own production logs.
 - Cross-system correlation (REQ-017): `GET /api/correlated-recommendation`
   (`mcp-server/src/correlatedRecommendationService.ts`) gathers live evidence
   from SQL Server DMVs and SSRS together and hands it all to one root-cause

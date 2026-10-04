@@ -6,6 +6,7 @@ import { logEvent } from "./observability/logger.js";
 import { readConfidenceThreshold } from "./confidenceThresholds.js";
 import { redactSecrets } from "./evidenceRedaction.js";
 import { claudeApiBudget } from "./claudeApiBudget.js";
+import { recordAnthropicCallOutcome } from "./anthropicReachability.js";
 
 // R1 (project-blueprint/requirements.md) / STORY-003: the Root Cause Analysis Agent,
 // per architecture.md's Components table — "Asks Claude to explain why the
@@ -237,13 +238,23 @@ export async function analyzeIncidentRootCause(
     claudeApiBudget.checkAndRecord();
   }
 
-  const text = await withReliability(() => modelFn(buildPrompt(incident)), {
-    timeoutMs: TIMEOUT_MS,
-    maxRetries: MAX_RETRIES,
-    baseDelayMs: BASE_DELAY_MS,
-    maxDelayMs: MAX_DELAY_MS,
-    circuitBreaker: rootCauseCircuitBreaker,
-  });
+  // Records the real outcome for healthCheck.ts's anthropic reachability report —
+  // gated on !callModel (same as the budget check above) so a test's injected mock
+  // never writes into this shared, process-wide state.
+  let text: string;
+  try {
+    text = await withReliability(() => modelFn(buildPrompt(incident)), {
+      timeoutMs: TIMEOUT_MS,
+      maxRetries: MAX_RETRIES,
+      baseDelayMs: BASE_DELAY_MS,
+      maxDelayMs: MAX_DELAY_MS,
+      circuitBreaker: rootCauseCircuitBreaker,
+    });
+    if (!callModel) recordAnthropicCallOutcome("success");
+  } catch (error) {
+    if (!callModel) recordAnthropicCallOutcome("failure", error instanceof Error ? error.name : "Error");
+    throw error;
+  }
 
   const parsed = parseResponse(text);
   const result: RootCauseResult = {

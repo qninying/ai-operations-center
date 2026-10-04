@@ -1,4 +1,5 @@
 import { readDmv, DmvReadResult, ReadDmvInput } from "./dmvReader.js";
+import { getLastAnthropicCallOutcome, type AnthropicReachabilityState } from "./anthropicReachability.js";
 
 // REQ-025/026 (STORY-012): a readiness check for the real production deploy,
 // distinct from GET /health's plain liveness ping (httpServer.ts), which stays
@@ -14,7 +15,20 @@ export interface DependencyHealthReport {
   timestamp: string;
   uptimeSeconds: number;
   sqlServer: { source: "live" | "fallback" };
-  anthropic: { configured: boolean };
+  anthropic: {
+    configured: boolean;
+    // INCIDENT-003: "configured" alone already caused a real incident — a key
+    // can be present and still be rejected by Anthropic's own API. These three
+    // report the outcome of the most recent REAL call this process actually
+    // made (rootCauseAgent.ts / diagnosticsGatherer.ts), not a synthetic probe
+    // — see anthropicReachability.ts for why no new call is made here. null
+    // means no real call has happened yet this process (e.g. right after a
+    // fresh deploy, before any incident triggered one) — an honest "unknown,"
+    // never presented as a false "ok".
+    lastCallOutcome: "success" | "failure" | null;
+    lastCallAt: string | null;
+    lastCallErrorClass?: string;
+  };
 }
 
 type ReadDmvFn = (input: ReadDmvInput) => Promise<DmvReadResult>;
@@ -23,6 +37,7 @@ export interface CheckDependencyHealthDeps {
   readDmvFn?: ReadDmvFn;
   now?: () => number;
   anthropicKeyPresent?: boolean;
+  anthropicReachability?: AnthropicReachabilityState | null;
 }
 
 // A deploy platform's health-check poller hits this route far more often than a
@@ -47,6 +62,12 @@ export async function checkDependencyHealth(
 
   const readDmvFn = deps.readDmvFn ?? readDmv;
   const anthropicConfigured = deps.anthropicKeyPresent ?? Boolean(process.env.ANTHROPIC_API_KEY);
+  // "anthropicReachability" in deps, not `?? getLastAnthropicCallOutcome()` — a test
+  // deliberately passing `null` (simulating "no real call made yet") must not fall
+  // through to the real module-level function the way `??` would, since null is
+  // itself a nullish value.
+  const reachability: AnthropicReachabilityState | null =
+    "anthropicReachability" in deps ? (deps.anthropicReachability ?? null) : getLastAnthropicCallOutcome();
 
   // Reuses the exact same read-only, capped, circuit-breaker-guarded DMV read
   // the dashboard already calls: a real reachability probe against the live
@@ -61,14 +82,18 @@ export async function checkDependencyHealth(
     timestamp: new Date(nowMs).toISOString(),
     uptimeSeconds: Math.round(process.uptime()),
     sqlServer: { source: dmvResult.source },
-    // Deliberately reports configuration, not live reachability: unlike the SQL
-    // Server probe above (a normal read against an existing least-privilege
-    // connection with its own circuit breaker), a real reachability check here
-    // would mean a genuine Anthropic API call on every health-check poll:
-    // recurring spend against CLAUDE_API_CALL_BUDGET for a signal this app
-    // already surfaces honestly, per-request, through the recommendation
-    // routes' own real failure paths (SqlServerUnavailableError and friends).
-    anthropic: { configured: anthropicConfigured },
+    // "configured" alone is exactly the gap INCIDENT-003 found live: a key can be
+    // present and still rejected by Anthropic's own API, and this field never
+    // distinguished the two. No new API call is made here (that would mean real
+    // spend against CLAUDE_API_BUDGET on every poll, for a signal this app
+    // already produces for free) — lastCallOutcome instead reports the real
+    // outcome of the most recent actual call, via anthropicReachability.ts.
+    anthropic: {
+      configured: anthropicConfigured,
+      lastCallOutcome: reachability?.outcome ?? null,
+      lastCallAt: reachability?.at ?? null,
+      ...(reachability?.errorClass ? { lastCallErrorClass: reachability.errorClass } : {}),
+    },
   };
 
   cached = { report, expiresAt: nowMs + CACHE_TTL_MS };
