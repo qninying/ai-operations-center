@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CoreOps: AI Visual Presentation</title>
+<meta name="description" content="A five-minute visual argument for CoreOps's incident-remediation workflow, built self-contained with no external dependencies.">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#14171c; --panel-2:#1b1f26; --text:#f4f4f1; --muted:#a9b0bb;
+    --accent:#e8b339; --accent-ink:#1a1403; --ok:#5fd38d; --bad:#e8684a; --line:#2a2f38;
+    --focus:#7fc6ff; --radius:14px; --gap:1.25rem;
+  }
+  @media (prefers-color-scheme: light){ /* intentionally unchanged: a projector/dark-room deck is the stated use case */ }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; overflow:hidden; } /* no page scroll, ever: the toolbar must never be scrollable out of view */
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .sr-only{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+  a.skip-link{
+    position:absolute; left:-9999px; top:0; background:var(--accent); color:var(--accent-ink);
+    padding:.6rem 1rem; z-index:1000; border-radius:0 0 8px 0; font-weight:700;
+  }
+  a.skip-link:focus{ left:0; }
+
+  /* ---------- Chrome (hidden on print) ---------- */
+  body{ display:flex; flex-direction:column; } /* body is itself the single-viewport frame: chrome, progress, stage stacked, nothing scrolls */
+  .chrome{ flex:0 0 auto; display:flex; align-items:center; gap:.5rem; padding:.6rem .9rem; background:var(--panel);
+    border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .chrome button{
+    background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:10px;
+    padding:.5rem .8rem; font-size:.95rem; cursor:pointer; line-height:1;
+  }
+  .chrome button:hover{ border-color:var(--accent); }
+  .chrome button:focus-visible, a:focus-visible, [tabindex]:focus-visible{
+    outline:3px solid var(--focus); outline-offset:2px;
+  }
+  .chrome .spacer{ flex:1; }
+  .timer{ font-variant-numeric:tabular-nums; font-size:1rem; background:var(--panel-2); border:1px solid var(--line);
+    border-radius:10px; padding:.5rem .8rem; min-width:7.5ch; text-align:center; }
+  .slide-count{ font-size:.9rem; color:var(--muted); white-space:nowrap; }
+
+  /* ---------- Progress bar ---------- */
+  .progress-track{ flex:0 0 auto; height:6px; background:var(--panel-2); }
+  .progress-fill{ height:100%; background:var(--accent); width:20%; transition:width .25s ease; }
+
+  /* ---------- Stage / slide area ---------- */
+  /* flex:1 + min-height:0 is what makes this shrink to whatever space is left under
+     the chrome/progress bar, instead of growing the page and pushing them off-screen
+     the way `min-height:100vh`-style sizing would under a scrollable body. */
+  .stage{
+    flex:1; min-height:0; overflow:hidden;
+    display:flex; align-items:center; justify-content:center; padding:1.2rem;
+  }
+  .deck{
+    position:relative; width:min(100%, 1280px); max-height:100%; aspect-ratio:16/9; background:var(--panel);
+    border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,.45);
+  }
+  section.slide{
+    position:absolute; inset:0; display:none; flex-direction:column; padding:clamp(1.2rem,3vw,3rem);
+  }
+  section.slide.active{ display:flex; }
+  .eyebrow{ font-size:clamp(.8rem,1.4vw,1rem); letter-spacing:.14em; text-transform:uppercase;
+    color:var(--accent); font-weight:700; margin:0 0 .4rem; }
+  h2.title{ font-size:clamp(1.4rem,3.6vw,2.6rem); line-height:1.15; margin:0 0 .8rem; font-weight:800; }
+  .budget{ margin-left:.6rem; font-size:.6em; color:var(--muted); font-weight:600; vertical-align:middle; }
+  .body{ flex:1; display:flex; min-height:0; }
+
+  /* ---------- Slide 1: the problem ---------- */
+  .cards-wrap{ display:flex; gap:var(--gap); flex:1; align-items:stretch; }
+  .incident-card{ flex:1; background:var(--panel-2); border:1px solid #3a2f16; border-radius:12px; padding:1rem 1.1rem;
+    display:flex; flex-direction:column; gap:.6rem; }
+  .incident-card h3{ margin:0; font-size:clamp(1rem,2vw,1.25rem); }
+  .incident-card .tag{ display:inline-block; font-size:.7rem; letter-spacing:.08em; text-transform:uppercase;
+    background:#2a2320; color:#e8b339; padding:.15rem .5rem; border-radius:999px; width:fit-content; }
+  .incident-card .meta{ color:var(--muted); font-size:.85rem; }
+  .err-block{ background:#1e1313; border:1px solid #4a2020; color:#f3b3a6; border-radius:8px; padding:.7rem .8rem;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:clamp(.72rem,1.3vw,.9rem);
+    overflow:auto; white-space:pre-wrap; word-break:break-word; }
+  .callout{ margin-top:auto; background:#201a08; border:1px solid #4a3c12; border-radius:10px; padding:.6rem .9rem;
+    font-size:clamp(.85rem,1.6vw,1.05rem); }
+
+  /* ---------- Slide 2: before/after ---------- */
+  .split{ display:flex; gap:var(--gap); flex:1; min-height:0; }
+  .col{ flex:1; background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:1rem 1.2rem;
+    display:flex; flex-direction:column; min-height:0; }
+  .col h3{ margin:0 0 .6rem; font-size:clamp(1rem,2vw,1.3rem); display:flex; align-items:center; gap:.5rem; }
+  .pill{ font-size:.65rem; letter-spacing:.08em; text-transform:uppercase; padding:.15rem .55rem; border-radius:999px; }
+  .pill.before{ background:#2a2017; color:#e8a05a; }
+  .pill.after{ background:#152a1d; color:var(--ok); }
+  ol.steps{ margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:.45rem; overflow:auto; }
+  ol.steps li{ font-size:clamp(.82rem,1.6vw,1.05rem); line-height:1.3; }
+  ol.steps li.gone{ color:var(--muted); text-decoration:line-through; text-decoration-color:#6a4; }
+  ol.steps li.new{ color:var(--accent); font-weight:700; text-decoration:none; }
+  .new::after{ content:" (new)"; font-weight:700; color:var(--accent); }
+
+  /* ---------- Slide 3: workflow ---------- */
+  .flow{ flex:1; display:flex; align-items:center; gap:.5rem; overflow-x:auto; padding:.5rem 0; }
+  .node{ flex:0 0 auto; min-width:150px; background:var(--panel-2); border:1px solid var(--line); border-radius:12px;
+    padding:.8rem .9rem; text-align:center; }
+  .node .k{ font-size:.65rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); display:block; margin-bottom:.3rem; }
+  .node .v{ font-size:clamp(.8rem,1.6vw,1rem); font-weight:700; }
+  .arrow{ flex:0 0 auto; color:var(--muted); font-size:1.4rem; }
+  .node.approve{ background:#201a08; border:2px solid var(--accent); box-shadow:0 0 0 4px rgba(232,179,57,.12); }
+  .node.approve .k{ color:var(--accent); }
+  .node.approve .v{ color:var(--accent); }
+  .human-tag{ display:block; margin-top:.3rem; font-size:.7rem; color:var(--accent); }
+
+  /* ---------- Slide 4: evidence ---------- */
+  .logs{ flex:1; display:flex; gap:var(--gap); min-height:0; }
+  .logpane{ flex:1; background:#0e1013; border:1px solid var(--line); border-radius:12px; display:flex; flex-direction:column; min-height:0; }
+  .logpane h4{ margin:0; padding:.6rem .9rem; border-bottom:1px solid var(--line); font-size:.85rem; color:var(--muted);
+    display:flex; justify-content:space-between; }
+  .logpane pre{ margin:0; padding:.8rem .9rem; overflow:auto; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:clamp(.62rem,1.15vw,.82rem); line-height:1.45; white-space:pre-wrap; word-break:break-word; flex:1; }
+  .logpane.fail pre{ color:#f3b3a6; }
+  .logpane.ok pre{ color:#b9f0cd; }
+  .elapsed{ text-align:center; font-size:clamp(.85rem,1.8vw,1.1rem); color:var(--accent); font-weight:700; margin-top:.6rem; }
+  .source-tag{ font-size:.7rem; color:var(--muted); }
+
+  /* ---------- Slide 5: next step ---------- */
+  .next{ flex:1; display:flex; flex-direction:column; justify-content:center; gap:1rem; }
+  .next .q{ font-size:clamp(1.1rem,3vw,1.8rem); font-weight:800; line-height:1.3; }
+  .next .settle{ font-size:clamp(.9rem,2vw,1.2rem); color:var(--muted); border-left:4px solid var(--accent); padding-left:1rem; }
+
+  /* ---------- Text-equivalent note ---------- */
+  .visual-note{ font-size:.72rem; color:var(--muted); margin-top:.5rem; }
+
+  /* ---------- TOC panel ---------- */
+  .toc-panel{ position:absolute; inset:0; background:rgba(5,6,8,.92); display:none; align-items:center; justify-content:center; z-index:50; }
+  .toc-panel.open{ display:flex; }
+  .toc-box{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:1.4rem 1.6rem; width:min(90%,520px); }
+  .toc-box h2{ margin:0 0 .8rem; font-size:1.2rem; }
+  .toc-box ol{ list-style:decimal; padding-left:1.3rem; margin:0; display:flex; flex-direction:column; gap:.5rem; }
+  .toc-box button{ background:none; border:none; color:var(--text); font-size:1rem; text-align:left; padding:.3rem 0;
+    cursor:pointer; width:100%; }
+  .toc-box button:hover, .toc-box button:focus-visible{ color:var(--accent); }
+  .toc-hint{ margin-top:1rem; font-size:.8rem; color:var(--muted); }
+
+  /* ---------- Fullscreen fallback banner ---------- */
+  .fs-fallback{ display:none; background:#201a08; color:var(--accent); font-size:.85rem; padding:.5rem .9rem;
+    border-bottom:1px solid #4a3c12; }
+  .fs-fallback.show{ display:block; }
+
+  @media (max-width:720px){
+    .split, .logs{ flex-direction:column; }
+    .chrome .slide-count{ display:none; }
+  }
+
+  /* ---------- Print ---------- */
+  @media print{
+    .chrome, .progress-track, .toc-panel, .fs-fallback, .skip-link{ display:none !important; }
+    html,body{ overflow:visible !important; height:auto !important; }
+    body{ background:#fff; color:#000; }
+    .stage{ flex:none; min-height:0; overflow:visible; padding:0; display:block; }
+    .deck{ all:unset; display:block; width:100%; }
+    section.slide{ position:relative; display:flex !important; page-break-after:always; aspect-ratio:auto;
+      min-height:90vh; border-bottom:2px solid #000; }
+    .incident-card, .col, .node, .logpane{ background:#f3f3f3 !important; border-color:#999 !important; color:#000 !important; }
+    .err-block{ background:#fff !important; color:#900 !important; border-color:#900 !important; }
+    .eyebrow, h2.title, .pill, .node.approve{ color:#000 !important; }
+    .node.approve{ border-color:#000 !important; box-shadow:none !important; }
+    a[href]::after{ content:""; }
+  }
+</style>
+</head>
+<body>
+<a href="#slide-1" class="skip-link">Skip to first slide</a>
+
+<div class="chrome" role="toolbar" aria-label="Presentation controls">
+  <button type="button" id="prevBtn" aria-label="Previous slide">&larr; Prev</button>
+  <button type="button" id="nextBtn" aria-label="Next slide">Next &rarr;</button>
+  <button type="button" id="tocBtn" aria-haspopup="dialog" aria-controls="tocPanel">Contents</button>
+  <button type="button" id="fsBtn">Full screen</button>
+  <span class="spacer"></span>
+  <span class="timer" id="timer" role="timer" aria-live="off">00:00</span>
+  <button type="button" id="timerToggle">Start</button>
+  <button type="button" id="timerReset" aria-label="Reset timer">Reset</button>
+  <span class="slide-count" id="slideCount" aria-hidden="true">Slide 1 of 5</span>
+</div>
+<div class="fs-fallback" id="fsFallback" role="status">
+  Full screen isn't available in this browser/context. Use your browser's full-screen shortcut
+  (e.g. <kbd>F11</kbd> on Windows/Linux, <kbd>Ctrl+Cmd+F</kbd> on macOS) instead.
+</div>
+<div class="progress-track" aria-hidden="true"><div class="progress-fill" id="progressFill"></div></div>
+
+<div aria-live="polite" class="sr-only" id="liveRegion"></div>
+<div id="jsErrorBanner" role="alert" style="display:none;background:#3a1414;color:#ffb4a6;padding:.7rem 1rem;font-family:ui-monospace,monospace;font-size:.85rem;border-bottom:1px solid #7a2a2a;"></div>
+
+<main class="stage">
+  <div class="deck" id="deck">
+
+    <!-- SLIDE 1 : The problem, shown (40s) -->
+    <section class="slide active" id="slide-1" aria-label="Slide 1 of 5: The problem, shown">
+      <p class="eyebrow">01 · The problem, shown <span class="budget">· 40s</span></p>
+      <h2 class="title">The health check said everything was fine.</h2>
+      <div class="body">
+        <div class="cards-wrap">
+          <article class="incident-card">
+            <span class="tag">Cloud · SSIS</span>
+            <h3>SSIS: warning</h3>
+            <p class="meta">Package load exceeded expected duration (18m vs 5m baseline) on the nightly ETL run.</p>
+            <button type="button" disabled style="align-self:flex-start;background:#1c2730;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:.3rem .7rem;">Troubleshoot</button>
+            <div class="err-block" role="img" aria-label="Error text: RECOMMENDATION_FAILED, upstream call failed after 3 attempts, HTTP 401, authentication error, API key is invalid">RECOMMENDATION_FAILED: Upstream call failed after 3 attempt(s): 401
+{"type":"error","error":{"type":"authentication_error","message":"API key is invalid."},"request_id":null}</div>
+          </article>
+          <article class="incident-card">
+            <span class="tag">SSRS</span>
+            <h3>SSRS report /Finance/MonthlyRevenue: rsProcessingAborted</h3>
+            <p class="meta">Run by svc-report-runner, started 2026-08-24T08:12:03Z</p>
+            <button type="button" disabled style="align-self:flex-start;background:#1c2730;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:.3rem .7rem;">Troubleshoot</button>
+            <div class="err-block" role="img" aria-label="Error text: RECOMMENDATION_FAILED, upstream call failed after 3 attempts, HTTP 401, authentication error, API key is invalid">RECOMMENDATION_FAILED: Upstream call failed after 3 attempt(s): 401
+{"type":"error","error":{"type":"authentication_error","message":"API key is invalid."},"request_id":null}</div>
+          </article>
+        </div>
+      </div>
+      <p class="callout">Production, 2026-10-01. <code>GET /health/dependencies</code> reported <code>anthropic.configured: true</code> the entire time this was happening.</p>
+      <p class="visual-note">Text equivalent: two real incident cards from the live CoreOps production dashboard, both showing the identical real error <code>RECOMMENDATION_FAILED: Upstream call failed after 3 attempt(s): 401, API key is invalid</code>, reconstructed faithfully from the actual incident (INCIDENT-003).</p>
+    </section>
+
+    <!-- SLIDE 2 : Before and after (60s) -->
+    <section class="slide" id="slide-2" aria-label="Slide 2 of 5: Before and after">
+      <p class="eyebrow">02 · Before and after <span class="budget">· 60s</span></p>
+      <h2 class="title">Eight steps became three.</h2>
+      <div class="body">
+        <div class="split">
+          <div class="col">
+            <h3><span class="pill before">Before</span> Diagnosing a real incident</h3>
+            <ol class="steps">
+              <li class="gone">Notice something's wrong (if anyone does)</li>
+              <li class="gone">SSH into the affected system</li>
+              <li class="gone">Manually query logs / DMVs / pg_stat_activity</li>
+              <li>Form a hypothesis about root cause</li>
+              <li class="gone">Decide the safe fix, by hand</li>
+              <li>Execute the fix</li>
+              <li class="gone">Manually re-check whether it worked</li>
+              <li class="gone">Write up what happened (if anyone bothers)</li>
+            </ol>
+          </div>
+          <div class="col">
+            <h3><span class="pill after">After</span> Same task, CoreOps</h3>
+            <ol class="steps">
+              <li>Incident auto-detected, shown on the dashboard</li>
+              <li class="new">Troubleshoot: evidence-cited root cause from a real Claude call</li>
+              <li>Approve: the one human action required</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+      <p class="visual-note">Text equivalent: a two-column list comparing the same task, diagnosing a real incident, before and after CoreOps. Five steps are struck through (removed): SSH access, manual log/DMV queries, manual fix decisions, manual re-checking, manual write-up. One step is marked new: an AI-generated, evidence-cited root cause (Troubleshoot).</p>
+    </section>
+
+    <!-- SLIDE 3 : How the workflow runs (70s) -->
+    <section class="slide" id="slide-3" aria-label="Slide 3 of 5: How the workflow runs">
+      <p class="eyebrow">03 · How the workflow runs <span class="budget">· 70s</span></p>
+      <h2 class="title">One path, five real incident sources, one approval gate.</h2>
+      <div class="body">
+        <div class="flow" role="list" aria-label="Workflow steps, in order">
+          <div class="node" role="listitem"><span class="k">Trigger</span><span class="v">Incident detected</span></div>
+          <span class="arrow" aria-hidden="true">&rarr;</span>
+          <div class="node" role="listitem"><span class="k">AI step</span><span class="v">Troubleshoot</span></div>
+          <span class="arrow" aria-hidden="true">&rarr;</span>
+          <div class="node approve" role="listitem"><span class="k">Human control point</span><span class="v">Approve</span><span class="human-tag">Nothing executes without this click</span></div>
+          <span class="arrow" aria-hidden="true">&rarr;</span>
+          <div class="node" role="listitem"><span class="k">System</span><span class="v">Real execution</span></div>
+          <span class="arrow" aria-hidden="true">&rarr;</span>
+          <div class="node" role="listitem"><span class="k">System</span><span class="v">Confirmed healthy</span></div>
+          <span class="arrow" aria-hidden="true">&rarr;</span>
+          <div class="node" role="listitem"><span class="k">System</span><span class="v">Audit log entry</span></div>
+        </div>
+      </div>
+      <p class="callout">Detected every 3 seconds, across five sources (SQL Server, SSRS, Cloud, Superset, Postgres). Only one step in this chain is a human decision; everything before and after it is automatic.</p>
+      <p class="visual-note">Text equivalent: a left-to-right flow of six boxes: Incident detected, Troubleshoot, Approve (visually distinct, gold border, labeled "human control point: nothing executes without this click"), Real execution, Confirmed healthy, Audit log entry.</p>
+    </section>
+
+    <!-- SLIDE 4 : Evidence (80s) -->
+    <section class="slide" id="slide-4" aria-label="Slide 4 of 5: Evidence">
+      <p class="eyebrow">04 · Evidence <span class="budget">· 80s</span></p>
+      <h2 class="title">Not simulated: a real production log, start to finish.</h2>
+      <div class="body">
+        <div class="logs">
+          <div class="logpane fail">
+            <h4>Detected <span class="source-tag">fly logs -a coreops</span></h4>
+            <pre>{"timestamp":"2026-10-03T22:12:45.300Z",
+ "level":"warn",
+ "event":"incident_feed_source_check",
+ "context":{
+   "source":"docker",
+   "outcome":"failure",
+   "errorClass":"UpstreamCallFailedError"
+ }}</pre>
+          </div>
+          <div class="logpane ok">
+            <h4>Resolved <span class="source-tag">fly logs -a coreops</span></h4>
+            <pre>{"timestamp":"2026-10-03T22:13:29.604Z",
+ "level":"info",
+ "event":"incident_naturally_cleared",
+ "context":{
+   "incidentId":"docker:superset",
+   "source":"docker"
+ }}</pre>
+          </div>
+        </div>
+      </div>
+      <p class="elapsed">44.3 seconds, detection to confirmed recovery, measured from one real test run on 2026-10-03. Not an average, not an SLA.</p>
+      <p class="visual-note">Text equivalent: two real, timestamped JSON log lines copied verbatim from production. Left: a failure detected at 22:12:45.300Z. Right: the same incident naturally cleared at 22:13:29.604Z, after a real restart. The only number on this slide (44.3s) is explicitly labeled as one measured test run, not an estimate or a guaranteed figure.</p>
+    </section>
+
+    <!-- SLIDE 5 : The next step (50s) -->
+    <section class="slide" id="slide-5" aria-label="Slide 5 of 5: The next step">
+      <p class="eyebrow">05 · The next step <span class="budget">· 50s</span></p>
+      <h2 class="title">What's still genuinely open.</h2>
+      <div class="body">
+        <div class="next">
+          <p class="q">STORY-012's last acceptance criterion is still unchecked: a different engineer, following <code>docs/DEPLOYMENT.md</code> alone, with no help from me, successfully deploying and rolling back.</p>
+          <p class="settle">What would settle it: actually hand the doc to someone who has never seen this repo and watch where it breaks, not another self-review.</p>
+        </div>
+      </div>
+      <p class="visual-note">Text equivalent: a single statement naming one specific, currently unchecked acceptance criterion, and the one concrete action that would resolve it.</p>
+    </section>
+
+  </div>
+</main>
+
+<div class="toc-panel" id="tocPanel" role="dialog" aria-modal="true" aria-labelledby="tocHeading">
+  <div class="toc-box">
+    <h2 id="tocHeading">Contents</h2>
+    <ol id="tocList"></ol>
+    <p class="toc-hint">Press <kbd>T</kbd> or <kbd>Esc</kbd> to close. Arrow keys move between slides.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  try {
+  var slides = Array.prototype.slice.call(document.querySelectorAll("section.slide"));
+  var total = slides.length;
+  var current = 0;
+
+  var prevBtn = document.getElementById("prevBtn");
+  var nextBtn = document.getElementById("nextBtn");
+  var tocBtn = document.getElementById("tocBtn");
+  var tocPanel = document.getElementById("tocPanel");
+  var tocList = document.getElementById("tocList");
+  var fsBtn = document.getElementById("fsBtn");
+  var fsFallback = document.getElementById("fsFallback");
+  var progressFill = document.getElementById("progressFill");
+  var slideCount = document.getElementById("slideCount");
+  var liveRegion = document.getElementById("liveRegion");
+  var timerEl = document.getElementById("timer");
+  var timerToggle = document.getElementById("timerToggle");
+  var timerReset = document.getElementById("timerReset");
+
+  function slideTitle(i){
+    var h = slides[i].querySelector(".title");
+    return h ? h.textContent.replace(/\s+/g," ").trim() : ("Slide " + (i+1));
+  }
+
+  function buildToc(){
+    tocList.innerHTML = "";
+    slides.forEach(function(s, i){
+      var li = document.createElement("li");
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = (i+1) + ". " + slideTitle(i);
+      btn.addEventListener("click", function(){ goTo(i); closeToc(); });
+      li.appendChild(btn);
+      tocList.appendChild(li);
+    });
+  }
+
+  function render(){
+    slides.forEach(function(s, i){ s.classList.toggle("active", i === current); });
+    progressFill.style.width = (((current+1)/total) * 100) + "%";
+    slideCount.textContent = "Slide " + (current+1) + " of " + total;
+    prevBtn.disabled = current === 0;
+    nextBtn.disabled = current === total - 1;
+    liveRegion.textContent = "Slide " + (current+1) + " of " + total + ": " + slideTitle(current);
+    var heading = slides[current].querySelector(".title");
+    if (heading) { heading.setAttribute("tabindex","-1"); heading.focus({preventScroll:true}); }
+    // Wrapped: some sandboxed/embedded contexts (e.g. a srcdoc iframe) throw a
+    // SecurityError on history.replaceState. That must never be allowed to abort
+    // slide navigation, which is why it's isolated here instead of left inline.
+    try { history.replaceState(null, "", "#" + slides[current].id); } catch (e) {}
+  }
+
+  function goTo(i){
+    if (i < 0 || i >= total) return;
+    current = i;
+    render();
+  }
+  function next(){ goTo(current + 1); }
+  function prev(){ goTo(current - 1); }
+
+  prevBtn.addEventListener("click", prev);
+  nextBtn.addEventListener("click", next);
+
+  function openToc(){ tocPanel.classList.add("open"); tocList.querySelector("button").focus(); }
+  function closeToc(){ tocPanel.classList.remove("open"); tocBtn.focus(); }
+  tocBtn.addEventListener("click", function(){
+    if (tocPanel.classList.contains("open")) closeToc(); else openToc();
+  });
+
+  document.addEventListener("keydown", function(e){
+    if (tocPanel.classList.contains("open")){
+      if (e.key === "Escape" || e.key.toLowerCase() === "t"){ e.preventDefault(); closeToc(); }
+      return;
+    }
+    switch(e.key){
+      case "ArrowRight": case "ArrowDown": case " ": case "PageDown":
+        e.preventDefault(); next(); break;
+      case "ArrowLeft": case "ArrowUp": case "PageUp":
+        e.preventDefault(); prev(); break;
+      case "Home": e.preventDefault(); goTo(0); break;
+      case "End": e.preventDefault(); goTo(total-1); break;
+      case "t": case "T": e.preventDefault(); openToc(); break;
+      case "f": case "F": e.preventDefault(); toggleFullscreen(); break;
+    }
+  });
+
+  // ---- Fullscreen, with a visible fallback when unavailable ----
+  function fullscreenSupported(){
+    return !!(document.fullscreenEnabled || document.documentElement.requestFullscreen);
+  }
+  function toggleFullscreen(){
+    if (!fullscreenSupported()){
+      fsFallback.classList.add("show");
+      return;
+    }
+    if (!document.fullscreenElement){
+      document.documentElement.requestFullscreen().catch(function(){
+        fsFallback.classList.add("show");
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  }
+  fsBtn.addEventListener("click", toggleFullscreen);
+  if (!fullscreenSupported()){
+    fsBtn.setAttribute("aria-disabled","true");
+  }
+
+  // ---- Timer: counts up from Start, matches the 300s speaking budget ----
+  var timerSeconds = 0, timerRunning = false, timerHandle = null;
+  function formatTime(s){
+    var m = Math.floor(s/60), r = s%60;
+    return (m<10?"0":"")+m+":"+(r<10?"0":"")+r;
+  }
+  function tick(){ timerSeconds++; timerEl.textContent = formatTime(timerSeconds); }
+  timerToggle.addEventListener("click", function(){
+    if (!timerRunning){
+      timerHandle = window.setInterval(tick, 1000);
+      timerRunning = true; timerToggle.textContent = "Pause";
+    } else {
+      window.clearInterval(timerHandle);
+      timerRunning = false; timerToggle.textContent = "Start";
+    }
+  });
+  timerReset.addEventListener("click", function(){
+    window.clearInterval(timerHandle); timerRunning = false;
+    timerToggle.textContent = "Start"; timerSeconds = 0; timerEl.textContent = "00:00";
+  });
+
+  // ---- Deep-link on load (e.g. presentation.html#slide-3) ----
+  (function initFromHash(){
+    var id = location.hash.replace("#","");
+    var idx = slides.findIndex(function(s){ return s.id === id; });
+    current = idx >= 0 ? idx : 0;
+  })();
+
+  buildToc();
+  render();
+  } catch (err) {
+    // Visible, not silent: if init fails for any reason (an unsupported API,
+    // a sandboxed-context restriction, anything), show it on the page instead
+    // of leaving a static, unresponsive slide 1 with no explanation.
+    var banner = document.getElementById("jsErrorBanner");
+    if (banner) {
+      banner.style.display = "block";
+      banner.textContent = "Presentation script failed to initialize: " + (err && err.message ? err.message : err);
+    }
+  }
+})();
+</script>
+</body>
+</html>
