@@ -61,6 +61,21 @@ function randomRevealDelay(): number {
   return MIN_REVEAL_DELAY_MS + Math.random() * (MAX_REVEAL_DELAY_MS - MIN_REVEAL_DELAY_MS);
 }
 
+// Same shape dmvReader.ts's readDmv() catch block already logs — errorClass alone
+// (what every catch block here logged before this fix) tells you a call failed,
+// never why, which is exactly what made the 2026-10-03 DEMO_TARGET=prod live
+// debugging session harder than it needed to be (see ADR-012's addendum and that
+// day's PROGRESS.md correction entry). Applied uniformly across all six catch
+// blocks below rather than fixed ad hoc per source.
+function errorDetails(error: unknown): { errorClass: string; message: string; cause: string | null } {
+  const err = error as { name?: string; message?: string; cause?: unknown };
+  return {
+    errorClass: err.name ?? "Error",
+    message: err.message ?? String(error),
+    cause: err.cause instanceof Error ? err.cause.message : err.cause != null ? String(err.cause) : null,
+  };
+}
+
 async function discoverSqlIncidents(): Promise<DashboardIncident[]> {
   try {
     const result = await readDmv({ dmvName: "sys.dm_exec_requests" });
@@ -84,7 +99,7 @@ async function discoverSqlIncidents(): Promise<DashboardIncident[]> {
     logEvent({
       level: "error",
       event: "incident_feed_source_check",
-      context: { source: "sql", outcome: "failure", errorClass: error instanceof Error ? error.name : "Error" },
+      context: { source: "sql", outcome: "failure", ...errorDetails(error) },
     });
     // Re-thrown, not swallowed into []: tick()'s Promise.allSettled distinguishes
     // "checked, genuinely clear" (fulfilled, empty array) from "couldn't check"
@@ -116,7 +131,7 @@ async function discoverSsrsIncidents(): Promise<DashboardIncident[]> {
     logEvent({
       level: "error",
       event: "incident_feed_source_check",
-      context: { source: "ssrs", outcome: "failure", errorClass: error instanceof Error ? error.name : "Error" },
+      context: { source: "ssrs", outcome: "failure", ...errorDetails(error) },
     });
     throw error;
   }
@@ -154,7 +169,7 @@ async function discoverCloudIncidents(): Promise<DashboardIncident[]> {
     logEvent({
       level: "error",
       event: "incident_feed_source_check",
-      context: { source: "cloud", outcome: "failure", errorClass: error instanceof Error ? error.name : "Error" },
+      context: { source: "cloud", outcome: "failure", ...errorDetails(error) },
     });
     throw error;
   }
@@ -171,7 +186,7 @@ async function discoverDockerIncidents(): Promise<DashboardIncident[]> {
     logEvent({
       level: "warn",
       event: "incident_feed_source_check",
-      context: { source: "docker", outcome: "failure", errorClass: error instanceof Error ? error.name : "Error" },
+      context: { source: "docker", outcome: "failure", ...errorDetails(error) },
     });
     return [
       {
@@ -222,7 +237,7 @@ async function discoverPostgresIncidents(): Promise<DashboardIncident[]> {
     logEvent({
       level: "warn",
       event: "incident_feed_source_check",
-      context: { source: "postgres", outcome: "failure", errorClass: error instanceof Error ? error.name : "Error" },
+      context: { source: "postgres", outcome: "failure", ...errorDetails(error) },
     });
     return [
       {
@@ -253,7 +268,7 @@ async function pushIncidentNotification(incident: DashboardIncident): Promise<vo
     safeLogEvent("incidentFeedService", {
       level: "error",
       event: "incident_notification_dispatch_failed",
-      context: { incidentId: incident.id, errorClass: error instanceof Error ? error.name : "Error" },
+      context: { incidentId: incident.id, ...errorDetails(error) },
     });
   }
 }

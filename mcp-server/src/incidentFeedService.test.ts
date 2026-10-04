@@ -1,4 +1,9 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { logEvent } from "./observability/logger.js";
+
+vi.mock("./observability/logger.js", () => ({
+  logEvent: vi.fn(),
+}));
 
 // Module-level state (the tracked-incident Map, the resolved-ids Set) means
 // every test needs a fresh module instance — vi.resetModules() + a dynamic
@@ -115,6 +120,35 @@ describe("incidentFeedService", () => {
     expect(incidents).toHaveLength(1);
     expect(incidents[0].id).toBe("docker:superset");
     expect(incidents[0].source).toBe("docker");
+    handle.stop();
+  });
+
+  it("a source failure logs the real message and cause, not just errorClass — the 2026-10-03 gap", async () => {
+    vi.mocked(logEvent).mockClear();
+    const mocks = mockAllSources({});
+    const networkCause = new Error("ECONNREFUSED");
+    const unavailable = Object.assign(new Error("Could not reach Superset at http://dev-superset.flycast:8088"), {
+      name: "SupersetUnavailableError",
+      cause: networkCause,
+    });
+    mocks.checkSupersetHealth.mockRejectedValue(unavailable);
+    const { startIncidentFeed } = await import("./incidentFeedService.js");
+
+    const handle = startIncidentFeed();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "incident_feed_source_check",
+        context: expect.objectContaining({
+          source: "docker",
+          outcome: "failure",
+          errorClass: "SupersetUnavailableError",
+          message: "Could not reach Superset at http://dev-superset.flycast:8088",
+          cause: "ECONNREFUSED",
+        }),
+      })
+    );
     handle.stop();
   });
 
