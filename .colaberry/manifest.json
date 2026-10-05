@@ -24,7 +24,7 @@
     },
     {
       "path": "artifacts/INDEX.md",
-      "sha256": "602b2c0c4963a3912c21c66f3f51f01dc48411eeb33a55f98115ba60e1d862fe"
+      "sha256": "7e874dbc7ccca368bb56ffbf12e147bcd4ac184f7803c5bb01c8b7b357110f51"
     },
     {
       "path": "artifacts/week-01/workflow-diagram.pdf",
@@ -33,6 +33,10 @@
     {
       "path": "artifacts/week-02/skill-template.md",
       "sha256": "8fa8c064ef7df657d81146bbf8b31131d7158cd232cd8d34de61f940c5bcf462"
+    },
+    {
+      "path": "artifacts/week-02/skill.md",
+      "sha256": "8797cb854bdfdedfae4a41cc0a4052dd6383faf6354bfae43886f69f73f8034e"
     },
     {
       "path": "artifacts/week-03/business-workflow-assistant.csv",
