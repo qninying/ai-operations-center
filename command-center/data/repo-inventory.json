@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-05T17:52:53.363Z",
-  "git_sha": "8eae0e9",
+  "generated_at": "2026-10-05T20:37:34.183Z",
+  "git_sha": "77ae3ec",
   "note": "Generated from the code by mcp-server/scripts/generateRepoInventory.mjs. Describes what the repo contains, not whether anything is live right now.",
   "agents": [
     {
@@ -1081,9 +1081,9 @@
       "satisfies": [
         "REQ-007"
       ],
-      "criteria_done": 0,
+      "criteria_done": 4,
       "criteria_total": 4,
-      "status": "Planned",
+      "status": "Done (2026-10-05)",
       "tracked_by_platform": false
     }
   ]

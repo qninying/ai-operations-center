@@ -179,8 +179,8 @@
         <div class="cap">architecture decision records, each naming the options rejected</div>
       </div>
       <div class="stat">
-        <div class="num">3.83/4</div>
-        <div class="cap">trust posture score, up from 2.4 (self-assessed, rescored 2026-10-03)</div>
+        <div class="num">4.0/4</div>
+        <div class="cap">trust posture score, up from 2.4 (self-assessed against my own rubric, 2026-10-05)</div>
       </div>
     </div>
     <div class="badge-row">
@@ -237,7 +237,8 @@
         <div class="label">Built and verified</div>
         <ul>
           <li>Production deployment with automated, tested rollback</li>
-          <li>Live SQL Server connection in production</li>
+          <li>Live SQL Server and SSRS data in production</li>
+          <li>Plug-in connector architecture for data sources (REQ-018, ADR-016)</li>
           <li>Two real, reversible execution paths with independent confirmation</li>
           <li>Fixed DBA safety rules that refuse risky kills (system, long-running, chained blockers)</li>
           <li>MFA, a second approver, and a durable, rotating audit trail</li>
@@ -247,8 +248,7 @@
       <div class="card warn">
         <div class="label">Next, and still open</div>
         <ul>
-          <li>Make the health check prove the AI key works, not just that it's set (INCIDENT-003)</li>
-          <li>Turn on live SSRS data in production (one missing setting), the last gap keeping Provenance below the top band</li>
+                    <li>Measure the 50 to 70% correlation target against the JIRA baseline (STORY-014), which needs a real team's tickets</li>
           <li>Have a second engineer deploy and roll back from the runbook alone, which is still untested</li>
           <li>Extend real execution beyond two paths, but only where the reversibility case holds</li>
         </ul>
