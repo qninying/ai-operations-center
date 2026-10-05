@@ -19,8 +19,14 @@ const MODE_KEY = "cc-mode"; // "sample" | "real"
 const THEME_KEY = "coreops-theme"; // same storage key as the main dashboard,
 // so a preference set on either surface applies to both.
 
+// Real by default: the Command Center reports what the plan and repo actually
+// contain. Sample (an illustrative overlay of invented states) is opt-in only,
+// via the toggle, because as the default it contradicted real data (e.g.
+// REQ-012 "Not enforced yet" while its story was verified). Changed 2026-10-05.
 function getMode() {
-  return localStorage.getItem(MODE_KEY) || "sample";
+  let saved = null;
+  try { saved = localStorage.getItem(MODE_KEY); } catch (e) { /* storage blocked: fall back to real */ }
+  return saved === "sample" ? "sample" : "real";
 }
 
 function setMode(mode) {
