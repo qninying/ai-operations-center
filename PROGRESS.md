@@ -1274,3 +1274,9 @@ heading and tagged with the Session ID that made the change.
   - What changed: At the user's request, when production's last check of PostgreSQL or Apache Superset failed, `command-center/systems.html` now shows a neutral grey dot with "machine is stopped when not in use", since the demo machines are switched off between demos to save cost. Every other system keeps its real live or failed reading.
   - Verification: Systems inline script passes `node --check`; live GitHub Pages render recorded in the session summary.
   - Notes: The browser can't tell "stopped on purpose" from "broken" for these two, so any failure shows this message. Acceptable for demo-only services; revisit if they ever carry real workloads.
+
+- [x] Systems tab: ntfy always has a live reading via a direct browser check of ntfy.sh's public health endpoint
+  - Date: 2026-10-05
+  - Session: CC-20261003-d7mw
+  - What changed: ntfy's status only came from production's last real delivery, so after every deploy (each push to main redeploys) the card sat grey ("no page sent yet since last restart") until the next incident paged someone. `command-center/systems.html` now also fetches `https://ntfy.sh/v1/health` from the browser (public, no credentials, `Access-Control-Allow-Origin: *`, confirmed by curl), HosPulse-style. Green "ntfy.sh service healthy" plus CoreOps's last delivery time when known. Amber if the service is up but CoreOps's last page failed. Red if ntfy.sh doesn't respond. Sends no notification.
+  - Verification: `curl https://ntfy.sh/v1/health` returned `{"healthy":true}` with `access-control-allow-origin: *`. Local headless render from `127.0.0.1` (an origin CoreOps's CORS rule correctly refuses) showed ntfy "service healthy" from the direct check alone, while SQL Server showed "couldn't reach coreops.fly.dev", confirming each signal stands on its own. Inline script passes `node --check`. Live Pages render recorded in the session summary.
