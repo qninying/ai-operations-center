@@ -267,6 +267,8 @@ interface PendingRemediation {
 }
 const pendingRemediations = new Map<string, PendingRemediation>();
 
+const COMMAND_CENTER_ORIGIN = process.env.COMMAND_CENTER_ORIGIN ?? "https://qninying.github.io";
+
 function sendJson(res: ServerResponse, status: number, body: unknown) {
   const payload = JSON.stringify(body, null, 2);
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -349,6 +351,15 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     // tagging convention as every other real data path in this repo, never a
     // separate, health-specific notion of truth. See healthCheck.ts.
     const report = await checkDependencyHealth();
+    // The public Command Center on GitHub Pages reads this route from the
+    // browser to show live status on its Systems tab. Allow exactly that origin
+    // (overridable via COMMAND_CENTER_ORIGIN), never "*": this route is already
+    // public and unauthenticated, but nothing else needs cross-origin access.
+    const origin = req.headers.origin;
+    if (origin && origin === COMMAND_CENTER_ORIGIN) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    }
+    res.setHeader("Vary", "Origin");
     sendJson(res, 200, report);
     return;
   }

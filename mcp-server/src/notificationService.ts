@@ -1,4 +1,5 @@
 import { withReliability } from "./reliability/withReliability.js";
+import { recordSourceCheck } from "./sourceReachability.js";
 import { safeLogEvent } from "./observability/safeLogEvent.js";
 import { recordSystemEvent } from "./observability/auditWrite.js";
 import type { AuditLog } from "../../guardrails/auditLog.js";
@@ -147,6 +148,9 @@ export async function notifyOperators(
       baseDelayMs: BASE_DELAY_MS,
       maxDelayMs: MAX_DELAY_MS,
     });
+    // Only the real ntfy channel counts toward ntfy's live status, not a test or
+    // custom channel passed in via options.
+    if (channel === defaultChannel) recordSourceCheck("ntfy", "success");
     safeLogEvent("notificationService", {
       level: "info",
       event: "operator_notification_delivered",
@@ -167,6 +171,7 @@ export async function notifyOperators(
     );
   } catch (error) {
     const errorClass = error instanceof Error ? error.name : "Error";
+    if (channel === defaultChannel) recordSourceCheck("ntfy", "failure", { errorClass });
     safeLogEvent("notificationService", {
       level: "error",
       event: "operator_notification_failed",

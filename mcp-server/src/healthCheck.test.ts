@@ -113,3 +113,22 @@ describe("checkDependencyHealth", () => {
     expect(report.anthropic.lastCallErrorClass).toBe("AuthenticationError");
   });
 });
+
+describe("checkDependencyHealth: per-source live status", () => {
+  it("includes the last real check for each source, for the public Command Center's Systems tab", async () => {
+    const readDmvFn = vi.fn().mockResolvedValue({ source: "live", rows: [] } satisfies DmvReadResult);
+    const sourceChecks = {
+      sql: { outcome: "success" as const, at: "2026-10-05T12:00:00.000Z", sourceMode: "live" as const },
+      ssrs: { outcome: "success" as const, at: "2026-10-05T12:00:00.000Z", sourceMode: "fallback" as const },
+      cloud: null,
+      postgres: { outcome: "failure" as const, at: "2026-10-05T12:00:00.000Z", errorClass: "UpstreamCallFailedError" },
+      superset: { outcome: "success" as const, at: "2026-10-05T12:00:00.000Z" },
+      ntfy: null,
+      flyMachinesApi: null,
+    };
+
+    const report = await checkDependencyHealth({ readDmvFn, anthropicKeyPresent: true, anthropicReachability: null, sourceChecks });
+
+    expect(report.sources).toEqual(sourceChecks);
+  });
+});

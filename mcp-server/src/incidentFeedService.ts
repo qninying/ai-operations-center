@@ -1,4 +1,5 @@
 import { readDmv } from "./dmvReader.js";
+import { recordSourceCheck, type ReachabilitySource } from "./sourceReachability.js";
 import { readSsrsExecutionLog } from "./ssrsReader.js";
 import { queryLiveCloudBlob } from "./cloudBlobSource.js";
 import { checkSupersetHealth } from "./supersetHealthSource.js";
@@ -76,10 +77,26 @@ function errorDetails(error: unknown): { errorClass: string; message: string; ca
   };
 }
 
+// Logs a source check AND records its real outcome for GET /health/dependencies
+// (sourceReachability.ts), so the public Command Center can show live status
+// from checks this feed already makes, with no extra probe. The feed calls
+// Apache Superset "docker" (its local-dev name); the health report says "superset".
+const REACHABILITY_NAME: Record<string, ReachabilitySource> = {
+  sql: "sql", ssrs: "ssrs", cloud: "cloud", postgres: "postgres", docker: "superset",
+};
+function logSourceCheck(entry: Parameters<typeof logEvent>[0]): void {
+  logEvent(entry);
+  const ctx = (entry.context ?? {}) as { source?: string; outcome?: string; sourceMode?: "live" | "fallback"; errorClass?: string };
+  const name = ctx.source ? REACHABILITY_NAME[ctx.source] : undefined;
+  if (name && (ctx.outcome === "success" || ctx.outcome === "failure")) {
+    recordSourceCheck(name, ctx.outcome, { sourceMode: ctx.sourceMode, errorClass: ctx.errorClass });
+  }
+}
+
 async function discoverSqlIncidents(): Promise<DashboardIncident[]> {
   try {
     const result = await readDmv({ dmvName: "sys.dm_exec_requests" });
-    logEvent({
+    logSourceCheck({
       level: "info",
       event: "incident_feed_source_check",
       context: { source: "sql", outcome: "success", sourceMode: result.source, rowCount: result.rows.length },
@@ -96,7 +113,7 @@ async function discoverSqlIncidents(): Promise<DashboardIncident[]> {
         sourceMode: result.source,
       }));
   } catch (error) {
-    logEvent({
+    logSourceCheck({
       level: "error",
       event: "incident_feed_source_check",
       context: { source: "sql", outcome: "failure", ...errorDetails(error) },
@@ -113,7 +130,7 @@ async function discoverSqlIncidents(): Promise<DashboardIncident[]> {
 async function discoverSsrsIncidents(): Promise<DashboardIncident[]> {
   try {
     const result = await readSsrsExecutionLog({ queryName: "ExecutionLog3" });
-    logEvent({
+    logSourceCheck({
       level: "info",
       event: "incident_feed_source_check",
       context: { source: "ssrs", outcome: "success", sourceMode: result.source, rowCount: result.rows.length },
@@ -128,7 +145,7 @@ async function discoverSsrsIncidents(): Promise<DashboardIncident[]> {
       sourceMode: result.source,
     }));
   } catch (error) {
-    logEvent({
+    logSourceCheck({
       level: "error",
       event: "incident_feed_source_check",
       context: { source: "ssrs", outcome: "failure", ...errorDetails(error) },
@@ -147,7 +164,7 @@ function normalizeCloudSeverity(raw: string): IncidentSeverity {
 async function discoverCloudIncidents(): Promise<DashboardIncident[]> {
   try {
     const records = await queryLiveCloudBlob();
-    logEvent({
+    logSourceCheck({
       level: "info",
       event: "incident_feed_source_check",
       context: { source: "cloud", outcome: "success", recordCount: records.length },
@@ -166,7 +183,7 @@ async function discoverCloudIncidents(): Promise<DashboardIncident[]> {
     // data as a real cloud finding) — an unreachable Blob container means "can't
     // check this source," same as SQL/SSRS's live-source failure path, not a
     // finding of its own.
-    logEvent({
+    logSourceCheck({
       level: "error",
       event: "incident_feed_source_check",
       context: { source: "cloud", outcome: "failure", ...errorDetails(error) },
@@ -178,12 +195,12 @@ async function discoverCloudIncidents(): Promise<DashboardIncident[]> {
 async function discoverDockerIncidents(): Promise<DashboardIncident[]> {
   try {
     await checkSupersetHealth();
-    logEvent({ level: "info", event: "incident_feed_source_check", context: { source: "docker", outcome: "success" } });
+    logSourceCheck({ level: "info", event: "incident_feed_source_check", context: { source: "docker", outcome: "success" } });
     return [];
   } catch (error) {
     // The one source where "unreachable" IS the incident, not just "can't
     // check" — there's nothing else about Docker/Superset to evaluate.
-    logEvent({
+    logSourceCheck({
       level: "warn",
       event: "incident_feed_source_check",
       context: { source: "docker", outcome: "failure", ...errorDetails(error) },
@@ -205,7 +222,7 @@ async function discoverDockerIncidents(): Promise<DashboardIncident[]> {
 async function discoverPostgresIncidents(): Promise<DashboardIncident[]> {
   try {
     const rows = await queryPgActivity();
-    logEvent({
+    logSourceCheck({
       level: "info",
       event: "incident_feed_source_check",
       context: { source: "postgres", outcome: "success", rowCount: rows.length },
@@ -234,7 +251,7 @@ async function discoverPostgresIncidents(): Promise<DashboardIncident[]> {
     // the container went down, this fixed id correctly replaces it as the
     // one real problem to report, the same way Docker's single fixed id
     // already works.
-    logEvent({
+    logSourceCheck({
       level: "warn",
       event: "incident_feed_source_check",
       context: { source: "postgres", outcome: "failure", ...errorDetails(error) },

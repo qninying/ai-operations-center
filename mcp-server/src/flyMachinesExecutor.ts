@@ -1,4 +1,5 @@
 import { withReliability } from "./reliability/withReliability.js";
+import { recordSourceCheck } from "./sourceReachability.js";
 
 // The "prod" counterpart to dockerExecutor.ts's local
 // `execFile("docker", ["restart", ...])` — the coreops Fly app has no Docker
@@ -50,7 +51,9 @@ export async function restartFlyMachine(appName: string, machineId: string, apiT
       baseDelayMs: 0,
       maxDelayMs: 0,
     });
+    recordSourceCheck("flyMachinesApi", "success");
   } catch (error) {
+    recordSourceCheck("flyMachinesApi", "failure", { errorClass: error instanceof Error ? error.name : "Error" });
     throw new FlyMachineRestartFailedError(appName, machineId, error);
   }
 }

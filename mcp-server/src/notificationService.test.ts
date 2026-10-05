@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { notifyOperators, OperatorContactMissingError } from "./notificationService.js";
+import { getSourceChecks, __resetSourceReachabilityForTests } from "./sourceReachability.js";
 import * as logger from "./observability/logger.js";
 import { AuditLog } from "../../guardrails/auditLog.js";
 
@@ -233,5 +234,21 @@ describe("notifyOperators (default ntfy channel)", () => {
     expect(logSpy).toHaveBeenCalledWith(
       expect.objectContaining({ event: "operator_notification_failed" })
     );
+  });
+});
+
+describe("notifyOperators: ntfy live status", () => {
+  beforeEach(() => {
+    process.env.OPERATOR_CONTACTS = "ops-oncall@example.com";
+    __resetSourceReachabilityForTests();
+  });
+  afterEach(() => {
+    delete process.env.OPERATOR_CONTACTS;
+  });
+
+  it("a custom (non-ntfy) channel never counts toward ntfy's live status", async () => {
+    const channel = vi.fn().mockResolvedValue(undefined);
+    await notifyOperators({ actionType: "test", incidentId: "i-1", summary: "s" }, { channel });
+    expect(getSourceChecks().ntfy).toBeNull();
   });
 });

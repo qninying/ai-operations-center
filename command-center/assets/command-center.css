@@ -352,3 +352,6 @@ table.cc-table th {
   margin: 28px 0 12px;
   color: var(--cc-text, inherit);
 }
+
+/* Amber: reachable-but-degraded, e.g. a source serving its tagged fallback data. */
+.cc-dot.cc-dot-warn { background: var(--cc-warn); }

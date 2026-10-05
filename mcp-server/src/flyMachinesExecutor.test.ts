@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { restartFlyMachine, FlyMachineRestartFailedError } from "./flyMachinesExecutor.js";
+import { getSourceChecks, __resetSourceReachabilityForTests } from "./sourceReachability.js";
 
 describe("restartFlyMachine", () => {
   const originalFetch = global.fetch;
@@ -46,5 +47,25 @@ describe("restartFlyMachine", () => {
       expect(error).toBeInstanceOf(FlyMachineRestartFailedError);
       expect((error as Error).message).not.toContain("super-secret-token-value");
     }
+  });
+});
+
+describe("restartFlyMachine: records the real outcome for live status", () => {
+  const originalFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = originalFetch;
+    __resetSourceReachabilityForTests();
+  });
+
+  it("records success after a real 200 from Fly's API", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 } as Response);
+    await restartFlyMachine("dev-postgres", "m1", "tok");
+    expect(getSourceChecks().flyMachinesApi?.outcome).toBe("success");
+  });
+
+  it("records failure (error class only) when Fly's API rejects the call", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 401 } as Response);
+    await expect(restartFlyMachine("dev-postgres", "m1", "tok")).rejects.toThrow(FlyMachineRestartFailedError);
+    expect(getSourceChecks().flyMachinesApi).toMatchObject({ outcome: "failure", errorClass: "UpstreamCallFailedError" });
   });
 });

@@ -1,5 +1,6 @@
 import { readDmv, DmvReadResult, ReadDmvInput } from "./dmvReader.js";
 import { getLastAnthropicCallOutcome, type AnthropicReachabilityState } from "./anthropicReachability.js";
+import { getSourceChecks, type SourceChecks } from "./sourceReachability.js";
 
 // REQ-025/026 (STORY-012): a readiness check for the real production deploy,
 // distinct from GET /health's plain liveness ping (httpServer.ts), which stays
@@ -29,6 +30,10 @@ export interface DependencyHealthReport {
     lastCallAt: string | null;
     lastCallErrorClass?: string;
   };
+  // The last real check this process made against each source (the incident
+  // feed polls every few seconds; ntfy and Fly's API record on real use). null
+  // means no check yet since this process started. See sourceReachability.ts.
+  sources: SourceChecks;
 }
 
 type ReadDmvFn = (input: ReadDmvInput) => Promise<DmvReadResult>;
@@ -38,6 +43,7 @@ export interface CheckDependencyHealthDeps {
   now?: () => number;
   anthropicKeyPresent?: boolean;
   anthropicReachability?: AnthropicReachabilityState | null;
+  sourceChecks?: SourceChecks;
 }
 
 // A deploy platform's health-check poller hits this route far more often than a
@@ -94,6 +100,7 @@ export async function checkDependencyHealth(
       lastCallAt: reachability?.at ?? null,
       ...(reachability?.errorClass ? { lastCallErrorClass: reachability.errorClass } : {}),
     },
+    sources: deps.sourceChecks ?? getSourceChecks(),
   };
 
   cached = { report, expiresAt: nowMs + CACHE_TTL_MS };
