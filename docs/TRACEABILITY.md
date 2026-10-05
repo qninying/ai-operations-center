@@ -23,7 +23,7 @@ none, because it is context rather than work.
 | REQ-015 | Safety | must | STORY-011 |
 | REQ-016 | Functional | must | STORY-008 |
 | REQ-017 | Non-functional | should | _(capability built directly — `mcp-server/src/correlatedRecommendationService.ts`; the 50-70% target is not yet measured: STORY-014, planned)_ |
-| REQ-018 | Constraint | must | STORY-013 _(planned 2026-10-05; no evidence of a plug-in connector architecture existed before it)_ |
+| REQ-018 | Constraint | must | STORY-013 _(built 2026-10-05: `mcp-server/src/connectors/`, ADR-016)_ |
 | REQ-019 | Safety | should | _(fulfilled directly — `mcp-server/src/evidenceGroundingCheck.ts`, no platform story assigned)_ |
 | REQ-020 | Safety | should | _(fulfilled directly — `mcp-server/src/evidenceGroundingCheck.ts` + `rootCauseAgent.ts`, no platform story assigned)_ |
 | REQ-021 | Safety | should | _(fulfilled directly — `mcp-server/src/adversarialEval/`, all 4 probe categories, no platform story assigned)_ |

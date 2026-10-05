@@ -132,15 +132,49 @@
       });
     }
 
+    // System name -> reachability key, for every registered plug-in connector
+    // (REQ-018), filled from the inventory at render. A connector with no
+    // hand-written LIVE_STATUS entry still gets a real reading from it.
+    const CONNECTOR_REACH = {};
+    function noteConnectors(inventory) {
+      for (const s of (inventory && inventory.systems) || []) {
+        if (s.connector && s.connector.reachability) CONNECTOR_REACH[s.name] = s.connector.reachability;
+      }
+    }
+
     function liveStatus(name) {
       if (name === "ntfy push notifications") return ntfyStatus();
+      if (!LIVE_STATUS[name] && CONNECTOR_REACH[name]) {
+        const key = CONNECTOR_REACH[name];
+        return fetchHealth().then(
+          (h) => fromCheck(h.sources && h.sources[key], "live", "no check yet since last restart"),
+          (e) => ({ cls: BAD, label: `couldn't reach coreops.fly.dev (${e.name === "AbortError" ? "timed out" : e.message})`, checked: "just now" })
+        );
+      }
       const read = LIVE_STATUS[name];
       if (!read) return Promise.resolve(null);
       return fetchHealth().then(read, (e) => ({ cls: BAD, label: `couldn't reach coreops.fly.dev (${e.name === "AbortError" ? "timed out" : e.message})`, checked: "just now" }));
     }
 
     function hasLive(name) {
-      return name === "ntfy push notifications" || Boolean(LIVE_STATUS[name]);
+      return name === "ntfy push notifications" || Boolean(LIVE_STATUS[name]) || Boolean(CONNECTOR_REACH[name]);
+    }
+
+    function connectorsPanel(inventory) {
+      const list = (inventory && inventory.connectors) || [];
+      if (!list.length) return "";
+      return `
+        <div class="cc-panel-box" style="margin-top:20px;">
+          <h3 style="margin-top:0;">Plug-in connectors (${list.length})</h3>
+          <p style="color:var(--cc-muted); font-size:13px; margin-top:0;">
+            Each data source is a self-contained connector registered in <code>mcp-server/src/connectors/index.ts</code> (REQ-018, ADR-016).
+            Adding a system means one new connector file plus one registry line; the incident feed, the health report and this page pick it up with no other edits.
+          </p>
+          <table class="cc-table">
+            <thead><tr><th>Connector</th><th>System</th><th>Health key</th><th>File</th></tr></thead>
+            <tbody>${list.map((c) => `<tr><td><code>${esc(c.id || c.name)}</code></td><td>${esc(c.system || "—")}</td><td><code>${esc(c.reachability || "—")}</code></td><td><code>${esc(c.file || "—")}</code></td></tr>`).join("")}</tbody>
+          </table>
+        </div>`;
     }
 
     function applyLive(el, s) {
@@ -187,6 +221,7 @@
 
     function renderList({ plan, mode, inventory }) {
       const el = document.getElementById("cc-content");
+      noteConnectors(inventory);
       const badge = CommandCenter.sampleBadge();
       const note = inventory ? "" : `<div class="cc-banner">No repo inventory yet. Run <code>npm run inventory</code> in mcp-server/ to add the systems found in the code.</div>`;
       el.innerHTML = note + `<div class="cc-grid">` + mergedSystems(plan, inventory).map((entry) => {
@@ -200,7 +235,7 @@
             <p data-status-text style="margin-top:4px; color:var(--cc-muted); font-size:12px;">Live status: ${hasLive(entry.name) ? "checking…" : esc(showSample ? sample.label : "no live signal for this system")}</p>
           </a>
         `;
-      }).join("") + `</div>`;
+      }).join("") + `</div>` + connectorsPanel(inventory);
       for (const card of el.querySelectorAll("[data-sys]")) {
         liveStatus(card.dataset.sys).then((s) => applyLive(card, s));
       }
@@ -218,6 +253,7 @@
 
     function renderDetail({ plan, mode, inventory }, id) {
       const el = document.getElementById("cc-content");
+      noteConnectors(inventory);
       const entry = mergedSystems(plan, inventory).find((s) => s.name === id);
       if (!entry) {
         el.innerHTML = `<div class="cc-empty-state">No system "${esc(id)}" in the plan or the code.</div>`;

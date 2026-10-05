@@ -6,7 +6,7 @@ registration, so that adding a new system (say Oracle, or a Kafka lag feed)
 means writing one new file, not editing the incident feed, the health report
 and the server.
 
-**Status:** Planned
+**Status:** In progress (code done 2026-10-05; production check pending)
 **Release:** r6 · Close the remaining requirement gaps (self-scoped, added
 2026-10-05 after a requirements audit found no evidence for REQ-018)
 **Owner:** Quincy Nkwain Ninying
@@ -58,15 +58,25 @@ and the Command Center's status map. That's a convention, not an architecture.
 
 ## Acceptance: your stop condition
 
-- [ ] Given a new test-only connector added in one file plus one registry line,
+- [x] Given a new test-only connector added in one file plus one registry line,
       when the incident feed runs, then its incidents appear and its status shows
       on `/health/dependencies`, with zero edits to `incidentFeedService.ts`,
       `healthCheck.ts` or `sourceReachability.ts` (proven by a test).
+      Verified 2026-10-05: `connectors/connectors.test.ts` registers a "kafka"
+      connector through the registry seam only; the feed reveals its incident
+      and `checkDependencyHealth()` reports `sources.kafka`.
 - [ ] Given the five existing sources migrated to connectors, when the full test
       suite runs, then every existing test still passes and production
       `/health/dependencies` reports the same sources as before.
-- [ ] Given one connector throws and another hangs, when the feed ticks, then
+- [x] Given one connector throws and another hangs, when the feed ticks, then
       every other connector's incidents still appear within the timeout (test).
-- [ ] Given two connectors share an `id`, when the server starts, then it fails
-      fast naming the duplicate (test).
-- [ ] ADR-016 is written, and `docs/TRACEABILITY.md` maps REQ-018 to this story.
+      Verified 2026-10-05: `connectors.test.ts` (throwing, hung and healthy
+      connectors; the hung one is recorded as `ConnectorTimeoutError`, and a
+      second test proves its existing incidents are kept, not pruned).
+- [x] Given two connectors share an `id`, when the server starts, then it fails
+      fast naming the duplicate (test). Verified 2026-10-05: `validateConnectors()`
+      runs when the registry module loads and throws `DuplicateConnectorError` for a
+      shared `id` or `reachabilityName` (two tests in `connectors.test.ts`).
+- [x] ADR-016 is written, and `docs/TRACEABILITY.md` maps REQ-018 to this story.
+      Done 2026-10-05: `docs/ADR-016-plugin-connector-architecture.md`, added
+      to the README's ADR table.

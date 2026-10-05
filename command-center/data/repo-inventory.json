@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-05T17:33:56.135Z",
-  "git_sha": "5c950d1",
+  "generated_at": "2026-10-05T17:44:05.707Z",
+  "git_sha": "e49e809",
   "note": "Generated from the code by mcp-server/scripts/generateRepoInventory.mjs. Describes what the repo contains, not whether anything is live right now.",
   "agents": [
     {
@@ -49,6 +49,43 @@
       "file": "mcp-server/src/mcpServerFactory.ts"
     }
   ],
+  "connectors": [
+    {
+      "name": "sqlServerConnector",
+      "id": "sql",
+      "system": "SQL Server",
+      "reachability": "sql",
+      "file": "mcp-server/src/connectors/sqlServerConnector.ts"
+    },
+    {
+      "name": "ssrsConnector",
+      "id": "ssrs",
+      "system": "SSRS",
+      "reachability": "ssrs",
+      "file": "mcp-server/src/connectors/ssrsConnector.ts"
+    },
+    {
+      "name": "cloudConnector",
+      "id": "cloud",
+      "system": "SSIS",
+      "reachability": "cloud",
+      "file": "mcp-server/src/connectors/cloudConnector.ts"
+    },
+    {
+      "name": "supersetConnector",
+      "id": "docker",
+      "system": "Apache Superset",
+      "reachability": "superset",
+      "file": "mcp-server/src/connectors/supersetConnector.ts"
+    },
+    {
+      "name": "postgresConnector",
+      "id": "postgres",
+      "system": "PostgreSQL",
+      "reachability": "postgres",
+      "file": "mcp-server/src/connectors/postgresConnector.ts"
+    }
+  ],
   "systems": [
     {
       "name": "Anthropic Claude API",
@@ -62,7 +99,8 @@
           ],
           "does": "Root-cause reasoning and follow-up diagnostics (the two AI agents)"
         }
-      ]
+      ],
+      "connector": null
     },
     {
       "name": "Apache Superset",
@@ -70,6 +108,12 @@
         {
           "file": "mcp-server/src/supersetHealthSource.ts",
           "does": "Checks Apache Superset's health endpoint",
+          "has_tests": true,
+          "fixture_fallback": null
+        },
+        {
+          "file": "mcp-server/src/connectors/supersetConnector.ts",
+          "does": "Plug-in connector \"docker\": turns this system's data into incidents (REQ-018)",
           "has_tests": true,
           "fixture_fallback": null
         }
@@ -82,7 +126,12 @@
           "fixture_fallback": null
         }
       ],
-      "uses": []
+      "uses": [],
+      "connector": {
+        "id": "docker",
+        "reachability": "superset",
+        "file": "mcp-server/src/connectors/supersetConnector.ts"
+      }
     },
     {
       "name": "Fly.io Machines API",
@@ -95,7 +144,8 @@
           "fixture_fallback": null
         }
       ],
-      "uses": []
+      "uses": [],
+      "connector": null
     },
     {
       "name": "ntfy push notifications",
@@ -108,7 +158,8 @@
           ],
           "does": "Pages operators about new incidents and actions"
         }
-      ]
+      ],
+      "connector": null
     },
     {
       "name": "PostgreSQL",
@@ -122,6 +173,12 @@
         {
           "file": "mcp-server/src/pgBackendStatusSource.ts",
           "does": "Reads whether one Postgres backend is blocked (MCP tool)",
+          "has_tests": true,
+          "fixture_fallback": null
+        },
+        {
+          "file": "mcp-server/src/connectors/postgresConnector.ts",
+          "does": "Plug-in connector \"postgres\": turns this system's data into incidents (REQ-018)",
           "has_tests": true,
           "fixture_fallback": null
         }
@@ -140,7 +197,12 @@
           "fixture_fallback": null
         }
       ],
-      "uses": []
+      "uses": [],
+      "connector": {
+        "id": "postgres",
+        "reachability": "postgres",
+        "file": "mcp-server/src/connectors/postgresConnector.ts"
+      }
     },
     {
       "name": "SQL Server",
@@ -150,10 +212,21 @@
           "does": "Reads SQL Server DMVs (blocking sessions, active requests)",
           "has_tests": true,
           "fixture_fallback": "mcp-server/src/dmvFixtures.ts"
+        },
+        {
+          "file": "mcp-server/src/connectors/sqlServerConnector.ts",
+          "does": "Plug-in connector \"sql\": turns this system's data into incidents (REQ-018)",
+          "has_tests": true,
+          "fixture_fallback": null
         }
       ],
       "writes": [],
-      "uses": []
+      "uses": [],
+      "connector": {
+        "id": "sql",
+        "reachability": "sql",
+        "file": "mcp-server/src/connectors/sqlServerConnector.ts"
+      }
     },
     {
       "name": "SSIS",
@@ -163,10 +236,21 @@
           "does": "Reads SSIS package-run and cloud diagnostic records from Azure Blob Storage",
           "has_tests": true,
           "fixture_fallback": null
+        },
+        {
+          "file": "mcp-server/src/connectors/cloudConnector.ts",
+          "does": "Plug-in connector \"cloud\": turns this system's data into incidents (REQ-018)",
+          "has_tests": true,
+          "fixture_fallback": null
         }
       ],
       "writes": [],
-      "uses": []
+      "uses": [],
+      "connector": {
+        "id": "cloud",
+        "reachability": "cloud",
+        "file": "mcp-server/src/connectors/cloudConnector.ts"
+      }
     },
     {
       "name": "SSRS",
@@ -176,10 +260,21 @@
           "does": "Reads the SSRS ExecutionLog3 report-run history",
           "has_tests": true,
           "fixture_fallback": "mcp-server/src/ssrsFixtures.ts"
+        },
+        {
+          "file": "mcp-server/src/connectors/ssrsConnector.ts",
+          "does": "Plug-in connector \"ssrs\": turns this system's data into incidents (REQ-018)",
+          "has_tests": true,
+          "fixture_fallback": null
         }
       ],
       "writes": [],
-      "uses": []
+      "uses": [],
+      "connector": {
+        "id": "ssrs",
+        "reachability": "ssrs",
+        "file": "mcp-server/src/connectors/ssrsConnector.ts"
+      }
     }
   ],
   "requirements": [
@@ -680,15 +775,25 @@
       "statement": "The system must provide a plug-in connector architecture for extensibility.",
       "fulfillment": null,
       "evidence": {
-        "code": [],
-        "tests": [],
-        "docs": [],
+        "code": [
+          "mcp-server/src/connectors/index.ts",
+          "mcp-server/src/connectors/types.ts",
+          "mcp-server/src/healthCheck.ts",
+          "mcp-server/src/incidentFeedService.ts",
+          "mcp-server/src/sourceReachability.ts"
+        ],
+        "tests": [
+          "mcp-server/src/connectors/connectors.test.ts"
+        ],
+        "docs": [
+          "docs/ADR-016-plugin-connector-architecture.md"
+        ],
         "commits": []
       },
       "repo_stories": [
         "STORY-013"
       ],
-      "repo_status": "planned"
+      "repo_status": "built_and_tested"
     },
     {
       "id": "REQ-016",
@@ -947,9 +1052,9 @@
       "satisfies": [
         "REQ-018"
       ],
-      "criteria_done": 0,
+      "criteria_done": 4,
       "criteria_total": 5,
-      "status": "Planned",
+      "status": "In progress (code done 2026-10-05; production check pending)",
       "tracked_by_platform": false
     },
     {

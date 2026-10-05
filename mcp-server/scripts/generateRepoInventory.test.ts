@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { buildInventory, leadingComment } from "./generateRepoInventory.mjs";
+import { buildInventory, leadingComment, readConnectors } from "./generateRepoInventory.mjs";
 
 let root: string;
 const src = () => join(root, "mcp-server", "src");
@@ -96,5 +96,30 @@ describe("leadingComment", () => {
 
   it("returns an empty string when there is no comment", () => {
     expect(leadingComment(`import a from "a";\nconst x = 1;\n`)).toBe("");
+  });
+});
+
+describe("readConnectors (REQ-018)", () => {
+  it("lists only connectors in the REGISTERED array, with id, system and reachability from each file", () => {
+    const dir = join(src(), "connectors");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "index.ts"), [
+      'import { aConnector } from "./aConnector.js";',
+      'import { bConnector } from "./bConnector.js";',
+      "const REGISTERED: readonly SourceConnector[] = [",
+      "  aConnector,",
+      "];",
+    ].join("\n"));
+    writeFileSync(join(dir, "aConnector.ts"), 'export const aConnector = { id: "a", system: "Alpha DB", reachabilityName: "alpha" };');
+    writeFileSync(join(dir, "bConnector.ts"), 'export const bConnector = { id: "b", system: "Beta", reachabilityName: "b" };');
+    expect(readConnectors(root)).toEqual([
+      { name: "aConnector", id: "a", system: "Alpha DB", reachability: "alpha", file: "mcp-server/src/connectors/aConnector.ts" },
+    ]);
+    const alpha = buildInventory(root, FIXED).systems.find((s: { name: string }) => s.name === "Alpha DB");
+    expect(alpha.connector).toEqual({ id: "a", reachability: "alpha", file: "mcp-server/src/connectors/aConnector.ts" });
+  });
+
+  it("boundary: no connectors folder gives an empty list", () => {
+    expect(readConnectors(root)).toEqual([]);
   });
 });

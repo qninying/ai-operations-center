@@ -62,6 +62,28 @@ const SERVICE_DETECTORS = [
   { system: "ntfy push notifications", pattern: /ntfy\.sh|NTFY_TOPIC/, does: "Pages operators about new incidents and actions" },
 ];
 
+// REQ-018: the registered plug-in connectors, read from the registry
+// (src/connectors/index.ts) rather than listed here. Only connectors in the
+// REGISTERED array count; a connector file that isn't registered isn't running.
+export function readConnectors(repoRoot) {
+  const dir = join(repoRoot, "mcp-server", "src", "connectors");
+  const indexPath = join(dir, "index.ts");
+  if (!existsSync(indexPath)) return [];
+  const index = readFileSync(indexPath, "utf8");
+  const block = index.match(/const REGISTERED[^=]*=\s*\[([\s\S]*?)\];/);
+  if (!block) return [];
+  const names = block[1].split(",").map((s) => s.trim()).filter(Boolean);
+  const importOf = {};
+  for (const m of index.matchAll(/import \{ (\w+) \} from "\.\/(\w+)\.js";/g)) importOf[m[1]] = m[2];
+  return names.map((name) => {
+    const fileBase = importOf[name];
+    const file = fileBase ? `mcp-server/src/connectors/${fileBase}.ts` : null;
+    const src = fileBase && existsSync(join(dir, `${fileBase}.ts`)) ? readFileSync(join(dir, `${fileBase}.ts`), "utf8") : "";
+    const field = (key) => (src.match(new RegExp(`${key}:\\s*"([^"]+)"`)) || [])[1] || null;
+    return { name, id: field("id"), system: field("system"), reachability: field("reachabilityName"), file };
+  });
+}
+
 const isCodeFile = (f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.endsWith(".d.ts");
 
 function humanize(fileBase) {
@@ -133,10 +155,22 @@ export function buildInventory(repoRoot, { now = new Date(), gitSha = null, incl
     const users = files.filter((f) => d.pattern.test(read(f)));
     if (users.length) addTo(d.system, { kind: "uses", files: users.map(rel), does: d.does });
   }
+  // Each registered connector is a data source the feed polls: make sure its
+  // system appears, and carry its live-status key for the Systems tab.
+  const connectors = readConnectors(repoRoot);
+  for (const c of connectors) {
+    if (!c.system) continue;
+    if (!bySystem.has(c.system)) bySystem.set(c.system, { name: c.system, reads: [], writes: [], uses: [] });
+    const s = bySystem.get(c.system);
+    s.connector = { id: c.id, reachability: c.reachability, file: c.file };
+    if (c.file && !s.reads.some((r) => r.file === c.file)) {
+      s.reads.push({ kind: "reads", file: c.file, does: `Plug-in connector "${c.id}": turns this system's data into incidents (REQ-018)`, has_tests: existsSync(join(repoRoot, "mcp-server", "src", "connectors", "connectors.test.ts")), fixture_fallback: null });
+    }
+  }
   const systems = [...bySystem.values()]
     .map((s) => {
       const clean = (arr) => arr.map(({ kind, ...rest }) => rest);
-      return { name: s.name, reads: clean(s.reads), writes: clean(s.writes), uses: clean(s.uses) };
+      return { name: s.name, reads: clean(s.reads), writes: clean(s.writes), uses: clean(s.uses), connector: s.connector || null };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -147,6 +181,7 @@ export function buildInventory(repoRoot, { now = new Date(), gitSha = null, incl
     note: "Generated from the code by mcp-server/scripts/generateRepoInventory.mjs. Describes what the repo contains, not whether anything is live right now.",
     agents,
     mcp_tools,
+    connectors,
     systems,
     // Every requirement in docs/REQUIREMENTS.md and every story in docs/stories/,
     // with repo evidence. See repoRequirements.mjs.

@@ -13,7 +13,15 @@
 // unknown, never presented as "ok". In-memory on purpose: a restart resets it,
 // and the next poll repopulates it within seconds.
 
-export type ReachabilitySource = "sql" | "ssrs" | "cloud" | "postgres" | "superset" | "ntfy" | "flyMachinesApi";
+// A connector's reachabilityName (connectors/, REQ-018), or one of the two
+// non-connector services below. A plain string so a new connector needs no
+// edit here.
+export type ReachabilitySource = string;
+
+// Services that aren't data-source connectors but whose real outcomes are still
+// recorded: ntfy delivery (notificationService.ts) and Fly restarts
+// (flyMachinesExecutor.ts).
+export const NON_CONNECTOR_SOURCES = ["ntfy", "flyMachinesApi"] as const;
 
 export interface SourceCheckState {
   outcome: "success" | "failure";
@@ -27,7 +35,9 @@ export interface SourceCheckState {
 
 export type SourceChecks = Record<ReachabilitySource, SourceCheckState | null>;
 
-const ALL_SOURCES: ReachabilitySource[] = ["sql", "ssrs", "cloud", "postgres", "superset", "ntfy", "flyMachinesApi"];
+// Used when the caller doesn't pass the registered names (e.g. older tests).
+// healthCheck.ts passes the live connector registry's names instead.
+const DEFAULT_SOURCES: readonly string[] = ["sql", "ssrs", "cloud", "postgres", "superset", ...NON_CONNECTOR_SOURCES];
 
 const lastChecks = new Map<ReachabilitySource, SourceCheckState>();
 
@@ -45,9 +55,11 @@ export function recordSourceCheck(
   });
 }
 
-export function getSourceChecks(): SourceChecks {
+// Every requested source is present (null until a real check happens), so a
+// newly registered connector shows up as "no check yet" rather than missing.
+export function getSourceChecks(sources: readonly string[] = DEFAULT_SOURCES): SourceChecks {
   const out = {} as SourceChecks;
-  for (const source of ALL_SOURCES) out[source] = lastChecks.get(source) ?? null;
+  for (const source of sources) out[source] = lastChecks.get(source) ?? null;
   return out;
 }
 

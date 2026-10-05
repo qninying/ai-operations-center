@@ -1,6 +1,7 @@
 import { readDmv, DmvReadResult, ReadDmvInput } from "./dmvReader.js";
 import { getLastAnthropicCallOutcome, type AnthropicReachabilityState } from "./anthropicReachability.js";
-import { getSourceChecks, type SourceChecks } from "./sourceReachability.js";
+import { getSourceChecks, NON_CONNECTOR_SOURCES, type SourceChecks } from "./sourceReachability.js";
+import { getConnectors } from "./connectors/index.js";
 
 // REQ-025/026 (STORY-012): a readiness check for the real production deploy,
 // distinct from GET /health's plain liveness ping (httpServer.ts), which stays
@@ -100,7 +101,9 @@ export async function checkDependencyHealth(
       lastCallAt: reachability?.at ?? null,
       ...(reachability?.errorClass ? { lastCallErrorClass: reachability.errorClass } : {}),
     },
-    sources: deps.sourceChecks ?? getSourceChecks(),
+    // Every registered connector (REQ-018) plus ntfy and Fly's API, so a new
+    // connector appears here with no edit to this file.
+    sources: deps.sourceChecks ?? getSourceChecks([...getConnectors().map((c) => c.reachabilityName), ...NON_CONNECTOR_SOURCES]),
   };
 
   cached = { report, expiresAt: nowMs + CACHE_TTL_MS };

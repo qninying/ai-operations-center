@@ -199,7 +199,7 @@ it was executed).
 
 ## Architecture decisions
 
-Fifteen ADRs, each with real alternatives considered and rejected, not just the
+Sixteen ADRs, each with real alternatives considered and rejected, not just the
 choice made:
 
 | ADR | Decision |
@@ -219,6 +219,7 @@ choice made:
 | [ADR-013](docs/ADR-013-real-postgres-remediation.md) | A second real execution path — a real Postgres blocking-query kill — over repurposing or renaming the existing demo Postgres container (rejected, breaks an unrelated working demo) or cloning the Docker case onto a second container (rejected, proves nothing new) |
 | [ADR-014](docs/ADR-014-mcp-roots-containment-order.md) | Resolve the real filesystem path first, compare against declared MCP roots second — the only order that closes a symlink or `../` traversal escape, verified against a real symlink and a real traversal attempt, not just reasoned about |
 | [ADR-015](docs/ADR-015-triage-semantic-cache-pgvector.md) | A dedicated pgvector container with local, in-process embeddings for near-duplicate incident matching, over a paid embeddings API (no per-call cost or new external failure mode) or skipping semantic matching entirely (misses the real near-duplicate pattern this tool actually sees) |
+| [ADR-016](docs/ADR-016-plugin-connector-architecture.md) | A read-only plug-in connector registry for data sources (one file plus one registry line to add a system; the feed, health report and Command Center read the registry), over dynamic folder loading (a stray file would silently go live) or a plugin framework (new dependency for a ~20-line contract); write paths deliberately stay hand-built and reviewed |
 
 The full architecture package — a written summary, layer diagrams, and a
 trust-boundary data-flow diagram — is in

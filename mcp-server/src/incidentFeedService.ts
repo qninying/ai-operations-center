@@ -1,9 +1,6 @@
-import { readDmv } from "./dmvReader.js";
-import { recordSourceCheck, type ReachabilitySource } from "./sourceReachability.js";
-import { readSsrsExecutionLog } from "./ssrsReader.js";
-import { queryLiveCloudBlob } from "./cloudBlobSource.js";
-import { checkSupersetHealth } from "./supersetHealthSource.js";
-import { queryPgActivity } from "./pgActivitySource.js";
+import { getConnectors, discoverWithTimeout, ConnectorTimeoutError } from "./connectors/index.js";
+import { recordCheckFailure, errorDetails } from "./connectors/sourceCheck.js";
+import type { DashboardIncident } from "./connectors/types.js";
 import { notifyOperators } from "./notificationService.js";
 import { isDemoModeEnabled } from "./demoModeGate.js";
 import { logEvent } from "./observability/logger.js";
@@ -30,18 +27,9 @@ import { safeLogEvent } from "./observability/safeLogEvent.js";
 // revealed/not-yet-revealed state, and the push for a given incident fires
 // exactly once, from here, regardless of how many times a client reloads.
 
-export type IncidentSource = "sql" | "cloud" | "ssrs" | "docker" | "postgres";
-export type IncidentSeverity = "warning" | "error" | "critical";
-
-export interface DashboardIncident {
-  id: string;
-  source: IncidentSource;
-  title: string;
-  detail: string;
-  severity: IncidentSeverity;
-  occurredAt: string;
-  sourceMode: "live" | "fallback";
-}
+// The incident shape and source types now live with the connector contract
+// (connectors/types.ts, REQ-018). Re-exported so existing imports keep working.
+export type { DashboardIncident, IncidentSeverity, IncidentSource } from "./connectors/types.js";
 
 interface TrackedIncident {
   incident: DashboardIncident;
@@ -62,213 +50,8 @@ function randomRevealDelay(): number {
   return MIN_REVEAL_DELAY_MS + Math.random() * (MAX_REVEAL_DELAY_MS - MIN_REVEAL_DELAY_MS);
 }
 
-// Same shape dmvReader.ts's readDmv() catch block already logs — errorClass alone
-// (what every catch block here logged before this fix) tells you a call failed,
-// never why, which is exactly what made the 2026-10-03 DEMO_TARGET=prod live
-// debugging session harder than it needed to be (see ADR-012's addendum and that
-// day's PROGRESS.md correction entry). Applied uniformly across all six catch
-// blocks below rather than fixed ad hoc per source.
-function errorDetails(error: unknown): { errorClass: string; message: string; cause: string | null } {
-  const err = error as { name?: string; message?: string; cause?: unknown };
-  return {
-    errorClass: err.name ?? "Error",
-    message: err.message ?? String(error),
-    cause: err.cause instanceof Error ? err.cause.message : err.cause != null ? String(err.cause) : null,
-  };
-}
-
-// Logs a source check AND records its real outcome for GET /health/dependencies
-// (sourceReachability.ts), so the public Command Center can show live status
-// from checks this feed already makes, with no extra probe. The feed calls
-// Apache Superset "docker" (its local-dev name); the health report says "superset".
-const REACHABILITY_NAME: Record<string, ReachabilitySource> = {
-  sql: "sql", ssrs: "ssrs", cloud: "cloud", postgres: "postgres", docker: "superset",
-};
-function logSourceCheck(entry: Parameters<typeof logEvent>[0]): void {
-  logEvent(entry);
-  const ctx = (entry.context ?? {}) as { source?: string; outcome?: string; sourceMode?: "live" | "fallback"; errorClass?: string };
-  const name = ctx.source ? REACHABILITY_NAME[ctx.source] : undefined;
-  if (name && (ctx.outcome === "success" || ctx.outcome === "failure")) {
-    recordSourceCheck(name, ctx.outcome, { sourceMode: ctx.sourceMode, errorClass: ctx.errorClass });
-  }
-}
-
-async function discoverSqlIncidents(): Promise<DashboardIncident[]> {
-  try {
-    const result = await readDmv({ dmvName: "sys.dm_exec_requests" });
-    logSourceCheck({
-      level: "info",
-      event: "incident_feed_source_check",
-      context: { source: "sql", outcome: "success", sourceMode: result.source, rowCount: result.rows.length },
-    });
-    return result.rows
-      .filter((row) => row.blocking_session_id && row.blocking_session_id !== 0)
-      .map((row) => ({
-        id: `sql:session:${row.session_id}`,
-        source: "sql" as const,
-        title: `Session ${row.session_id} blocked by session ${row.blocking_session_id}`,
-        detail: `${row.command} on ${row.database_name} — ${row.status}${row.wait_type ? " · " + row.wait_type : ""}`,
-        severity: "error" as const,
-        occurredAt: new Date().toISOString(),
-        sourceMode: result.source,
-      }));
-  } catch (error) {
-    logSourceCheck({
-      level: "error",
-      event: "incident_feed_source_check",
-      context: { source: "sql", outcome: "failure", ...errorDetails(error) },
-    });
-    // Re-thrown, not swallowed into []: tick()'s Promise.allSettled distinguishes
-    // "checked, genuinely clear" (fulfilled, empty array) from "couldn't check"
-    // (rejected) — collapsing both into [] would make tick()'s stale-incident
-    // pruning below treat a transient SQL Server outage as proof every previously
-    // active session cleared, silently hiding real incidents during an outage.
-    throw error;
-  }
-}
-
-async function discoverSsrsIncidents(): Promise<DashboardIncident[]> {
-  try {
-    const result = await readSsrsExecutionLog({ queryName: "ExecutionLog3" });
-    logSourceCheck({
-      level: "info",
-      event: "incident_feed_source_check",
-      context: { source: "ssrs", outcome: "success", sourceMode: result.source, rowCount: result.rows.length },
-    });
-    return result.rows.map((row, index) => ({
-      id: `ssrs:${row.report_path}:${row.time_start}:${index}`,
-      source: "ssrs" as const,
-      title: `SSRS report ${row.report_path} — ${row.status}`,
-      detail: `Run by ${row.user_name}, started ${row.time_start}`,
-      severity: "error" as const,
-      occurredAt: row.time_start,
-      sourceMode: result.source,
-    }));
-  } catch (error) {
-    logSourceCheck({
-      level: "error",
-      event: "incident_feed_source_check",
-      context: { source: "ssrs", outcome: "failure", ...errorDetails(error) },
-    });
-    throw error;
-  }
-}
-
-function normalizeCloudSeverity(raw: string): IncidentSeverity {
-  const lower = raw.toLowerCase();
-  if (lower === "critical") return "critical";
-  if (lower === "error") return "error";
-  return "warning";
-}
-
-async function discoverCloudIncidents(): Promise<DashboardIncident[]> {
-  try {
-    const records = await queryLiveCloudBlob();
-    logSourceCheck({
-      level: "info",
-      event: "incident_feed_source_check",
-      context: { source: "cloud", outcome: "success", recordCount: records.length },
-    });
-    return records.map((record, index) => ({
-      id: `cloud:${record.service}:${record.timestamp}:${index}`,
-      source: "cloud" as const,
-      title: `${record.service}: ${record.severity}`,
-      detail: record.message,
-      severity: normalizeCloudSeverity(record.severity),
-      occurredAt: record.timestamp,
-      sourceMode: "live" as const,
-    }));
-  } catch (error) {
-    // Cloud has no fixture-fallback (ADR-era decision: never present fixture
-    // data as a real cloud finding) — an unreachable Blob container means "can't
-    // check this source," same as SQL/SSRS's live-source failure path, not a
-    // finding of its own.
-    logSourceCheck({
-      level: "error",
-      event: "incident_feed_source_check",
-      context: { source: "cloud", outcome: "failure", ...errorDetails(error) },
-    });
-    throw error;
-  }
-}
-
-async function discoverDockerIncidents(): Promise<DashboardIncident[]> {
-  try {
-    await checkSupersetHealth();
-    logSourceCheck({ level: "info", event: "incident_feed_source_check", context: { source: "docker", outcome: "success" } });
-    return [];
-  } catch (error) {
-    // The one source where "unreachable" IS the incident, not just "can't
-    // check" — there's nothing else about Docker/Superset to evaluate.
-    logSourceCheck({
-      level: "warn",
-      event: "incident_feed_source_check",
-      context: { source: "docker", outcome: "failure", ...errorDetails(error) },
-    });
-    return [
-      {
-        id: "docker:superset",
-        source: "docker",
-        title: "Superset (dev-superset stack) unreachable",
-        detail: "Verify Docker Desktop is running and the dev-superset stack is up (mcp-server/dev-superset/).",
-        severity: "warning",
-        occurredAt: new Date().toISOString(),
-        sourceMode: "live",
-      },
-    ];
-  }
-}
-
-async function discoverPostgresIncidents(): Promise<DashboardIncident[]> {
-  try {
-    const rows = await queryPgActivity();
-    logSourceCheck({
-      level: "info",
-      event: "incident_feed_source_check",
-      context: { source: "postgres", outcome: "success", rowCount: rows.length },
-    });
-    return rows
-      .filter((row) => row.blocked_by.length > 0)
-      .map((row) => ({
-        id: `postgres:pid:${row.pid}`,
-        source: "postgres" as const,
-        title: `Backend ${row.pid} blocked by ${row.blocked_by[0]}`,
-        detail: `${row.query} on ${row.datname} — ${row.state}${row.wait_event_type ? " · " + row.wait_event_type : ""}`,
-        severity: "error" as const,
-        occurredAt: new Date().toISOString(),
-        sourceMode: "live" as const,
-      }));
-  } catch (error) {
-    // Unlike SQL/SSRS/Cloud's remote, sometimes-legitimately-unreachable
-    // dependencies, dev-postgres is a fully local, fully-controlled dev
-    // container (same reasoning pgActivitySource.ts's own header comment
-    // already gives for why it has no fixture-fallback) — unreachable here IS
-    // a real incident of its own, mirroring discoverDockerIncidents() below
-    // exactly, not just "can't check this source." Deliberately a fulfilled
-    // result (not re-thrown): a genuine, successful check that found the
-    // container down is real information, and tick()'s pruning below should
-    // treat it as such — if a real blocking-query incident was active when
-    // the container went down, this fixed id correctly replaces it as the
-    // one real problem to report, the same way Docker's single fixed id
-    // already works.
-    logSourceCheck({
-      level: "warn",
-      event: "incident_feed_source_check",
-      context: { source: "postgres", outcome: "failure", ...errorDetails(error) },
-    });
-    return [
-      {
-        id: "postgres:unreachable",
-        source: "postgres",
-        title: "Postgres (dev-postgres) unreachable",
-        detail: "Verify Docker Desktop is running and the dev-postgres container is up (mcp-server/dev-postgres/).",
-        severity: "warning",
-        occurredAt: new Date().toISOString(),
-        sourceMode: "live",
-      },
-    ];
-  }
-}
+// Each data source is a plug-in connector (connectors/, REQ-018 / ADR-016).
+// Every connector logs and records its own check; this feed only orchestrates.
 
 async function pushIncidentNotification(incident: DashboardIncident): Promise<void> {
   try {
@@ -291,14 +74,15 @@ async function pushIncidentNotification(incident: DashboardIncident): Promise<vo
 }
 
 async function tick(): Promise<void> {
-  const SOURCES: IncidentSource[] = ["sql", "ssrs", "cloud", "docker", "postgres"];
-  const settled = await Promise.allSettled([
-    discoverSqlIncidents(),
-    discoverSsrsIncidents(),
-    discoverCloudIncidents(),
-    discoverDockerIncidents(),
-    discoverPostgresIncidents(),
-  ]);
+  const connectors = getConnectors();
+  const settled = await Promise.allSettled(connectors.map((connector) => discoverWithTimeout(connector)));
+  // A hung connector never got to log its own failure; record it here so the
+  // log and GET /health/dependencies still show it as a failed check.
+  settled.forEach((r, i) => {
+    if (r.status === "rejected" && r.reason instanceof ConnectorTimeoutError) {
+      recordCheckFailure(connectors[i], r.reason);
+    }
+  });
   const discovered = settled
     .filter((r): r is PromiseFulfilledResult<DashboardIncident[]> => r.status === "fulfilled")
     .flatMap((r) => r.value);
@@ -310,7 +94,7 @@ async function tick(): Promise<void> {
   // transient SQL Server/SSRS/Cloud/Postgres outage silently prune every one
   // of that source's real active incidents out of the feed.
   const checkedSources = new Set(
-    settled.flatMap((r, i) => (r.status === "fulfilled" ? [SOURCES[i]] : []))
+    settled.flatMap((r, i) => (r.status === "fulfilled" ? [connectors[i].id] : []))
   );
 
   // An active, never-explicitly-resolved incident whose underlying condition
