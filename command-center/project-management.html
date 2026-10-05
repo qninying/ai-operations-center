@@ -37,7 +37,7 @@
     <p class="cc-page-desc">Releases and per-story status, straight from the plan and progress files.</p>
     <div id="cc-content">Loading…</div>
   </main>
-  <script src="assets/command-center.js?v=6"></script>
+  <script src="assets/command-center.js?v=7"></script>
   <script>
   (function () {
     const { esc, getParam } = CommandCenter;
@@ -99,7 +99,35 @@
       `;
     }
 
-    function renderList({ plan, progress, mode }) {
+    // Stories the repo tracks itself (docs/stories/), outside the platform's
+    // plan: progress comes from each story's own ticked acceptance criteria.
+    function renderRepoStories(inventory) {
+      const stories = ((inventory && inventory.repo_stories) || []).filter((s) => !s.tracked_by_platform);
+      if (!stories.length) return "";
+      const rows = stories.map((s) => {
+        const state = s.criteria_total && s.criteria_done === s.criteria_total ? "verified"
+          : s.criteria_done > 0 ? "partial" : "not_started";
+        const label = state === "verified" ? "Done" : state === "partial" ? "In progress" : (s.status || "Planned");
+        return `<tr>
+          <td>${esc(s.id)}</td>
+          <td>${esc(s.title)}<br><span style="color:var(--cc-muted); font-size:12px;"><code>${esc(s.file)}</code></span></td>
+          <td>${esc(s.satisfies.join(", ") || "—")}</td>
+          <td>${s.criteria_done} of ${s.criteria_total}</td>
+          <td>${CommandCenter.statusDot(state)}${esc(label)}</td>
+        </tr>`;
+      }).join("");
+      return `
+        <div class="cc-panel-box">
+          <h3 style="margin-top:0;">Self-scoped stories (from the repo)</h3>
+          <p style="color:var(--cc-muted); font-size:13px; margin-top:0;">Work planned and tracked in <code>docs/stories/</code> after the platform's plan. Progress is each story's own ticked acceptance criteria, read by <code>npm run inventory</code>. Nothing here is edited by hand.</p>
+          <table class="cc-table">
+            <thead><tr><th>ID</th><th>Title</th><th>Requirements</th><th>Criteria met</th><th>Status</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
+
+    function renderList({ plan, progress, mode, inventory }) {
       const el = document.getElementById("cc-content");
       const badge = CommandCenter.sampleBadge();
       const rows = (plan.stories || []).map((s) => {
@@ -124,7 +152,7 @@
             <tbody>${rows}</tbody>
           </table>
         </div>
-      `;
+      ` + renderRepoStories(inventory);
     }
 
     function renderDetail({ plan, progress, mode }, id) {

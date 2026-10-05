@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-05T17:08:20.084Z",
-  "git_sha": "995b364",
+  "generated_at": "2026-10-05T17:33:56.135Z",
+  "git_sha": "5c950d1",
   "note": "Generated from the code by mcp-server/scripts/generateRepoInventory.mjs. Describes what the repo contains, not whether anything is live right now.",
   "agents": [
     {
@@ -180,6 +180,801 @@
       ],
       "writes": [],
       "uses": []
+    }
+  ],
+  "requirements": [
+    {
+      "id": "REQ-002",
+      "kind": "Functional",
+      "priority": "must",
+      "statement": "The system must automatically detect, diagnose, correlate, and recommend actions without executing production changes.",
+      "fulfillment": "Fulfilled by: STORY-003",
+      "evidence": {
+        "code": [],
+        "tests": [],
+        "docs": [],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-003"
+      ],
+      "repo_status": "no_evidence"
+    },
+    {
+      "id": "REQ-003",
+      "kind": "Functional",
+      "priority": "must",
+      "statement": "The system must provide confidence scores for recommended actions.",
+      "fulfillment": "Fulfilled by: STORY-003",
+      "evidence": {
+        "code": [],
+        "tests": [],
+        "docs": [],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-003"
+      ],
+      "repo_status": "no_evidence"
+    },
+    {
+      "id": "REQ-004",
+      "kind": "Functional",
+      "priority": "must",
+      "statement": "The system must present evidence-backed reasoning for all recommendations.",
+      "fulfillment": "Fulfilled by: STORY-003",
+      "evidence": {
+        "code": [],
+        "tests": [],
+        "docs": [],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-003"
+      ],
+      "repo_status": "no_evidence"
+    },
+    {
+      "id": "REQ-010",
+      "kind": "Functional",
+      "priority": "must",
+      "statement": "The system must gather additional diagnostics when confidence is below 80%.",
+      "fulfillment": "Fulfilled by: STORY-004",
+      "evidence": {
+        "code": [
+          "mcp-server/src/diagnosticsGatherer.ts"
+        ],
+        "tests": [
+          "mcp-server/src/diagnosticsGatherer.test.ts"
+        ],
+        "docs": [
+          "docs/implementation-notes.md"
+        ],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-004"
+      ],
+      "repo_status": "built_and_tested"
+    },
+    {
+      "id": "REQ-011",
+      "kind": "Functional",
+      "priority": "must",
+      "statement": "The system must escalate incidents to a human when confidence is below 60%.",
+      "fulfillment": "Fulfilled by: STORY-009",
+      "evidence": {
+        "code": [
+          "mcp-server/src/escalationService.ts",
+          "mcp-server/src/httpServer.ts"
+        ],
+        "tests": [
+          "mcp-server/src/escalationService.test.ts"
+        ],
+        "docs": [
+          "docs/implementation-notes.md"
+        ],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-009"
+      ],
+      "repo_status": "built_and_tested"
+    },
+    {
+      "id": "REQ-013",
+      "kind": "Functional",
+      "priority": "must",
+      "statement": "The system must provide explainable AI recommendations for all users.",
+      "fulfillment": "Fulfilled by: STORY-006, STORY-007",
+      "evidence": {
+        "code": [
+          "mcp-server/src/cloudRecommendationService.ts",
+          "mcp-server/src/httpServer.ts",
+          "mcp-server/src/recommendationService.ts"
+        ],
+        "tests": [],
+        "docs": [],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-006",
+        "STORY-007"
+      ],
+      "repo_status": "built_partly"
+    },
+    {
+      "id": "REQ-001",
+      "kind": "Safety",
+      "priority": "must",
+      "statement": "The system must require human approval for any action that changes a production environment.",
+      "fulfillment": "Fulfilled by: STORY-001",
+      "evidence": {
+        "code": [
+          "guardrails/auditLog.ts",
+          "guardrails/remediationGuardrail.ts"
+        ],
+        "tests": [],
+        "docs": [
+          "docs/ADR-002-audit-trail-correlation-id-unification.md",
+          "docs/DATA_CONTRACT.md"
+        ],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-001"
+      ],
+      "repo_status": "built_partly"
+    },
+    {
+      "id": "REQ-015",
+      "kind": "Safety",
+      "priority": "must",
+      "statement": "The system must support rollback capabilities for low-risk, reversible tasks.",
+      "fulfillment": "Fulfilled by: STORY-011",
+      "evidence": {
+        "code": [
+          "mcp-server/src/httpServer.ts",
+          "mcp-server/src/rollbackService.ts"
+        ],
+        "tests": [
+          "mcp-server/src/rollbackService.test.ts"
+        ],
+        "docs": [],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-011"
+      ],
+      "repo_status": "built_and_tested"
+    },
+    {
+      "id": "REQ-019",
+      "kind": "Safety",
+      "priority": "should",
+      "statement": "The system must verify that an AI recommendation's cited evidence is real before presenting it as an actionable, approvable recommendation.",
+      "fulfillment": "Fulfilled directly, not through a platform story (this requirement was never",
+      "evidence": {
+        "code": [
+          "mcp-server/src/adversarialEval/probes.ts"
+        ],
+        "tests": [],
+        "docs": [
+          "docs/AI-GOVERNANCE-PROFILE.md",
+          "docs/FRAMEWORK-MAPPING.md",
+          "docs/adversarial-eval-design.md"
+        ],
+        "commits": [
+          {
+            "sha": "0d93433",
+            "subject": "Add an evidence grounding check, closing the confident-but-wrong gap (REQ-019)"
+          }
+        ]
+      },
+      "repo_stories": [],
+      "repo_status": "built_partly"
+    },
+    {
+      "id": "REQ-020",
+      "kind": "Safety",
+      "priority": "should",
+      "statement": "The system must verify that an AI recommendation's specific factual claims about cited evidence actually match what that evidence contains, not just that the citation exists.",
+      "fulfillment": "Fulfilled directly, not through a platform story (identified after the plan",
+      "evidence": {
+        "code": [
+          "mcp-server/src/adversarialEval/probes.ts"
+        ],
+        "tests": [],
+        "docs": [
+          "docs/FRAMEWORK-MAPPING.md",
+          "docs/adversarial-eval-design.md"
+        ],
+        "commits": [
+          {
+            "sha": "b2d46e9",
+            "subject": "Add structured claim verification, one level deeper than citation grounding (REQ-020)"
+          }
+        ]
+      },
+      "repo_stories": [],
+      "repo_status": "built_partly"
+    },
+    {
+      "id": "REQ-005",
+      "kind": "Safety",
+      "priority": "must",
+      "statement": "The system must log every decision and action for audit purposes.",
+      "fulfillment": "Fulfilled by: STORY-002",
+      "evidence": {
+        "code": [
+          "guardrails/auditLog.ts"
+        ],
+        "tests": [],
+        "docs": [
+          "docs/ADR-002-audit-trail-correlation-id-unification.md"
+        ],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-002"
+      ],
+      "repo_status": "built_partly"
+    },
+    {
+      "id": "REQ-014",
+      "kind": "Functional",
+      "priority": "should",
+      "statement": "The system must allow configuration of confidence thresholds for actions.",
+      "fulfillment": "Fulfilled directly, not through a platform story (this requirement was never",
+      "evidence": {
+        "code": [
+          "mcp-server/src/confidenceThresholds.ts",
+          "mcp-server/src/diagnosticsGatherer.ts",
+          "mcp-server/src/escalationService.ts",
+          "mcp-server/src/rootCauseAgent.ts"
+        ],
+        "tests": [
+          "mcp-server/src/confidenceThresholds.test.ts"
+        ],
+        "docs": [],
+        "commits": [
+          {
+            "sha": "feef5bb",
+            "subject": "Update capstone doc for REQ-014/REQ-017 closure and current test counts"
+          },
+          {
+            "sha": "c7082d7",
+            "subject": "Close REQ-014: make confidence thresholds configurable"
+          }
+        ]
+      },
+      "repo_stories": [],
+      "repo_status": "built_and_tested"
+    },
+    {
+      "id": "REQ-017",
+      "kind": "Non-functional",
+      "priority": "should",
+      "statement": "The system must reduce manual incident correlation across systems by 50-70%.",
+      "fulfillment": "Fulfilled directly, not through a platform story (this requirement was never",
+      "evidence": {
+        "code": [
+          "mcp-server/src/correlatedRecommendationService.ts",
+          "mcp-server/src/httpServer.ts"
+        ],
+        "tests": [
+          "mcp-server/src/correlatedRecommendationService.test.ts"
+        ],
+        "docs": [],
+        "commits": [
+          {
+            "sha": "feef5bb",
+            "subject": "Update capstone doc for REQ-014/REQ-017 closure and current test counts"
+          },
+          {
+            "sha": "a684890",
+            "subject": "Close REQ-017: real cross-system incident correlation"
+          }
+        ]
+      },
+      "repo_stories": [
+        "STORY-014"
+      ],
+      "repo_status": "built_target_unmeasured"
+    },
+    {
+      "id": "REQ-021",
+      "kind": "Safety",
+      "priority": "should",
+      "statement": "The system's LLM-driven recommendation and remediation pipeline must be tested against adversarial inputs (prompt injection, jailbreak attempts, PII extraction, hallucinated citations) with a repeatable evaluation suite, not a one-off manual check.",
+      "fulfillment": null,
+      "evidence": {
+        "code": [
+          "mcp-server/src/adversarialEval/runner.ts",
+          "mcp-server/src/adversarialEval/types.ts"
+        ],
+        "tests": [],
+        "docs": [
+          "docs/AI-GOVERNANCE-PROFILE.md",
+          "docs/FRAMEWORK-MAPPING.md"
+        ],
+        "commits": [
+          {
+            "sha": "d3e45fa",
+            "subject": "Complete REQ-021: direct injection, jailbreak, leakage/hallucination probes"
+          },
+          {
+            "sha": "1de5458",
+            "subject": "Add REQ-021 adversarial eval harness, indirect-injection category"
+          }
+        ]
+      },
+      "repo_stories": [],
+      "repo_status": "built_partly"
+    },
+    {
+      "id": "REQ-022",
+      "kind": "Safety",
+      "priority": "should",
+      "statement": "The system must have a written, reviewable risk-scoping artifact, declaring deployment context, data types handled, capabilities, and risk tier, independent of the code.",
+      "fulfillment": null,
+      "evidence": {
+        "code": [],
+        "tests": [],
+        "docs": [
+          "docs/AI-GOVERNANCE-PROFILE.md",
+          "docs/FRAMEWORK-MAPPING.md"
+        ],
+        "commits": [
+          {
+            "sha": "321535b",
+            "subject": "Add REQ-022: AI Governance Profile, a standalone risk-scoping artifact"
+          }
+        ]
+      },
+      "repo_stories": [],
+      "repo_status": "built_partly"
+    },
+    {
+      "id": "REQ-023",
+      "kind": "Safety",
+      "priority": "should",
+      "statement": "The system's existing guardrail and audit evidence must be explicitly mapped to at least one named regulatory framework (NIST AI RMF functions, at minimum), so a reviewer can see framework coverage without inferring it from source code.",
+      "fulfillment": null,
+      "evidence": {
+        "code": [],
+        "tests": [],
+        "docs": [
+          "docs/FRAMEWORK-MAPPING.md"
+        ],
+        "commits": [
+          {
+            "sha": "8253ed6",
+            "subject": "Add REQ-023: NIST AI RMF framework mapping, closes the governance gap review"
+          }
+        ]
+      },
+      "repo_stories": [],
+      "repo_status": "built_partly"
+    },
+    {
+      "id": "REQ-024",
+      "kind": "Safety",
+      "priority": "should",
+      "statement": "The system's live recommendation pipeline must carry a runtime signal for suspected manipulation in the model's own output, not only detect it retroactively inside an offline eval suite.",
+      "fulfillment": null,
+      "evidence": {
+        "code": [],
+        "tests": [],
+        "docs": [],
+        "commits": [
+          {
+            "sha": "f073083",
+            "subject": "REQ-024: live suspicion-check signal in the recommendation pipeline"
+          }
+        ]
+      },
+      "repo_stories": [],
+      "repo_status": "built_partly"
+    },
+    {
+      "id": "REQ-025",
+      "kind": "Constraint",
+      "priority": "must",
+      "statement": "The system must run in a real, internet-reachable production environment, built and deployed through a reproducible pipeline, not a developer's laptop.",
+      "fulfillment": "Fulfilled by: STORY-012",
+      "evidence": {
+        "code": [
+          ".github/workflows/deploy.yml",
+          "mcp-server/src/healthCheck.ts",
+          "mcp-server/src/httpServer.ts"
+        ],
+        "tests": [],
+        "docs": [
+          "docs/DEPLOYMENT.md"
+        ],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-012"
+      ],
+      "repo_status": "built_partly"
+    },
+    {
+      "id": "REQ-026",
+      "kind": "Safety",
+      "priority": "must",
+      "statement": "The system must support a live-verified rollback from a bad production deploy, with recovery bounded and measured, not merely claimed.",
+      "fulfillment": "Fulfilled by: STORY-012",
+      "evidence": {
+        "code": [
+          ".github/workflows/deploy.yml"
+        ],
+        "tests": [],
+        "docs": [
+          "docs/DEPLOYMENT.md",
+          "docs/INCIDENT-DRILL-001.md"
+        ],
+        "commits": [
+          {
+            "sha": "f7b9b8a",
+            "subject": "STORY-012: log the real incident/rollback drill (REQ-026)"
+          }
+        ]
+      },
+      "repo_stories": [
+        "STORY-012"
+      ],
+      "repo_status": "built_partly"
+    },
+    {
+      "id": "REQ-007",
+      "kind": "Constraint",
+      "priority": null,
+      "statement": "The system must support integration with SQL Server, SSIS, SSRS, and Windows servers.",
+      "fulfillment": "Fulfilled by: STORY-006",
+      "evidence": {
+        "code": [
+          "mcp-server/src/httpServer.ts",
+          "mcp-server/src/recommendationService.ts"
+        ],
+        "tests": [
+          "mcp-server/src/recommendationService.test.ts"
+        ],
+        "docs": [],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-006",
+        "STORY-015"
+      ],
+      "repo_status": "built_and_tested"
+    },
+    {
+      "id": "REQ-008",
+      "kind": "Constraint",
+      "priority": null,
+      "statement": "The system must support integration with cloud services and enterprise applications through standardized connectors.",
+      "fulfillment": "Fulfilled by: STORY-007",
+      "evidence": {
+        "code": [
+          "mcp-server/src/cloudBlobSource.ts",
+          "mcp-server/src/cloudRecommendationService.ts",
+          "mcp-server/src/httpServer.ts"
+        ],
+        "tests": [
+          "mcp-server/src/cloudRecommendationService.test.ts"
+        ],
+        "docs": [],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-007"
+      ],
+      "repo_status": "built_and_tested"
+    },
+    {
+      "id": "REQ-018",
+      "kind": "Constraint",
+      "priority": null,
+      "statement": "The system must provide a plug-in connector architecture for extensibility.",
+      "fulfillment": null,
+      "evidence": {
+        "code": [],
+        "tests": [],
+        "docs": [],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-013"
+      ],
+      "repo_status": "planned"
+    },
+    {
+      "id": "REQ-016",
+      "kind": "Functional",
+      "priority": "must",
+      "statement": "The system must provide continuous monitoring and AI-powered root cause analysis.",
+      "fulfillment": "Fulfilled by: STORY-008",
+      "evidence": {
+        "code": [
+          "mcp-server/src/httpServer.ts",
+          "mcp-server/src/monitoringService.ts"
+        ],
+        "tests": [],
+        "docs": [],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-008"
+      ],
+      "repo_status": "built_partly"
+    },
+    {
+      "id": "REQ-012",
+      "kind": "Safety",
+      "priority": "must",
+      "statement": "The system must notify operators immediately of any autonomous actions taken.",
+      "fulfillment": "Fulfilled by: STORY-010",
+      "evidence": {
+        "code": [
+          "mcp-server/src/escalationService.ts",
+          "mcp-server/src/monitoringService.ts",
+          "mcp-server/src/notificationService.ts"
+        ],
+        "tests": [
+          "mcp-server/src/notificationService.test.ts"
+        ],
+        "docs": [],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-010"
+      ],
+      "repo_status": "built_and_tested"
+    },
+    {
+      "id": "REQ-006",
+      "kind": "Functional",
+      "priority": "must",
+      "statement": "The system must provide role-based dashboards for different user types.",
+      "fulfillment": "Fulfilled by: STORY-005",
+      "evidence": {
+        "code": [
+          "frontend/src/App.tsx",
+          "mcp-server/src/dashboardSummary.ts",
+          "mcp-server/src/httpServer.ts"
+        ],
+        "tests": [
+          "frontend/src/App.test.tsx",
+          "mcp-server/src/dashboardSummary.test.ts"
+        ],
+        "docs": [],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-005"
+      ],
+      "repo_status": "built_and_tested"
+    },
+    {
+      "id": "REQ-009",
+      "kind": "Functional",
+      "priority": "must",
+      "statement": "The system must provide operational summaries for IT Managers and Engineering Leaders.",
+      "fulfillment": "Fulfilled by: STORY-005",
+      "evidence": {
+        "code": [
+          "frontend/src/App.tsx",
+          "mcp-server/src/dashboardSummary.ts",
+          "mcp-server/src/httpServer.ts"
+        ],
+        "tests": [],
+        "docs": [],
+        "commits": []
+      },
+      "repo_stories": [
+        "STORY-005"
+      ],
+      "repo_status": "built_partly"
+    }
+  ],
+  "repo_stories": [
+    {
+      "id": "STORY-000",
+      "title": "Build your Command Center",
+      "file": "docs/stories/STORY-000.md",
+      "satisfies": [],
+      "criteria_done": 0,
+      "criteria_total": 5,
+      "status": null,
+      "tracked_by_platform": true
+    },
+    {
+      "id": "STORY-001",
+      "title": "Implement human approval workflow for production changes",
+      "file": "docs/stories/STORY-001.md",
+      "satisfies": [
+        "REQ-001"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 3,
+      "status": null,
+      "tracked_by_platform": true
+    },
+    {
+      "id": "STORY-002",
+      "title": "Log all decisions and actions for audit purposes",
+      "file": "docs/stories/STORY-002.md",
+      "satisfies": [
+        "REQ-005"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 3,
+      "status": null,
+      "tracked_by_platform": true
+    },
+    {
+      "id": "STORY-003",
+      "title": "Implement AI-driven diagnostics and recommendations",
+      "file": "docs/stories/STORY-003.md",
+      "satisfies": [
+        "REQ-002",
+        "REQ-003",
+        "REQ-004"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 3,
+      "status": null,
+      "tracked_by_platform": true
+    },
+    {
+      "id": "STORY-004",
+      "title": "Gather additional diagnostics for low-confidence incidents",
+      "file": "docs/stories/STORY-004.md",
+      "satisfies": [
+        "REQ-010"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 3,
+      "status": null,
+      "tracked_by_platform": true
+    },
+    {
+      "id": "STORY-005",
+      "title": "Develop role-based dashboards for different user types",
+      "file": "docs/stories/STORY-005.md",
+      "satisfies": [
+        "REQ-006",
+        "REQ-009"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 3,
+      "status": null,
+      "tracked_by_platform": true
+    },
+    {
+      "id": "STORY-006",
+      "title": "Enable SQL Server data access for AI recommendations",
+      "file": "docs/stories/STORY-006.md",
+      "satisfies": [
+        "REQ-007",
+        "REQ-013"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 3,
+      "status": null,
+      "tracked_by_platform": true
+    },
+    {
+      "id": "STORY-007",
+      "title": "Enable cloud service data access for AI recommendations",
+      "file": "docs/stories/STORY-007.md",
+      "satisfies": [
+        "REQ-008",
+        "REQ-013"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 3,
+      "status": null,
+      "tracked_by_platform": true
+    },
+    {
+      "id": "STORY-008",
+      "title": "Enhance monitoring capabilities for continuous incident management",
+      "file": "docs/stories/STORY-008.md",
+      "satisfies": [
+        "REQ-016"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 3,
+      "status": null,
+      "tracked_by_platform": true
+    },
+    {
+      "id": "STORY-009",
+      "title": "Implement incident escalation based on confidence thresholds",
+      "file": "docs/stories/STORY-009.md",
+      "satisfies": [
+        "REQ-011"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 3,
+      "status": null,
+      "tracked_by_platform": true
+    },
+    {
+      "id": "STORY-010",
+      "title": "Notify operators of autonomous actions",
+      "file": "docs/stories/STORY-010.md",
+      "satisfies": [
+        "REQ-012"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 3,
+      "status": null,
+      "tracked_by_platform": true
+    },
+    {
+      "id": "STORY-011",
+      "title": "Implement rollback capabilities for low-risk tasks",
+      "file": "docs/stories/STORY-011.md",
+      "satisfies": [
+        "REQ-015"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 3,
+      "status": null,
+      "tracked_by_platform": true
+    },
+    {
+      "id": "STORY-012",
+      "title": "Deploy CoreOps to a real production environment and prove you can operate it",
+      "file": "docs/stories/STORY-012.md",
+      "satisfies": [
+        "REQ-025",
+        "REQ-026"
+      ],
+      "criteria_done": 4,
+      "criteria_total": 5,
+      "status": null,
+      "tracked_by_platform": false
+    },
+    {
+      "id": "STORY-013",
+      "title": "Turn the data sources into plug-in connectors",
+      "file": "docs/stories/STORY-013.md",
+      "satisfies": [
+        "REQ-018"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 5,
+      "status": "Planned",
+      "tracked_by_platform": false
+    },
+    {
+      "id": "STORY-014",
+      "title": "Measure whether CoreOps actually cuts manual correlation time",
+      "file": "docs/stories/STORY-014.md",
+      "satisfies": [
+        "REQ-017"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 4,
+      "status": "Planned",
+      "tracked_by_platform": false
+    },
+    {
+      "id": "STORY-015",
+      "title": "Make SSRS data live in production",
+      "file": "docs/stories/STORY-015.md",
+      "satisfies": [
+        "REQ-007"
+      ],
+      "criteria_done": 0,
+      "criteria_total": 4,
+      "status": "Planned",
+      "tracked_by_platform": false
     }
   ]
 }

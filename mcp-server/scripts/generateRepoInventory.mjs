@@ -22,6 +22,7 @@ import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from 
 import { join, dirname, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { buildRequirements } from "./repoRequirements.mjs";
 
 // File-name prefix -> the system(s) that file talks to. Labels only; whether a
 // file exists, and whether it reads or writes, is always derived from the repo.
@@ -81,7 +82,7 @@ export function leadingComment(source) {
   return firstSentences ? (firstSentences[1] + (firstSentences[3] ? " " + firstSentences[3] : "")).trim() : text.slice(0, 240);
 }
 
-export function buildInventory(repoRoot, { now = new Date(), gitSha = null } = {}) {
+export function buildInventory(repoRoot, { now = new Date(), gitSha = null, includeRequirements = true } = {}) {
   const srcDir = join(repoRoot, "mcp-server", "src");
   const files = readdirSync(srcDir).filter(isCodeFile).sort();
   const read = (f) => readFileSync(join(srcDir, f), "utf8");
@@ -147,6 +148,12 @@ export function buildInventory(repoRoot, { now = new Date(), gitSha = null } = {
     agents,
     mcp_tools,
     systems,
+    // Every requirement in docs/REQUIREMENTS.md and every story in docs/stories/,
+    // with repo evidence. See repoRequirements.mjs.
+    ...(includeRequirements ? (() => {
+      const { requirements, stories } = buildRequirements(repoRoot);
+      return { requirements, repo_stories: stories };
+    })() : {}),
   };
 }
 
@@ -167,6 +174,7 @@ if (isMain) {
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify(inventory, null, 2) + "\n");
   console.log(
-    `Wrote ${outPath}: ${inventory.agents.length} AI agents, ${inventory.mcp_tools.length} MCP tools, ${inventory.systems.length} systems`
+    `Wrote ${outPath}: ${inventory.agents.length} AI agents, ${inventory.mcp_tools.length} MCP tools, ${inventory.systems.length} systems, ` +
+      `${(inventory.requirements || []).length} requirements, ${(inventory.repo_stories || []).length} repo stories`
   );
 }

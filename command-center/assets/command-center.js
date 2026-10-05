@@ -138,8 +138,9 @@ function verificationForRequirement(plan, progress, req) {
 }
 
 function statusDot(state) {
-  const cls = state === "verified" || state === "enforced" ? "cc-dot-ok"
-    : state === "error" ? "cc-dot-error" : "";
+  const cls = state === "verified" || state === "enforced" || state === "built_and_tested" ? "cc-dot-ok"
+    : state === "error" || state === "no_evidence" ? "cc-dot-error"
+    : state === "built_partly" || state === "built_target_unmeasured" || state === "partial" ? "cc-dot-warn" : "";
   return `<span class="cc-dot ${cls}"></span>`;
 }
 
@@ -213,8 +214,61 @@ function storyOwners(plan) {
   return [...byName.values()];
 }
 
+// Every requirement that exists: the plan's, plus any the repo's own
+// docs/REQUIREMENTS.md adds (from the generated inventory). Plan entries keep
+// their plan fields; repo-only ones are marked source: "repo".
+function allRequirements(plan, inventory) {
+  const planReqs = ((plan && plan.requirements) || []).map((r) => ({ ...r, source: "plan" }));
+  const seen = new Set(planReqs.map((r) => r.id));
+  const repoOnly = ((inventory && inventory.requirements) || [])
+    .filter((r) => !seen.has(r.id))
+    .map((r) => ({
+      id: r.id, statement: r.statement, priority: r.priority || "constraint",
+      kind: r.kind, fulfilled_by: [], source: "repo",
+    }));
+  return [...planReqs, ...repoOnly].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+const REPO_STATUS_LABEL = {
+  built_and_tested: "Built outside the plan: code and tests in the repo",
+  built_partly: "Built outside the plan: evidence in code, docs or commits",
+  built_target_unmeasured: "Capability built; target not measured yet",
+  planned: "Planned: a repo story covers it, not started",
+  documented_only: "Documented only",
+  no_evidence: "Not built: no evidence in the repo",
+};
+
+// One honest status per requirement. A platform story (progress.json) wins
+// when the plan has one; otherwise the repo's own evidence speaks, labelled as
+// such, so work done after the platform's tracking still shows without anyone
+// editing plan.json by hand.
+function requirementStatus(plan, progress, inventory, req) {
+  const v = verificationForRequirement(plan, progress, req);
+  const repo = ((inventory && inventory.requirements) || []).find((r) => r.id === (req && req.id)) || null;
+  if (v.state !== "unfulfilled") {
+    const label = v.state === "enforced" ? "Verified by the platform" : v.state === "partial" ? "Partly verified by the platform" : "Not verified yet";
+    return { state: v.state, label, stories: v.stories, repo };
+  }
+  if (!repo) return { state: "no_evidence", label: "No platform story, and not in the repo's requirements", stories: [], repo: null };
+  return { state: repo.repo_status, label: REPO_STATUS_LABEL[repo.repo_status] || repo.repo_status, stories: [], repo };
+}
+
+// Short, linkable summary of a requirement's repo evidence for tables.
+function evidenceSummary(repo) {
+  if (!repo) return "";
+  const e = repo.evidence || {};
+  const parts = [];
+  if ((e.code || []).length) parts.push(`${e.code.length} code`);
+  if ((e.tests || []).length) parts.push(`${e.tests.length} test`);
+  if ((e.docs || []).length) parts.push(`${e.docs.length} doc`);
+  if ((e.commits || []).length) parts.push(`${e.commits.length} commit`);
+  if ((repo.repo_stories || []).length) parts.push(repo.repo_stories.join(", "));
+  return parts.join(" · ");
+}
+
 window.CommandCenter = {
   TABS, getMode, setMode, loadData, formatDataAsOf, renderChrome, sampleBadge, demoReleaseLabel, storyOwners,
+  allRequirements, requirementStatus, evidenceSummary,
   init, getParam, esc: escapeHtml, verificationForRequirement, statusDot,
   getTheme, setTheme,
 };

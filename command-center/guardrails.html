@@ -30,7 +30,7 @@
     <p class="cc-page-desc">The promises this system makes — and whether anything in the build currently enforces each one.</p>
     <div id="cc-content">Loading…</div>
   </main>
-  <script src="assets/command-center.js?v=6"></script>
+  <script src="assets/command-center.js?v=7"></script>
   <script>
   (function () {
     const { esc, getParam, statusDot } = CommandCenter;
@@ -40,6 +40,20 @@
     // so the shape of a finished build is visible without faking real progress data.
     const SAMPLE_STATES = { "REQ-001": "enforced", "REQ-005": "partial", "REQ-012": "not_enforced", "REQ-015": "enforced" };
 
+    // Plan guardrails plus safety requirements the repo added after the plan.
+    function allGuardrails(plan, inventory) {
+      const fromPlan = ((plan.derived && plan.derived.guardrails) || []).map((g) => ({ ...g, source: "plan" }));
+      const seen = new Set(fromPlan.map((g) => g.id));
+      const fromRepo = CommandCenter.allRequirements(plan, inventory)
+        .filter((r) => r.source === "repo" && /safety/i.test(r.kind || "") && !seen.has(r.id))
+        .map((r) => ({ id: r.id, statement: r.statement, source: "repo" }));
+      return [...fromPlan, ...fromRepo];
+    }
+
+    function findReq(plan, inventory, id) {
+      return CommandCenter.allRequirements(plan, inventory).find((r) => r.id === id);
+    }
+
     function statusLabel(state) {
       if (state === "enforced") return "Enforced";
       if (state === "partial") return "Partially enforced";
@@ -47,44 +61,50 @@
       return "No story fulfils this yet";
     }
 
-    function renderList({ plan, progress, mode }) {
+    function renderList({ plan, progress, mode, inventory }) {
       const el = document.getElementById("cc-content");
-      const guardrails = (plan.derived && plan.derived.guardrails) || [];
-      const requirements = plan.requirements || [];
       const badge = CommandCenter.sampleBadge();
-      el.innerHTML = `<div class="cc-grid">` + guardrails.map((g) => {
-        const req = requirements.find((r) => r.id === g.id);
-        const real = CommandCenter.verificationForRequirement(plan, progress, req);
-        const state = mode === "sample" ? (SAMPLE_STATES[g.id] || real.state) : real.state;
+      el.innerHTML = `<div class="cc-grid">` + allGuardrails(plan, inventory).map((g) => {
+        const real = CommandCenter.requirementStatus(plan, progress, inventory, findReq(plan, inventory, g.id));
+        const useSample = mode === "sample" && SAMPLE_STATES[g.id];
+        const state = useSample ? SAMPLE_STATES[g.id] : real.state;
+        const label = useSample ? statusLabel(state) : real.label;
         return `
           <a class="cc-card" href="guardrails.html?id=${encodeURIComponent(g.id)}">
-            <h3>${statusDot(state)}${esc(g.id)}${badge}</h3>
+            <h3>${statusDot(state)}${esc(g.id)}${useSample ? badge : ""}</h3>
+            <p><span class="cc-tag">${g.source === "plan" ? "plan" : "repo only"}</span></p>
             <p>${esc(g.statement)}</p>
-            <p style="margin-top:8px; font-weight:600;">${statusLabel(state)}</p>
+            <p style="margin-top:8px; font-weight:600;">${esc(label)}</p>
           </a>
         `;
       }).join("") + `</div>`;
     }
 
-    function renderDetail({ plan, progress, mode }, id) {
+    function renderDetail({ plan, progress, mode, inventory }, id) {
       const el = document.getElementById("cc-content");
-      const guardrails = (plan.derived && plan.derived.guardrails) || [];
-      const g = guardrails.find((x) => x.id === id);
+      const g = allGuardrails(plan, inventory).find((x) => x.id === id);
       if (!g) {
         el.innerHTML = `<div class="cc-empty-state">No guardrail "${esc(id)}" in the plan.</div>`;
         return;
       }
-      const req = (plan.requirements || []).find((r) => r.id === g.id);
-      const v = CommandCenter.verificationForRequirement(plan, progress, req);
-      const badge = CommandCenter.sampleBadge();
-      const displayState = mode === "sample" ? (SAMPLE_STATES[g.id] || v.state) : v.state;
+      const v = CommandCenter.requirementStatus(plan, progress, inventory, findReq(plan, inventory, g.id));
+      const useSample = mode === "sample" && SAMPLE_STATES[g.id];
+      const badge = useSample ? CommandCenter.sampleBadge() : "";
+      const displayState = useSample ? SAMPLE_STATES[g.id] : v.state;
+      const repoEvidence = v.repo && v.repo.evidence ? v.repo.evidence : null;
+      const evidenceHtml = repoEvidence ? `
+          <h4>Evidence in the repo</h4>
+          <ul style="font-size:13px;">
+            ${[...repoEvidence.code, ...repoEvidence.tests, ...repoEvidence.docs].map((f) => `<li><code>${esc(f)}</code></li>`).join("")}
+            ${(repoEvidence.commits || []).map((c) => `<li>commit <code>${esc(c.sha)}</code> ${esc(c.subject)}</li>`).join("")}
+          </ul>` : "";
       el.innerHTML = `
         <p><a href="guardrails.html">← Guardrails</a></p>
         <div class="cc-panel-box">
-          <p style="margin:0 0 4px; color:var(--cc-muted); font-size:12px; text-transform:uppercase;">${statusDot(displayState)}${esc(g.id)} · ${statusLabel(displayState)}${badge}</p>
+          <p style="margin:0 0 4px; color:var(--cc-muted); font-size:12px; text-transform:uppercase;">${statusDot(displayState)}${esc(g.id)} · ${esc(useSample ? statusLabel(displayState) : v.label)}${badge}</p>
           <p style="margin:0 0 16px; font-size:15px;">${esc(g.statement)}</p>
           ${v.stories.length === 0
-            ? `<p style="color:var(--cc-muted);">A guardrail whose stories are not verified is a promise made and not yet kept — and this one has no story mapped to it in the plan at all yet, so nothing enforces it.</p>`
+            ? `<p style="color:var(--cc-muted);">No platform story covers this guardrail, so its status comes from the repo's own evidence below.</p>${evidenceHtml}`
             : `<table class="cc-table"><thead><tr><th>Story</th><th>Title</th><th>State</th></tr></thead><tbody>` +
               v.stories.map((s) => `<tr><td>${esc(s.id)}</td><td>${esc(s.title)}</td><td>${statusDot(s.state)}${esc(s.state)}</td></tr>`).join("") +
               `</tbody></table>`}

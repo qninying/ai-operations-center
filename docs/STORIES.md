@@ -70,3 +70,27 @@ postmortem.
 - **[STORY-012](stories/STORY-012.md)**: Deploy CoreOps to a real production
   environment and prove you can operate it _(waits on STORY-001, STORY-002,
   STORY-009, STORY-011)_
+
+## r6 · Close the remaining requirement gaps (self-scoped)
+
+Added 2026-10-05 after a requirements audit compared every requirement in
+`docs/REQUIREMENTS.md` against evidence in the code, tests, docs and commit
+history. Every platform story (STORY-000 to STORY-011) is verified. These are
+the requirements that still had no evidence, or whose target was never measured.
+Tracked in these docs only, like r5.
+
+**Goal:** No requirement is left without either evidence it's met or an honest,
+measured result saying it isn't.
+**Done when you can show:** REQ-018 enforced by code and tests, REQ-017 measured
+against the JIRA baseline, and SSRS live in production.
+
+- **[STORY-013](stories/STORY-013.md)**: Turn the data sources into plug-in
+  connectors _(REQ-018; no blockers)_
+- **[STORY-014](stories/STORY-014.md)**: Measure whether CoreOps actually cuts
+  manual correlation time _(REQ-017; waits on access to a real team's tickets)_
+- **[STORY-015](stories/STORY-015.md)**: Make SSRS data live in production
+  _(REQ-007; no blockers, configuration only)_
+
+STORY-012's last open criterion (a second engineer deploying and rolling back
+from `docs/DEPLOYMENT.md` alone) is still open too. It needs another person, not
+code, so it stays on STORY-012 rather than becoming a new story.

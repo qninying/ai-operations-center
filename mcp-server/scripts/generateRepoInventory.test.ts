@@ -7,7 +7,7 @@ import { buildInventory, leadingComment } from "./generateRepoInventory.mjs";
 let root: string;
 const src = () => join(root, "mcp-server", "src");
 const write = (file: string, body: string) => writeFileSync(join(src(), file), body);
-const FIXED = { now: new Date("2026-10-05T12:00:00Z"), gitSha: "abc1234" };
+const FIXED = { now: new Date("2026-10-05T12:00:00Z"), gitSha: "abc1234", includeRequirements: false };
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "inventory-"));
