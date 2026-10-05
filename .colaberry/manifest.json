@@ -24,7 +24,7 @@
     },
     {
       "path": "artifacts/INDEX.md",
-      "sha256": "7889f7deaeb5692e481350369d6def43027f4ae26c69185a84953d4a6df4cc28"
+      "sha256": "9fb4cbea0819c8151d3f2613dfe5ba2a2a00f17a1f45ea185a06be1420e336b8"
     },
     {
       "path": "artifacts/week-01/workflow-diagram.pdf",
@@ -57,6 +57,10 @@
     {
       "path": "artifacts/week-06/progress-log-notification-framework.docx",
       "sha256": "2c2a3bb0edee2f8ec1a8c8dc41233fcd1e2d0161ea396ebf3cdddf5c46396ca5"
+    },
+    {
+      "path": "artifacts/week-07/multi-agent-coordination-plan.docx",
+      "sha256": "d6f2a5639aace6ef050504f5e6db60ffce180a231637a2e6caf971d51a9c2197"
     },
     {
       "path": "artifacts/week-07/specialized-subagent-design.csv",
