@@ -13,7 +13,7 @@
   })();
 </script>
 <title>CoreOps — AI Agents</title>
-<link rel="stylesheet" href="assets/command-center.css?v=2" />
+<link rel="stylesheet" href="assets/command-center.css?v=3" />
 </head>
 <body>
   <header class="cc-header">
@@ -27,10 +27,10 @@
   </header>
   <main id="cc-main">
     <h1 class="cc-page-title">AI Agents</h1>
-    <p class="cc-page-desc">The plan doesn't carry a scoped agent roster yet, so this tab is built from who owns each story — owners, not agents.</p>
+    <p class="cc-page-desc">What the code actually contains: the AI agents that call Claude, and the MCP tools other agents can call. Generated from the repo by <code>npm run inventory</code>, so it can't drift from the build. Story owners from the plan are listed below.</p>
     <div id="cc-content">Loading…</div>
   </main>
-  <script src="assets/command-center.js?v=4"></script>
+  <script src="assets/command-center.js?v=6"></script>
   <script>
   (function () {
     const { esc, getParam } = CommandCenter;
@@ -43,12 +43,36 @@
       "System": ["incident-correlation"],
     };
 
-    function renderList({ plan, mode }) {
+    function renderRepoSection(inventory) {
+      if (!inventory) {
+        return `<div class="cc-empty-state">No repo inventory yet. Run <code>npm run inventory</code> in mcp-server/ to generate command-center/data/repo-inventory.json.</div>`;
+      }
+      const asOf = new Date(inventory.generated_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+      const agents = inventory.agents || [];
+      const tools = inventory.mcp_tools || [];
+      return `
+        <p style="color:var(--cc-muted); font-size:13px;">From the code at commit ${esc(inventory.git_sha || "unknown")}, generated ${esc(asOf)}. This says what exists in the repo, not whether it is running right now.</p>
+        <h2 class="cc-section-title">AI agents in the code (${agents.length})</h2>
+        <div class="cc-grid">` + (agents.length ? agents.map((a) => `
+          <div class="cc-card">
+            <h3>${esc(a.name)}</h3>
+            <p>${esc(a.description || "No description comment in the file.")}</p>
+            <p style="margin-top:8px; color: var(--cc-muted); font-size:12px;"><code>${esc(a.file)}</code> · ${a.has_tests ? "has tests" : "no test file"} · calls Claude</p>
+          </div>`).join("") : `<div class="cc-empty-state">No file in mcp-server/src calls Claude.</div>`) + `</div>
+        <h2 class="cc-section-title">MCP tools other agents can call (${tools.length})</h2>
+        <table class="cc-table">
+          <thead><tr><th>Tool</th><th>What it does</th><th>Defined in</th></tr></thead>
+          <tbody>${tools.map((tl) => `<tr><td><code>${esc(tl.name)}</code></td><td>${esc(tl.title)}</td><td><code>${esc(tl.file)}</code></td></tr>`).join("")}</tbody>
+        </table>`;
+    }
+
+    function renderList({ plan, mode, inventory }) {
       const el = document.getElementById("cc-content");
-      const owners = (plan.derived && plan.derived.owners) || [];
+      const owners = CommandCenter.storyOwners(plan);
       const badge = CommandCenter.sampleBadge();
-      el.innerHTML = `
-        <div class="cc-banner">These are story owners, not scoped AI agents — the plan has no agent roster to show yet.</div>
+      el.innerHTML = renderRepoSection(inventory) + `
+        <h2 class="cc-section-title">Story owners from the plan</h2>
+        ` + (owners.length ? `<div class="cc-banner">These are the people or roles who own stories in the plan. They are owners, not AI agents.</div>` : `<div class="cc-empty-state">The plan doesn't list story owners.</div>`) + `
         <div class="cc-grid">` + owners.map((o) => {
           const skills = mode === "sample" ? (SAMPLE_SKILLS[o.name] || []) : [];
           const skillsText = mode === "sample"
@@ -66,7 +90,7 @@
 
     function renderDetail({ plan, progress, mode }, id) {
       const el = document.getElementById("cc-content");
-      const owners = (plan.derived && plan.derived.owners) || [];
+      const owners = CommandCenter.storyOwners(plan);
       const owner = owners.find((o) => o.name === id);
       if (!owner) {
         el.innerHTML = `<div class="cc-empty-state">No owner "${esc(id)}" in the plan.</div>`;

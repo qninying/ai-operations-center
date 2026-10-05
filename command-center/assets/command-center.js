@@ -66,7 +66,11 @@ async function loadData() {
     fetchJson("../.colaberry/progress.json").catch(() => null),
     fetchJson("../.colaberry/manifest.json").catch(() => null),
   ]);
-  return { plan, progress, manifest };
+  // Generated from the code by `npm run inventory` (mcp-server/scripts/
+  // generateRepoInventory.mjs): what the repo actually contains, alongside what
+  // the plan names. null when it hasn't been generated, and pages say so.
+  const inventory = await fetchJson("data/repo-inventory.json").catch(() => null);
+  return { plan, progress, manifest, inventory };
 }
 
 function formatDataAsOf(manifest) {
@@ -176,18 +180,41 @@ function renderChrome(activeTabId, dataAsOf) {
 }
 
 // init(tabId, renderFn): fetches data, renders shared chrome, then calls
-// renderFn({ plan, progress, manifest, mode }) to render the page's own content.
+// renderFn({ plan, progress, manifest, inventory, mode }) to render the page's own content.
 async function init(tabId, renderFn) {
-  const { plan, progress, manifest } = await loadData();
+  const { plan, progress, manifest, inventory } = await loadData();
   const dataAsOf = formatDataAsOf(manifest);
   renderChrome(tabId, dataAsOf);
   if (renderFn) {
-    renderFn({ plan, progress, manifest, mode: getMode(), dataAsOf });
+    renderFn({ plan, progress, manifest, inventory, mode: getMode(), dataAsOf });
   }
 }
 
+// The plan's schema_version 2 sends demo_release_key: null when no release is
+// marked as the demo target. Calling .toUpperCase() on it threw and left Overview
+// and Project Management stuck on "Loading…" (found 2026-10-05). Returns an
+// escaped "(release R2)" fragment, or "" when no demo release is set.
+function demoReleaseLabel(schedule) {
+  const key = schedule && schedule.demo_release_key;
+  return key ? `(release ${escapeHtml(String(key).toUpperCase())})` : "";
+}
+
+// plan.derived.owners isn't in schema_version 2; every story carries owner_agent
+// instead. Use derived.owners when the platform sends it, otherwise group stories
+// by owner_agent, so owners come from the plan either way rather than being blank.
+function storyOwners(plan) {
+  if (plan && plan.derived && Array.isArray(plan.derived.owners)) return plan.derived.owners;
+  const byName = new Map();
+  for (const s of (plan && plan.stories) || []) {
+    if (!s.owner_agent) continue;
+    if (!byName.has(s.owner_agent)) byName.set(s.owner_agent, { name: s.owner_agent, owns: [] });
+    byName.get(s.owner_agent).owns.push(s.id);
+  }
+  return [...byName.values()];
+}
+
 window.CommandCenter = {
-  TABS, getMode, setMode, loadData, formatDataAsOf, renderChrome, sampleBadge,
+  TABS, getMode, setMode, loadData, formatDataAsOf, renderChrome, sampleBadge, demoReleaseLabel, storyOwners,
   init, getParam, esc: escapeHtml, verificationForRequirement, statusDot,
   getTheme, setTheme,
 };

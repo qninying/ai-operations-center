@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-05T16:58:48.233Z",
+  "git_sha": "38e3edc",
+  "note": "Generated from the code by mcp-server/scripts/generateRepoInventory.mjs. Describes what the repo contains, not whether anything is live right now.",
+  "agents": [
+    {
+      "name": "Diagnostics Gatherer",
+      "file": "mcp-server/src/diagnosticsGatherer.ts",
+      "description": "When the root-cause confidence is under 80%, gathers more diagnostics and asks Claude again. Under 60%, the incident escalates to a person.",
+      "has_tests": true
+    },
+    {
+      "name": "Root Cause Analysis Agent",
+      "file": "mcp-server/src/rootCauseAgent.ts",
+      "description": "Asks Claude why correlated failures happened, using live read-only evidence. Returns a root cause, a confidence score and the evidence IDs it cited. Every citation is checked against the evidence it was actually given.",
+      "has_tests": true
+    }
+  ],
+  "mcp_tools": [
+    {
+      "name": "check_postgres_backend_blocked",
+      "title": "Check Postgres backend blocked status",
+      "file": "mcp-server/src/mcpServerFactory.ts"
+    },
+    {
+      "name": "read_diagnostic_log_file",
+      "title": "Read diagnostic log file",
+      "file": "mcp-server/src/mcpServerFactory.ts"
+    },
+    {
+      "name": "read_sql_server_dmv",
+      "title": "Read SQL Server DMV",
+      "file": "mcp-server/src/mcpServerFactory.ts"
+    },
+    {
+      "name": "read_ssrs_execution_log",
+      "title": "Read SSRS execution log",
+      "file": "mcp-server/src/mcpServerFactory.ts"
+    },
+    {
+      "name": "run_diagnostic_query",
+      "title": "Run diagnostic query (stub)",
+      "file": "mcp-server/src/mcpServerFactory.ts"
+    },
+    {
+      "name": "triage_active_incidents",
+      "title": "Triage active incidents",
+      "file": "mcp-server/src/mcpServerFactory.ts"
+    }
+  ],
+  "systems": [
+    {
+      "name": "Anthropic Claude API",
+      "reads": [],
+      "writes": [],
+      "uses": [
+        {
+          "files": [
+            "mcp-server/src/diagnosticsGatherer.ts",
+            "mcp-server/src/rootCauseAgent.ts"
+          ],
+          "does": "Root-cause reasoning and follow-up diagnostics (the two AI agents)"
+        }
+      ]
+    },
+    {
+      "name": "Apache Superset",
+      "reads": [
+        {
+          "file": "mcp-server/src/supersetHealthSource.ts",
+          "does": "Checks Apache Superset's health endpoint",
+          "has_tests": true,
+          "fixture_fallback": null
+        }
+      ],
+      "writes": [
+        {
+          "file": "mcp-server/src/dockerExecutor.ts",
+          "does": "Restarts the PostgreSQL or Apache Superset service, after human approval, then confirms it is back",
+          "has_tests": true,
+          "fixture_fallback": null
+        }
+      ],
+      "uses": []
+    },
+    {
+      "name": "Fly.io Machines API",
+      "reads": [],
+      "writes": [
+        {
+          "file": "mcp-server/src/flyMachinesExecutor.ts",
+          "does": "Restarts a Fly.io machine (the production path for the restarts above)",
+          "has_tests": true,
+          "fixture_fallback": null
+        }
+      ],
+      "uses": []
+    },
+    {
+      "name": "ntfy push notifications",
+      "reads": [],
+      "writes": [],
+      "uses": [
+        {
+          "files": [
+            "mcp-server/src/notificationService.ts"
+          ],
+          "does": "Pages operators about new incidents and actions"
+        }
+      ]
+    },
+    {
+      "name": "PostgreSQL",
+      "reads": [
+        {
+          "file": "mcp-server/src/pgActivitySource.ts",
+          "does": "Reads pg_stat_activity and pg_blocking_pids() to find blocked sessions",
+          "has_tests": true,
+          "fixture_fallback": null
+        },
+        {
+          "file": "mcp-server/src/pgBackendStatusSource.ts",
+          "does": "Reads whether one Postgres backend is blocked (MCP tool)",
+          "has_tests": true,
+          "fixture_fallback": null
+        }
+      ],
+      "writes": [
+        {
+          "file": "mcp-server/src/dockerExecutor.ts",
+          "does": "Restarts the PostgreSQL or Apache Superset service, after human approval, then confirms it is back",
+          "has_tests": true,
+          "fixture_fallback": null
+        },
+        {
+          "file": "mcp-server/src/pgRemediationExecutor.ts",
+          "does": "Ends one blocking Postgres session (pg_terminate_backend), after human approval",
+          "has_tests": true,
+          "fixture_fallback": null
+        }
+      ],
+      "uses": []
+    },
+    {
+      "name": "SQL Server",
+      "reads": [
+        {
+          "file": "mcp-server/src/dmvLiveSource.ts",
+          "does": "Reads SQL Server DMVs (blocking sessions, active requests)",
+          "has_tests": true,
+          "fixture_fallback": "mcp-server/src/dmvFixtures.ts"
+        }
+      ],
+      "writes": [],
+      "uses": []
+    },
+    {
+      "name": "SSIS",
+      "reads": [
+        {
+          "file": "mcp-server/src/cloudBlobSource.ts",
+          "does": "Reads SSIS package-run and cloud diagnostic records from Azure Blob Storage",
+          "has_tests": true,
+          "fixture_fallback": null
+        }
+      ],
+      "writes": [],
+      "uses": []
+    },
+    {
+      "name": "SSRS",
+      "reads": [
+        {
+          "file": "mcp-server/src/ssrsLiveSource.ts",
+          "does": "Reads the SSRS ExecutionLog3 report-run history",
+          "has_tests": true,
+          "fixture_fallback": "mcp-server/src/ssrsFixtures.ts"
+        }
+      ],
+      "writes": [],
+      "uses": []
+    }
+  ]
+}

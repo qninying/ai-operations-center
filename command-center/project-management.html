@@ -13,7 +13,7 @@
   })();
 </script>
 <title>CoreOps — Project Management</title>
-<link rel="stylesheet" href="assets/command-center.css?v=2" />
+<link rel="stylesheet" href="assets/command-center.css?v=3" />
 <style>
   .cc-gantt-row { display: flex; align-items: center; margin-bottom: 10px; font-size: 12px; }
   .cc-gantt-label { width: 220px; flex-shrink: 0; color: var(--cc-muted); }
@@ -37,7 +37,7 @@
     <p class="cc-page-desc">Releases and per-story status, straight from the plan and progress files.</p>
     <div id="cc-content">Loading…</div>
   </main>
-  <script src="assets/command-center.js?v=4"></script>
+  <script src="assets/command-center.js?v=6"></script>
   <script>
   (function () {
     const { esc, getParam } = CommandCenter;
@@ -93,7 +93,7 @@
             </div>
           </div>
           <p style="color:var(--cc-muted); font-size:12px; margin-top:12px;">
-            Build ${esc(build_start)} → ${esc(build_end)} · Demo ${esc(demo_day)} (release ${esc(plan.schedule.demo_release_key.toUpperCase())})
+            Build ${esc(build_start)} → ${esc(build_end)} · Demo ${esc(demo_day)} ${CommandCenter.demoReleaseLabel(plan.schedule)}
           </p>
         </div>
       `;

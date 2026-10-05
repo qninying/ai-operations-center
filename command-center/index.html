@@ -13,7 +13,7 @@
   })();
 </script>
 <title>CoreOps — Command Center</title>
-<link rel="stylesheet" href="assets/command-center.css?v=2" />
+<link rel="stylesheet" href="assets/command-center.css?v=3" />
 </head>
 <body>
   <header class="cc-header">
@@ -36,9 +36,10 @@
     <div id="cc-overview-content">Loading…</div>
   </main>
 
-  <script src="assets/command-center.js?v=4"></script>
+  <script src="assets/command-center.js?v=6"></script>
   <script>
     function renderOverview({ plan, progress, dataAsOf, mode }) {
+      const esc = CommandCenter.esc;
       const el = document.getElementById("cc-overview-content");
       const sub = document.getElementById("cc-project-sub");
       // Pause banner removed — all 9 tabs are now built.
@@ -68,15 +69,15 @@
 
       el.innerHTML = `
         <div class="cc-panel-box">
-          <p style="margin:0 0 4px; color: var(--cc-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em;">${plan.project.name}${badge}</p>
-          <p style="margin:0; font-size: 15px;">${plan.project.descriptor}</p>
+          <p style="margin:0 0 4px; color: var(--cc-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em;">${esc(plan.project.name)}${badge}</p>
+          <p style="margin:0; font-size: 15px;">${esc(plan.project.descriptor)}</p>
         </div>
 
         <div class="cc-grid">
           <div class="cc-card">
             <h3>Current release</h3>
-            <p class="cc-card-value">${currentRelease.key.toUpperCase()}</p>
-            <p>${currentRelease.name} · ${currentRelease.starts_on} → ${currentRelease.ends_on}</p>
+            <p class="cc-card-value">${esc(currentRelease.key.toUpperCase())}</p>
+            <p>${esc(currentRelease.name)} · ${esc(currentRelease.starts_on)} → ${esc(currentRelease.ends_on)}</p>
           </div>
           <div class="cc-card">
             <h3>Stories verified${badge}</h3>
@@ -98,8 +99,8 @@
         <div class="cc-panel-box" style="margin-top:20px;">
           <h3 style="margin-top:0;">Build window</h3>
           <p style="color: var(--cc-muted); font-size: 13px; margin: 0;">
-            ${plan.schedule.build_start} → ${plan.schedule.build_end} · Demo day ${plan.schedule.demo_day}
-            (release ${plan.schedule.demo_release_key.toUpperCase()})
+            ${esc(plan.schedule.build_start)} → ${esc(plan.schedule.build_end)} · Demo day ${esc(plan.schedule.demo_day)}
+            ${CommandCenter.demoReleaseLabel(plan.schedule)}
           </p>
         </div>
       `;

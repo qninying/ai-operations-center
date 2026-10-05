@@ -344,3 +344,11 @@ table.cc-table th {
 
 .cc-tag.cc-tag-must { color: var(--cc-danger); border-color: var(--cc-danger); }
 .cc-tag.cc-tag-should { color: var(--cc-warn); border-color: var(--cc-warn); }
+
+/* Section headings inside a tab, e.g. the repo-inventory sections on AI Agents / Systems. */
+.cc-section-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 28px 0 12px;
+  color: var(--cc-text, inherit);
+}
