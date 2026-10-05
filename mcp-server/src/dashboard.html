@@ -1229,7 +1229,7 @@ async function troubleshootIncident(incidentId, cardEl) {
 
   if (source === 'docker') {
     rootCauseEl.style.display = 'block';
-    rootCauseEl.textContent = 'Superset containers unreachable — verify Docker Desktop is running and the dev-superset stack is up (cd mcp-server/dev-superset && docker compose up -d). No AI analysis applies here — this is a plain connectivity check, not evidence to reason over.';
+    rootCauseEl.textContent = 'Apache Superset (dev-superset) unreachable. In production it runs as a Fly.io machine that is stopped when not in use; locally it is a Docker stack (cd mcp-server/dev-superset && docker compose up -d). Approving Fix restarts it and confirms it is back. No AI analysis applies here: this is a plain connectivity check, not evidence to reason over.';
     actionsRow.style.display = 'flex';
     setCorrelationId(incidentId, 'demo-docker-' + Date.now(), cardEl);
     pushActivity('warning', '<strong>Troubleshoot</strong> — Docker/Superset unreachable');
@@ -1242,7 +1242,7 @@ async function troubleshootIncident(incidentId, cardEl) {
     // Mirrors the docker branch above exactly — a plain connectivity check,
     // no evidence to reason over, same honesty pattern.
     rootCauseEl.style.display = 'block';
-    rootCauseEl.textContent = 'Postgres (dev-postgres) unreachable — verify Docker Desktop is running and the dev-postgres container is up (cd mcp-server/dev-postgres && docker compose up -d). No AI analysis applies here — this is a plain connectivity check, not evidence to reason over.';
+    rootCauseEl.textContent = 'Postgres (dev-postgres) unreachable. In production it runs as a Fly.io machine that is stopped when not in use; locally it is a Docker container (cd mcp-server/dev-postgres && docker compose up -d). Approving Fix restarts it and confirms it is back. No AI analysis applies here: this is a plain connectivity check, not evidence to reason over.';
     actionsRow.style.display = 'flex';
     setCorrelationId(incidentId, 'demo-postgres-' + Date.now(), cardEl);
     pushActivity('warning', '<strong>Troubleshoot</strong> — Postgres/dev-postgres unreachable');

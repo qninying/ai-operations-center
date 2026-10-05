@@ -20,7 +20,8 @@
     "generate-totp-secret": "tsx src/auth/generateTotpSecret.ts",
     "current-totp-code": "tsx src/auth/printCurrentTotpCode.ts",
     "build-console": "npm run build --prefix ../frontend",
-    "inventory": "node scripts/generateRepoInventory.mjs"
+    "inventory": "node scripts/generateRepoInventory.mjs",
+    "inventory:check": "node scripts/generateRepoInventory.mjs --check"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

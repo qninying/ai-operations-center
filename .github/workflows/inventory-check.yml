@@ -1,0 +1,31 @@
+# Fails visibly when command-center/data/repo-inventory.json no longer matches
+# the code (new agent, tool, connector, requirement, story or evidence), so the
+# public Command Center never silently drifts from the repo. It checks rather
+# than commits: an automated commit to main would race the Colaberry platform's
+# own sync bot. Deliberately separate from deploy.yml, so a stale inventory
+# never blocks a production deploy.
+name: Command Center inventory check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history: commit messages naming a requirement are part of the evidence.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      # The generator uses only Node built-ins, so no npm install is needed.
+      - name: Check the committed inventory matches the code
+        working-directory: mcp-server
+        run: node scripts/generateRepoInventory.mjs --check

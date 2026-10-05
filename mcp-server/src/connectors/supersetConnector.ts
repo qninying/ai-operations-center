@@ -1,6 +1,7 @@
 import { checkSupersetHealth } from "../supersetHealthSource.js";
 import { recordCheckSuccess, recordCheckFailure } from "./sourceCheck.js";
 import type { SourceConnector } from "./types.js";
+import { getDemoTarget } from "../demoTargetConfig.js";
 
 // Apache Superset's health. The dashboard's historical source name is "docker"
 // (from local development), so `id` stays "docker" for compatibility with
@@ -23,7 +24,10 @@ export const supersetConnector: SourceConnector = {
           id: "docker:superset",
           source: "docker",
           title: "Superset (dev-superset stack) unreachable",
-          detail: "Verify Docker Desktop is running and the dev-superset stack is up (mcp-server/dev-superset/).",
+          // Production runs dev-superset as a Fly.io machine, not Docker Desktop.
+          detail: getDemoTarget() === "prod"
+            ? "The dev-superset demo machine on Fly.io isn't reachable. It's stopped when not in use; approving Fix restarts it and confirms it's back."
+            : "Verify Docker Desktop is running and the dev-superset stack is up (mcp-server/dev-superset/).",
           severity: "warning",
           occurredAt: new Date().toISOString(),
           sourceMode: "live",

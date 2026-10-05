@@ -1,6 +1,7 @@
 import { queryPgActivity } from "../pgActivitySource.js";
 import { recordCheckSuccess, recordCheckFailure } from "./sourceCheck.js";
 import type { SourceConnector } from "./types.js";
+import { getDemoTarget } from "../demoTargetConfig.js";
 
 // PostgreSQL blocking queries via pg_stat_activity / pg_blocking_pids().
 export const postgresConnector: SourceConnector = {
@@ -34,7 +35,10 @@ export const postgresConnector: SourceConnector = {
           id: "postgres:unreachable",
           source: "postgres",
           title: "Postgres (dev-postgres) unreachable",
-          detail: "Verify Docker Desktop is running and the dev-postgres container is up (mcp-server/dev-postgres/).",
+          // Production runs dev-postgres as a Fly.io machine, not Docker Desktop.
+          detail: getDemoTarget() === "prod"
+            ? "The dev-postgres demo machine on Fly.io isn't reachable. It's stopped when not in use; approving Fix restarts it and confirms it's back."
+            : "Verify Docker Desktop is running and the dev-postgres container is up (mcp-server/dev-postgres/).",
           severity: "warning",
           occurredAt: new Date().toISOString(),
           sourceMode: "live",

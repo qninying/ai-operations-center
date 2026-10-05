@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-05T20:49:34.665Z",
-  "git_sha": "96cd26a",
+  "generated_at": "2026-10-05T20:57:59.402Z",
+  "git_sha": "0a5e8b7",
   "note": "Generated from the code by mcp-server/scripts/generateRepoInventory.mjs. Describes what the repo contains, not whether anything is live right now.",
   "agents": [
     {

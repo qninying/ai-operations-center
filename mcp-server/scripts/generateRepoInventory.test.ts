@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { buildInventory, leadingComment, readConnectors } from "./generateRepoInventory.mjs";
+import { buildInventory, leadingComment, readConnectors, inventoriesMatch } from "./generateRepoInventory.mjs";
 
 let root: string;
 const src = () => join(root, "mcp-server", "src");
@@ -121,5 +121,14 @@ describe("readConnectors (REQ-018)", () => {
 
   it("boundary: no connectors folder gives an empty list", () => {
     expect(readConnectors(root)).toEqual([]);
+  });
+});
+
+describe("inventoriesMatch (--check mode)", () => {
+  it("ignores the volatile generated_at and git_sha fields", () => {
+    expect(inventoriesMatch({ generated_at: "a", git_sha: "1", agents: [] }, { generated_at: "b", git_sha: "2", agents: [] })).toBe(true);
+  });
+  it("detects a real content change", () => {
+    expect(inventoriesMatch({ agents: [] }, { agents: [{ name: "New Agent" }] })).toBe(false);
   });
 });

@@ -125,9 +125,11 @@ export function commitEvidence(gitLogText) {
   return out;
 }
 
-function readGitLog(repoRoot) {
+// `rev` limits history: the inventory check passes "HEAD~1", because a
+// committed inventory can never include the commit it is itself part of.
+function readGitLog(repoRoot, rev = "HEAD") {
   try {
-    return execFileSync("git", ["log", "--format=@@%h %s", "--name-only"], { cwd: repoRoot, timeout: 15_000, maxBuffer: 64 * 1024 * 1024 }).toString();
+    return execFileSync("git", ["log", rev, "--format=@@%h %s", "--name-only"], { cwd: repoRoot, timeout: 15_000, maxBuffer: 64 * 1024 * 1024 }).toString();
   } catch (error) {
     console.warn(`repoRequirements: git log unavailable (${error instanceof Error ? error.message : String(error)}); commit evidence omitted`);
     return "";
@@ -172,7 +174,7 @@ function platformStoryIds(repoRoot) {
   return ids;
 }
 
-export function buildRequirements(repoRoot) {
+export function buildRequirements(repoRoot, { gitRev = "HEAD" } = {}) {
   const tracked = platformStoryIds(repoRoot);
   const reqPath = join(repoRoot, "docs", "REQUIREMENTS.md");
   const requirements = existsSync(reqPath) ? parseRequirementsDoc(readFileSync(reqPath, "utf8")) : [];
@@ -186,7 +188,7 @@ export function buildRequirements(repoRoot) {
         .map((s) => ({ ...s, tracked_by_platform: tracked.has(s.id) }))
     : [];
   const evidence = requirementEvidence(repoRoot);
-  const commits = commitEvidence(readGitLog(repoRoot));
+  const commits = commitEvidence(readGitLog(repoRoot, gitRev));
   const withEvidence = requirements.map((r) => {
     const satisfiedBy = stories.filter((s) => s.satisfies.includes(r.id));
     const base = evidence[r.id] || { code: [], tests: [], docs: [] };

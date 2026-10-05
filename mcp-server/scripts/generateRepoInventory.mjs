@@ -104,7 +104,7 @@ export function leadingComment(source) {
   return firstSentences ? (firstSentences[1] + (firstSentences[3] ? " " + firstSentences[3] : "")).trim() : text.slice(0, 240);
 }
 
-export function buildInventory(repoRoot, { now = new Date(), gitSha = null, includeRequirements = true } = {}) {
+export function buildInventory(repoRoot, { now = new Date(), gitSha = null, includeRequirements = true, gitRev = "HEAD" } = {}) {
   const srcDir = join(repoRoot, "mcp-server", "src");
   const files = readdirSync(srcDir).filter(isCodeFile).sort();
   const read = (f) => readFileSync(join(srcDir, f), "utf8");
@@ -186,10 +186,20 @@ export function buildInventory(repoRoot, { now = new Date(), gitSha = null, incl
     // Every requirement in docs/REQUIREMENTS.md and every story in docs/stories/,
     // with repo evidence. See repoRequirements.mjs.
     ...(includeRequirements ? (() => {
-      const { requirements, stories } = buildRequirements(repoRoot);
+      const { requirements, stories } = buildRequirements(repoRoot, { gitRev });
       return { requirements, repo_stories: stories };
     })() : {}),
   };
+}
+
+// True when two inventories describe the same repo contents. generated_at and
+// git_sha change on every run/commit, so they're ignored.
+export function inventoriesMatch(a, b) {
+  const strip = (inv) => {
+    const { generated_at, git_sha, ...rest } = inv || {};
+    return JSON.stringify(rest);
+  };
+  return strip(a) === strip(b);
 }
 
 function currentGitSha(repoRoot) {
@@ -204,8 +214,28 @@ function currentGitSha(repoRoot) {
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-  const inventory = buildInventory(repoRoot, { gitSha: currentGitSha(repoRoot) });
+  // In --check mode, history stops at the parent commit: the committed
+  // inventory was generated before its own commit existed, so it can't list it.
+  const checkMode = process.argv.includes("--check");
+  const inventory = buildInventory(repoRoot, { gitSha: currentGitSha(repoRoot), gitRev: checkMode ? "HEAD~1" : "HEAD" });
   const outPath = join(repoRoot, "command-center", "data", "repo-inventory.json");
+  // --check (used by .github/workflows/inventory-check.yml): don't write, just
+  // fail if the committed inventory no longer matches the code.
+  if (checkMode) {
+    let committed = null;
+    try {
+      committed = JSON.parse(readFileSync(outPath, "utf8"));
+    } catch (error) {
+      console.error(`Inventory check: cannot read ${outPath} (${error instanceof Error ? error.message : String(error)}).`);
+      process.exit(1);
+    }
+    if (!inventoriesMatch(committed, inventory)) {
+      console.error("Inventory check FAILED: command-center/data/repo-inventory.json is out of date with the code. Run `npm run inventory` in mcp-server/ and commit the result.");
+      process.exit(1);
+    }
+    console.log("Inventory check passed: the committed inventory matches the code.");
+    process.exit(0);
+  }
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify(inventory, null, 2) + "\n");
   console.log(

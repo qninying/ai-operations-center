@@ -148,3 +148,28 @@ describe("connector timeout budget", () => {
     vi.resetModules();
   });
 });
+
+describe("unreachable incident wording per environment", () => {
+  afterEach(() => {
+    delete process.env.DEMO_TARGET;
+    vi.resetModules();
+  });
+
+  it("in production (DEMO_TARGET=prod) the Postgres incident says it's a stopped Fly.io machine, not Docker Desktop", async () => {
+    process.env.DEMO_TARGET = "prod";
+    vi.doMock("../pgActivitySource.js", () => ({ queryPgActivity: vi.fn().mockRejectedValue(new Error("down")) }));
+    const { postgresConnector } = await import("./postgresConnector.js");
+    const [inc] = await postgresConnector.discoverIncidents();
+    expect(inc.detail).toMatch(/Fly\.io/);
+    expect(inc.detail).not.toMatch(/Docker Desktop/);
+    vi.doUnmock("../pgActivitySource.js");
+  });
+
+  it("locally the Superset incident keeps the Docker Desktop instructions", async () => {
+    vi.doMock("../supersetHealthSource.js", () => ({ checkSupersetHealth: vi.fn().mockRejectedValue(new Error("down")) }));
+    const { supersetConnector } = await import("./supersetConnector.js");
+    const [inc] = await supersetConnector.discoverIncidents();
+    expect(inc.detail).toMatch(/Docker Desktop/);
+    vi.doUnmock("../supersetHealthSource.js");
+  });
+});
