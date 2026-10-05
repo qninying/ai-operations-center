@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-05T17:44:05.707Z",
-  "git_sha": "e49e809",
+  "generated_at": "2026-10-05T17:52:53.363Z",
+  "git_sha": "8eae0e9",
   "note": "Generated from the code by mcp-server/scripts/generateRepoInventory.mjs. Describes what the repo contains, not whether anything is live right now.",
   "agents": [
     {
@@ -788,7 +788,12 @@
         "docs": [
           "docs/ADR-016-plugin-connector-architecture.md"
         ],
-        "commits": []
+        "commits": [
+          {
+            "sha": "e6ea996",
+            "subject": "STORY-013: plug-in connector architecture for data sources (REQ-018, ADR-016)"
+          }
+        ]
       },
       "repo_stories": [
         "STORY-013"
@@ -1052,9 +1057,9 @@
       "satisfies": [
         "REQ-018"
       ],
-      "criteria_done": 4,
+      "criteria_done": 5,
       "criteria_total": 5,
-      "status": "In progress (code done 2026-10-05; production check pending)",
+      "status": "Done (2026-10-05)",
       "tracked_by_platform": false
     },
     {

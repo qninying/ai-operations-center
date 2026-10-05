@@ -6,7 +6,7 @@ registration, so that adding a new system (say Oracle, or a Kafka lag feed)
 means writing one new file, not editing the incident feed, the health report
 and the server.
 
-**Status:** In progress (code done 2026-10-05; production check pending)
+**Status:** Done (2026-10-05)
 **Release:** r6 · Close the remaining requirement gaps (self-scoped, added
 2026-10-05 after a requirements audit found no evidence for REQ-018)
 **Owner:** Quincy Nkwain Ninying
@@ -65,9 +65,16 @@ and the Command Center's status map. That's a convention, not an architecture.
       Verified 2026-10-05: `connectors/connectors.test.ts` registers a "kafka"
       connector through the registry seam only; the feed reveals its incident
       and `checkDependencyHealth()` reports `sources.kafka`.
-- [ ] Given the five existing sources migrated to connectors, when the full test
+- [x] Given the five existing sources migrated to connectors, when the full test
       suite runs, then every existing test still passes and production
       `/health/dependencies` reports the same sources as before.
+      Verified 2026-10-05: the existing 448 tests passed unchanged against the
+      migration. In production (deploy `8eae0e9`, after fixing a backstop-timeout
+      regression the first deploy exposed; see ADR-016), `/health/dependencies`
+      reports the same seven sources (sql, ssrs, cloud, superset, postgres, ntfy,
+      flyMachinesApi), the stopped demo machines report their own
+      `CircuitOpenError`, and the paging log shows `postgres:unreachable` and
+      `docker:superset` raised as before.
 - [x] Given one connector throws and another hangs, when the feed ticks, then
       every other connector's incidents still appear within the timeout (test).
       Verified 2026-10-05: `connectors.test.ts` (throwing, hung and healthy
