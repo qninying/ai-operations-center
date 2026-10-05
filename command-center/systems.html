@@ -82,12 +82,16 @@
       "SSIS": (h) => fromCheck(h.sources && h.sources.cloud, "live", "no check yet since last restart"),
       "PostgreSQL": (h) => {
         const s = fromCheck(h.sources && h.sources.postgres, "live", "no check yet since last restart");
-        if (s.cls === BAD) s.label += ". The demo machine is stopped when not in use.";
+        // The demo machines are switched off between demos to save cost, so an
+        // unreachable check here is the normal resting state, not an outage.
+        if (s.cls === BAD) return { cls: "", label: "machine is stopped when not in use", checked: s.checked };
         return s;
       },
       "Apache Superset": (h) => {
         const s = fromCheck(h.sources && h.sources.superset, "live", "no check yet since last restart");
-        if (s.cls === BAD) s.label += ". The demo machine is stopped when not in use.";
+        // The demo machines are switched off between demos to save cost, so an
+        // unreachable check here is the normal resting state, not an outage.
+        if (s.cls === BAD) return { cls: "", label: "machine is stopped when not in use", checked: s.checked };
         return s;
       },
       "Fly.io Machines API": (h) => {
