@@ -20,10 +20,16 @@ const REGISTERED: readonly SourceConnector[] = [
   postgresConnector,
 ];
 
-// A connector that never settles must not stall the whole feed. Each source
-// module already has its own timeouts; this is the backstop, generous enough
-// to sit above them (the slowest, SQL Server, retries within ~3s per attempt).
-export const CONNECTOR_TIMEOUT_MS = 10_000;
+// A connector that never settles must not stall the whole feed. This is only a
+// backstop for a source that hangs forever. It MUST sit above every source's
+// own worst-case failure time, or a source that is genuinely down (which a
+// connector like PostgreSQL reports as an "unreachable" incident) gets cut off
+// first and misread as "couldn't check". Each source module retries up to 3
+// times with a 10s per-attempt timeout and up to 4s backoff: 4 x 10s + 0.5s +
+// 1s + 2s = about 44s worst case. Found in production on 2026-10-05, when an
+// earlier 10s value hid the stopped demo machines' "unreachable" incidents.
+export const SOURCE_WORST_CASE_MS = 4 * 10_000 + 500 + 1_000 + 2_000;
+export const CONNECTOR_TIMEOUT_MS = 60_000;
 
 export class DuplicateConnectorError extends Error {
   readonly errorClass = "DuplicateConnectorError" as const;

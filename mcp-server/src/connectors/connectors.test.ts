@@ -125,3 +125,26 @@ describe("connector registry (REQ-018)", () => {
     ]);
   });
 });
+
+describe("connector timeout budget", () => {
+  it("the backstop sits above every source's own worst-case failure time, so a down source is never misread as 'couldn't check'", async () => {
+    const reg = await import("./index.js");
+    expect(reg.CONNECTOR_TIMEOUT_MS).toBeGreaterThan(reg.SOURCE_WORST_CASE_MS);
+  });
+
+  it("a connector that reports 'unreachable' after a slow failure (longer than 10s) still surfaces its incident", async () => {
+    vi.useFakeTimers();
+    const reg = await import("./index.js");
+    reg.__setConnectorsForTests([
+      connector("slowdown", () => new Promise<DashboardIncident[]>((resolve) => setTimeout(() => resolve([incident("slowdown", 1)]), 44_000))),
+    ]);
+    const { startIncidentFeed, getRevealedIncidents } = await import("../incidentFeedService.js");
+    const handle = startIncidentFeed();
+    await vi.advanceTimersByTimeAsync(44_001);
+    expect(getRevealedIncidents().map((i) => i.id)).toEqual(["slowdown:item:1"]);
+    handle.stop();
+    reg.__resetConnectorsForTests();
+    vi.useRealTimers();
+    vi.resetModules();
+  });
+});

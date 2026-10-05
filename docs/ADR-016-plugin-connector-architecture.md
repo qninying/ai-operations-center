@@ -43,9 +43,14 @@ reads the registry.**
 - `connectors/index.ts` holds the `REGISTERED` list. **Adding a source = one new
   connector file + one line in that list.** Nothing else is edited.
 - The incident feed iterates the registry. Each connector runs through
-  `discoverWithTimeout()` (10s backstop above each source's own timeouts), and a
+  `discoverWithTimeout()` (a 60s backstop for a source that never settles), and a
   hung connector is recorded as a failed check (`ConnectorTimeoutError`). It's
-  never treated as "clear", so its existing incidents are kept.
+  never treated as "clear", so its existing incidents are kept. The backstop must
+  sit above every source's own worst case (4 attempts x 10s plus backoff, about
+  44s). The first deploy used 10s, which cut off the stopped demo machines'
+  real "unreachable" findings in production. Caught on 2026-10-05 by checking
+  `/health/dependencies` after the deploy (`ConnectorTimeoutError` instead of the
+  source's own error), fixed the same day, and now pinned by a test.
 - `GET /health/dependencies` reports every registered connector's
   `reachabilityName`, plus ntfy and Fly's API.
 - `validateConnectors()` fails fast at startup if two connectors share an `id` or
