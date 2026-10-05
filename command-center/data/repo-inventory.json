@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-05T20:37:34.183Z",
-  "git_sha": "77ae3ec",
+  "generated_at": "2026-10-05T20:49:34.665Z",
+  "git_sha": "96cd26a",
   "note": "Generated from the code by mcp-server/scripts/generateRepoInventory.mjs. Describes what the repo contains, not whether anything is live right now.",
   "agents": [
     {
@@ -388,7 +388,10 @@
           "mcp-server/src/httpServer.ts",
           "mcp-server/src/recommendationService.ts"
         ],
-        "tests": [],
+        "tests": [
+          "mcp-server/src/cloudRecommendationService.test.ts",
+          "mcp-server/src/recommendationService.test.ts"
+        ],
         "docs": [],
         "commits": []
       },
@@ -396,7 +399,7 @@
         "STORY-006",
         "STORY-007"
       ],
-      "repo_status": "built_partly"
+      "repo_status": "built_and_tested"
     },
     {
       "id": "REQ-001",
@@ -409,7 +412,10 @@
           "guardrails/auditLog.ts",
           "guardrails/remediationGuardrail.ts"
         ],
-        "tests": [],
+        "tests": [
+          "guardrails/auditLog.test.ts",
+          "guardrails/remediationGuardrail.test.ts"
+        ],
         "docs": [
           "docs/ADR-002-audit-trail-correlation-id-unification.md",
           "docs/DATA_CONTRACT.md"
@@ -419,7 +425,7 @@
       "repo_stories": [
         "STORY-001"
       ],
-      "repo_status": "built_partly"
+      "repo_status": "built_and_tested"
     },
     {
       "id": "REQ-015",
@@ -451,9 +457,18 @@
       "fulfillment": "Fulfilled directly, not through a platform story (this requirement was never",
       "evidence": {
         "code": [
-          "mcp-server/src/adversarialEval/probes.ts"
+          "mcp-server/src/adversarialEval/probes.ts",
+          "mcp-server/src/cloudRecommendationService.ts",
+          "mcp-server/src/correlatedRecommendationService.ts",
+          "mcp-server/src/evidenceGroundingCheck.ts",
+          "mcp-server/src/recommendationService.ts"
         ],
-        "tests": [],
+        "tests": [
+          "mcp-server/src/cloudRecommendationService.test.ts",
+          "mcp-server/src/correlatedRecommendationService.test.ts",
+          "mcp-server/src/evidenceGroundingCheck.test.ts",
+          "mcp-server/src/recommendationService.test.ts"
+        ],
         "docs": [
           "docs/AI-GOVERNANCE-PROFILE.md",
           "docs/FRAMEWORK-MAPPING.md",
@@ -467,7 +482,7 @@
         ]
       },
       "repo_stories": [],
-      "repo_status": "built_partly"
+      "repo_status": "built_and_tested"
     },
     {
       "id": "REQ-020",
@@ -477,9 +492,20 @@
       "fulfillment": "Fulfilled directly, not through a platform story (identified after the plan",
       "evidence": {
         "code": [
-          "mcp-server/src/adversarialEval/probes.ts"
+          "mcp-server/src/adversarialEval/probes.ts",
+          "mcp-server/src/cloudRecommendationService.ts",
+          "mcp-server/src/correlatedRecommendationService.ts",
+          "mcp-server/src/evidenceGroundingCheck.ts",
+          "mcp-server/src/recommendationService.ts",
+          "mcp-server/src/rootCauseAgent.ts"
         ],
-        "tests": [],
+        "tests": [
+          "mcp-server/src/cloudRecommendationService.test.ts",
+          "mcp-server/src/correlatedRecommendationService.test.ts",
+          "mcp-server/src/evidenceGroundingCheck.test.ts",
+          "mcp-server/src/recommendationService.test.ts",
+          "mcp-server/src/rootCauseAgent.test.ts"
+        ],
         "docs": [
           "docs/FRAMEWORK-MAPPING.md",
           "docs/adversarial-eval-design.md"
@@ -492,7 +518,7 @@
         ]
       },
       "repo_stories": [],
-      "repo_status": "built_partly"
+      "repo_status": "built_and_tested"
     },
     {
       "id": "REQ-005",
@@ -504,7 +530,9 @@
         "code": [
           "guardrails/auditLog.ts"
         ],
-        "tests": [],
+        "tests": [
+          "guardrails/auditLog.test.ts"
+        ],
         "docs": [
           "docs/ADR-002-audit-trail-correlation-id-unification.md"
         ],
@@ -513,7 +541,7 @@
       "repo_stories": [
         "STORY-002"
       ],
-      "repo_status": "built_partly"
+      "repo_status": "built_and_tested"
     },
     {
       "id": "REQ-014",
@@ -529,7 +557,10 @@
           "mcp-server/src/rootCauseAgent.ts"
         ],
         "tests": [
-          "mcp-server/src/confidenceThresholds.test.ts"
+          "mcp-server/src/confidenceThresholds.test.ts",
+          "mcp-server/src/diagnosticsGatherer.test.ts",
+          "mcp-server/src/escalationService.test.ts",
+          "mcp-server/src/rootCauseAgent.test.ts"
         ],
         "docs": [],
         "commits": [
@@ -585,10 +616,14 @@
       "fulfillment": null,
       "evidence": {
         "code": [
+          "mcp-server/src/adversarialEval/assessors.ts",
+          "mcp-server/src/adversarialEval/probes.ts",
           "mcp-server/src/adversarialEval/runner.ts",
           "mcp-server/src/adversarialEval/types.ts"
         ],
-        "tests": [],
+        "tests": [
+          "mcp-server/src/adversarialEval/runner.test.ts"
+        ],
         "docs": [
           "docs/AI-GOVERNANCE-PROFILE.md",
           "docs/FRAMEWORK-MAPPING.md"
@@ -605,7 +640,7 @@
         ]
       },
       "repo_stories": [],
-      "repo_status": "built_partly"
+      "repo_status": "built_and_tested"
     },
     {
       "id": "REQ-022",
@@ -659,8 +694,19 @@
       "statement": "The system's live recommendation pipeline must carry a runtime signal for suspected manipulation in the model's own output, not only detect it retroactively inside an offline eval suite.",
       "fulfillment": null,
       "evidence": {
-        "code": [],
-        "tests": [],
+        "code": [
+          "mcp-server/src/adversarialEval/assessors.ts",
+          "mcp-server/src/cloudRecommendationService.ts",
+          "mcp-server/src/correlatedRecommendationService.ts",
+          "mcp-server/src/recommendationService.ts",
+          "mcp-server/src/suspicionCheck.ts"
+        ],
+        "tests": [
+          "mcp-server/src/cloudRecommendationService.test.ts",
+          "mcp-server/src/correlatedRecommendationService.test.ts",
+          "mcp-server/src/recommendationService.test.ts",
+          "mcp-server/src/suspicionCheck.test.ts"
+        ],
         "docs": [],
         "commits": [
           {
@@ -670,7 +716,7 @@
         ]
       },
       "repo_stories": [],
-      "repo_status": "built_partly"
+      "repo_status": "built_and_tested"
     },
     {
       "id": "REQ-025",
@@ -684,7 +730,9 @@
           "mcp-server/src/healthCheck.ts",
           "mcp-server/src/httpServer.ts"
         ],
-        "tests": [],
+        "tests": [
+          "mcp-server/src/healthCheck.test.ts"
+        ],
         "docs": [
           "docs/DEPLOYMENT.md"
         ],
@@ -693,7 +741,7 @@
       "repo_stories": [
         "STORY-012"
       ],
-      "repo_status": "built_partly"
+      "repo_status": "built_and_tested"
     },
     {
       "id": "REQ-026",
@@ -758,6 +806,7 @@
           "mcp-server/src/httpServer.ts"
         ],
         "tests": [
+          "mcp-server/src/cloudBlobSource.test.ts",
           "mcp-server/src/cloudRecommendationService.test.ts"
         ],
         "docs": [],
@@ -776,14 +825,23 @@
       "fulfillment": null,
       "evidence": {
         "code": [
+          "mcp-server/src/connectors/cloudConnector.ts",
           "mcp-server/src/connectors/index.ts",
+          "mcp-server/src/connectors/postgresConnector.ts",
+          "mcp-server/src/connectors/sourceCheck.ts",
+          "mcp-server/src/connectors/sqlServerConnector.ts",
+          "mcp-server/src/connectors/ssrsConnector.ts",
+          "mcp-server/src/connectors/supersetConnector.ts",
           "mcp-server/src/connectors/types.ts",
           "mcp-server/src/healthCheck.ts",
           "mcp-server/src/incidentFeedService.ts",
           "mcp-server/src/sourceReachability.ts"
         ],
         "tests": [
-          "mcp-server/src/connectors/connectors.test.ts"
+          "mcp-server/src/connectors/connectors.test.ts",
+          "mcp-server/src/healthCheck.test.ts",
+          "mcp-server/src/incidentFeedService.test.ts",
+          "mcp-server/src/sourceReachability.test.ts"
         ],
         "docs": [
           "docs/ADR-016-plugin-connector-architecture.md"
@@ -811,14 +869,16 @@
           "mcp-server/src/httpServer.ts",
           "mcp-server/src/monitoringService.ts"
         ],
-        "tests": [],
+        "tests": [
+          "mcp-server/src/monitoringService.test.ts"
+        ],
         "docs": [],
         "commits": []
       },
       "repo_stories": [
         "STORY-008"
       ],
-      "repo_status": "built_partly"
+      "repo_status": "built_and_tested"
     },
     {
       "id": "REQ-012",
@@ -833,6 +893,8 @@
           "mcp-server/src/notificationService.ts"
         ],
         "tests": [
+          "mcp-server/src/escalationService.test.ts",
+          "mcp-server/src/monitoringService.test.ts",
           "mcp-server/src/notificationService.test.ts"
         ],
         "docs": [],
@@ -879,14 +941,17 @@
           "mcp-server/src/dashboardSummary.ts",
           "mcp-server/src/httpServer.ts"
         ],
-        "tests": [],
+        "tests": [
+          "frontend/src/App.test.tsx",
+          "mcp-server/src/dashboardSummary.test.ts"
+        ],
         "docs": [],
         "commits": []
       },
       "repo_stories": [
         "STORY-005"
       ],
-      "repo_status": "built_partly"
+      "repo_status": "built_and_tested"
     }
   ],
   "repo_stories": [

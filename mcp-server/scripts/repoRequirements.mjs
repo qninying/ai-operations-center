@@ -72,6 +72,7 @@ function walk(dir, out = []) {
 // Which files mention each REQ id, split into code / tests / docs. The three
 // requirements-tracking docs themselves are excluded: they mention every id.
 const TRACKING_DOCS = new Set(["docs/REQUIREMENTS.md", "docs/TRACEABILITY.md", "docs/STORIES.md"]);
+const CODE_ROOTS = ["mcp-server/src", "mcp-server/scripts", "guardrails", "frontend/src", ".github/workflows"];
 const SELF_FILES = /^mcp-server\/scripts\/(repoRequirements|generateRepoInventory)\./;
 export function requirementEvidence(repoRoot) {
   const roots = ["mcp-server/src", "mcp-server/scripts", "guardrails", "frontend/src", ".github/workflows", "docs"];
@@ -91,27 +92,42 @@ export function requirementEvidence(repoRoot) {
       }
     }
   }
+  // A code file's own test file (foo.ts -> foo.test.ts) tests that code, even
+  // when the test never mentions the requirement id. Without this, a real,
+  // tested feature (e.g. REQ-019's evidenceGroundingCheck.ts) looked untested.
+  for (const e of Object.values(evidence)) {
+    for (const file of e.code) {
+      const sibling = file.replace(/\.(ts|tsx|mjs|js)$/, ".test.$1");
+      if (sibling !== file && existsSync(join(repoRoot, sibling)) && !e.tests.includes(sibling)) e.tests.push(sibling);
+    }
+  }
   for (const e of Object.values(evidence)) for (const k of ["code", "tests", "docs"]) e[k].sort();
   return evidence;
 }
 
 // Commits whose subject names a REQ id: real evidence that work landed, even
-// when the code itself never mentions the id. "%h %s" = short sha + subject.
+// when the code itself never mentions the id. Each commit block starts with an
+// "@@<sha> <subject>" line, followed by the files it changed (git log
+// --name-only). The files tell us where that requirement's code and tests live.
 export function commitEvidence(gitLogText) {
   const out = {};
+  let current = null;
   for (const line of gitLogText.split("\n")) {
-    const m = line.match(/^([0-9a-f]{7,})\s+(.*)$/);
-    if (!m) continue;
-    for (const id of new Set(m[2].match(/REQ-\d{3}/g) || [])) {
-      (out[id] ??= []).push({ sha: m[1], subject: m[2] });
+    const head = line.match(/^@@([0-9a-f]{7,})\s+(.*)$/);
+    if (head) {
+      current = { sha: head[1], subject: head[2], files: [], ids: [...new Set(head[2].match(/REQ-\d{3}/g) || [])] };
+      for (const id of current.ids) (out[id] ??= []).push(current);
+      continue;
     }
+    if (current && line.trim()) current.files.push(line.trim());
   }
+  for (const list of Object.values(out)) for (const c of list) delete c.ids;
   return out;
 }
 
 function readGitLog(repoRoot) {
   try {
-    return execFileSync("git", ["log", "--format=%h %s"], { cwd: repoRoot, timeout: 10_000, maxBuffer: 16 * 1024 * 1024 }).toString();
+    return execFileSync("git", ["log", "--format=@@%h %s", "--name-only"], { cwd: repoRoot, timeout: 15_000, maxBuffer: 64 * 1024 * 1024 }).toString();
   } catch (error) {
     console.warn(`repoRequirements: git log unavailable (${error instanceof Error ? error.message : String(error)}); commit evidence omitted`);
     return "";
@@ -173,7 +189,22 @@ export function buildRequirements(repoRoot) {
   const commits = commitEvidence(readGitLog(repoRoot));
   const withEvidence = requirements.map((r) => {
     const satisfiedBy = stories.filter((s) => s.satisfies.includes(r.id));
-    const ev = { ...(evidence[r.id] || { code: [], tests: [], docs: [] }), commits: commits[r.id] || [] };
+    const base = evidence[r.id] || { code: [], tests: [], docs: [] };
+    const ev = { code: [...base.code], tests: [...base.tests], docs: [...base.docs], commits: (commits[r.id] || []).map(({ sha, subject }) => ({ sha, subject })) };
+    // Files changed by the commits that delivered this requirement, if they
+    // still exist: code and tests only (not PROGRESS.md and the like).
+    for (const c of commits[r.id] || []) {
+      for (const f of c.files) {
+        if (!CODE_ROOTS.some((root) => f.startsWith(root + "/")) || !existsSync(join(repoRoot, f))) continue;
+        const bucket = /\.test\.(ts|tsx|mjs|js)$/.test(f) ? "tests" : /\.(ts|tsx|mjs|js|yml|yaml)$/.test(f) ? "code" : null;
+        if (bucket && !SELF_FILES.test(f) && !ev[bucket].includes(f)) ev[bucket].push(f);
+      }
+    }
+    for (const f of [...ev.code]) {
+      const sibling = f.replace(/\.(ts|tsx|mjs|js)$/, ".test.$1");
+      if (sibling !== f && existsSync(join(repoRoot, sibling)) && !ev.tests.includes(sibling)) ev.tests.push(sibling);
+    }
+    ev.code.sort(); ev.tests.sort();
     return {
       ...r,
       evidence: ev,

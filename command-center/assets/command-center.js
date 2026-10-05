@@ -235,13 +235,16 @@ function allRequirements(plan, inventory) {
   return [...planReqs, ...repoOnly].sort((a, b) => a.id.localeCompare(b.id));
 }
 
+// "Built outside the plan" is the whole distinction from platform-verified
+// work. The dot colour says the rest: green when the code has tests, amber when
+// it doesn't (e.g. a document deliverable, or a live drill rather than a test).
 const REPO_STATUS_LABEL = {
-  built_and_tested: "Built outside the plan: code and tests in the repo",
-  built_partly: "Built outside the plan: evidence in code, docs or commits",
-  built_target_unmeasured: "Capability built; target not measured yet",
-  planned: "Planned: a repo story covers it, not started",
-  documented_only: "Documented only",
-  no_evidence: "Not built: no evidence in the repo",
+  built_and_tested: "Built outside the plan",
+  built_partly: "Built outside the plan",
+  built_target_unmeasured: "Built; target not measured yet",
+  planned: "Planned",
+  documented_only: "Built outside the plan",
+  no_evidence: "Not built",
 };
 
 // One honest status per requirement. A platform story (progress.json) wins
@@ -255,8 +258,20 @@ function requirementStatus(plan, progress, inventory, req) {
     const label = v.state === "enforced" ? "Verified by the platform" : v.state === "partial" ? "Partly verified by the platform" : "Not verified yet";
     return { state: v.state, label, stories: v.stories, repo };
   }
-  if (!repo) return { state: "no_evidence", label: "No platform story, and not in the repo's requirements", stories: [], repo: null };
+  if (!repo) return { state: "no_evidence", label: "Not built", stories: [], repo: null };
   return { state: repo.repo_status, label: REPO_STATUS_LABEL[repo.repo_status] || repo.repo_status, stories: [], repo };
+}
+
+// The story that covers a requirement: the plan's story if it has one,
+// otherwise a repo story (docs/stories/), otherwise "Built directly" when the
+// repo shows the work was done without a story.
+function storyLabel(req, status) {
+  const planStories = (req && req.fulfilled_by) || [];
+  if (planStories.length) return planStories.join(", ");
+  const repoStories = (status && status.repo && status.repo.repo_stories) || [];
+  if (repoStories.length) return repoStories.join(", ");
+  if (status && /^built|^documented/.test(status.state)) return "Built directly";
+  return "—";
 }
 
 // Short, linkable summary of a requirement's repo evidence for tables.
@@ -274,7 +289,7 @@ function evidenceSummary(repo) {
 
 window.CommandCenter = {
   TABS, getMode, setMode, loadData, formatDataAsOf, renderChrome, sampleBadge, demoReleaseLabel, storyOwners,
-  allRequirements, requirementStatus, evidenceSummary,
+  allRequirements, requirementStatus, evidenceSummary, storyLabel,
   init, getParam, esc: escapeHtml, verificationForRequirement, statusDot,
   getTheme, setTheme,
 };

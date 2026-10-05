@@ -79,11 +79,21 @@ describe("parseStoryDoc", () => {
 });
 
 describe("commitEvidence", () => {
-  it("maps REQ ids named in commit subjects to those commits", () => {
-    const log = "f073083 REQ-024: live suspicion-check signal\nabc1234 unrelated change\n1de5458 Add REQ-021 and REQ-021 harness\n";
+  it("maps REQ ids named in commit subjects to those commits and the files they changed", () => {
+    const log = [
+      "@@f073083 REQ-024: live suspicion-check signal",
+      "",
+      "mcp-server/src/suspicionCheck.ts",
+      "mcp-server/src/suspicionCheck.test.ts",
+      "@@abc1234 unrelated change",
+      "",
+      "README.md",
+      "@@1de5458 Add REQ-021 and REQ-021 harness",
+      "",
+    ].join("\n");
     expect(commitEvidence(log)).toEqual({
-      "REQ-024": [{ sha: "f073083", subject: "REQ-024: live suspicion-check signal" }],
-      "REQ-021": [{ sha: "1de5458", subject: "Add REQ-021 and REQ-021 harness" }],
+      "REQ-024": [{ sha: "f073083", subject: "REQ-024: live suspicion-check signal", files: ["mcp-server/src/suspicionCheck.ts", "mcp-server/src/suspicionCheck.test.ts"] }],
+      "REQ-021": [{ sha: "1de5458", subject: "Add REQ-021 and REQ-021 harness", files: [] }],
     });
   });
 
@@ -149,5 +159,30 @@ describe("requirementEvidence: never counts the generator's own fixtures", () =>
     const req018 = buildRequirements(repoRoot).requirements.find((r: { id: string }) => r.id === "REQ-018");
     const all = [...req018.evidence.code, ...req018.evidence.tests, ...req018.evidence.docs];
     expect(all.filter((f: string) => /scripts\/(repoRequirements|generateRepoInventory)\./.test(f))).toEqual([]);
+  });
+});
+
+describe("requirementEvidence: sibling test files", () => {
+  let root: string;
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "sib-"));
+    mkdirSync(join(root, "mcp-server", "src"), { recursive: true });
+    mkdirSync(join(root, "docs"), { recursive: true });
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it("a code file's own test counts as testing that requirement, even if the test never names it", () => {
+    writeFileSync(join(root, "docs", "REQUIREMENTS.md"), "### REQ-019 — Safety · should\n\nCheck citations.\n");
+    writeFileSync(join(root, "mcp-server", "src", "grounding.ts"), "// REQ-019\n");
+    writeFileSync(join(root, "mcp-server", "src", "grounding.test.ts"), "// no id here\n");
+    const [req] = buildRequirements(root).requirements;
+    expect(req.evidence.tests).toEqual(["mcp-server/src/grounding.test.ts"]);
+    expect(req.repo_status).toBe("built_and_tested");
+  });
+
+  it("no sibling test means not counted as tested", () => {
+    writeFileSync(join(root, "docs", "REQUIREMENTS.md"), "### REQ-019 — Safety · should\n\nCheck citations.\n");
+    writeFileSync(join(root, "mcp-server", "src", "grounding.ts"), "// REQ-019\n");
+    expect(buildRequirements(root).requirements[0].repo_status).toBe("built_partly");
   });
 });
