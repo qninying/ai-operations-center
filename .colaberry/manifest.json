@@ -24,7 +24,7 @@
     },
     {
       "path": "artifacts/INDEX.md",
-      "sha256": "9fb4cbea0819c8151d3f2613dfe5ba2a2a00f17a1f45ea185a06be1420e336b8"
+      "sha256": "800c8eeebec10363a5ffcf822aff5b26217ce6dc7d3a78f8603be2acb0d251d4"
     },
     {
       "path": "artifacts/week-01/workflow-diagram.pdf",
@@ -57,6 +57,10 @@
     {
       "path": "artifacts/week-06/progress-log-notification-framework.docx",
       "sha256": "2c2a3bb0edee2f8ec1a8c8dc41233fcd1e2d0161ea396ebf3cdddf5c46396ca5"
+    },
+    {
+      "path": "artifacts/week-07/agent-role-description-document.pdf",
+      "sha256": "dc125e4e56d3d6255e85430d01e6063ba8bf407b4099eedb5ced911a2dccbff5"
     },
     {
       "path": "artifacts/week-07/multi-agent-coordination-plan.docx",
