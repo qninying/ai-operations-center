@@ -26,7 +26,7 @@ jobs:
           fetch-depth: 0
 
       - name: Ask Claude to review the changes
-        uses: anthropics/claude-code-action@459ad358ae43fea66bfefd0a1f8d840b4b9791fb # v1.0.194
+        uses: anthropics/claude-code-action@cab360f6565aa35a51d6ce9e43f1f4287c0a32ea # v1.0.241
         with:
           prompt: >
             Review this pull request's diff for the CoreOps AI Operations Center
