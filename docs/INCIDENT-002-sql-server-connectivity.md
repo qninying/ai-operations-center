@@ -33,10 +33,10 @@ firewall was the easiest of the four to fix once reached.
 Server, but the first gap found, and fixed first: `fly secrets set
 AZURE_STORAGE_CONNECTION_STRING=... AZURE_STORAGE_CONTAINER=...`.
 
-### 2. The Azure subscription hosting `quinaidemo` was disabled
+### 2. The Azure subscription hosting `<azure-sql-server>` was disabled
 Adding the Azure SQL firewall rule failed with:
 ```
-Failed to update server firewall rules for server quinaidemo. Error: The
+Failed to update server firewall rules for server <azure-sql-server>. Error: The
 subscription 'c381d2ff-0296-4ee4-9e54-12a50b08e62f' is disabled and
 therefore marked as read only.
 ```
@@ -47,7 +47,7 @@ After `az login` and re-checking, the *same* subscription ID now showed
 `state: Enabled` — the conversion had in fact re-enabled the original
 subscription in place (Azure's official upgrade path keeps the same
 subscription ID), not created a separate new one as first assumed.
-`az sql server list` then confirmed the original `quinaidemo` server and its
+`az sql server list` then confirmed the original `<azure-sql-server>` server and its
 `CoreOps-Demo` resource group were still intact — no data loss, no new
 server needed, just a retry of the firewall rule against the now-enabled
 subscription, which succeeded immediately.
@@ -64,7 +64,7 @@ allowed.
 
 ### 4. Node resolving the hostname via a dead IPv6 route — the real final blocker
 After steps 1–3, `/health/dependencies` *still* reported `fallback`. The
-decisive piece of evidence: `nc -zv -w 10 quinaidemo.database.windows.net
+decisive piece of evidence: `nc -zv -w 10 <azure-sql-server>.database.windows.net
 1433` succeeded instantly from the same machine where the app's own
 connection test hung for over a minute — past the app's own configured
 10-second `connectionTimeout`. A tool that defaults to IPv4 working while
@@ -106,7 +106,7 @@ Fixed with `rm -rf node_modules package-lock.json && npm install` (commit
 |---|---|
 | 17:10:09 | Azure Blob secrets set; `/health/dependencies` still `sqlServer.source: fallback` (expected — SQL Server not yet addressed). |
 | ~17:2x | Azure Portal firewall save fails: subscription disabled. |
-| 17:26:58 | `az account show` confirms the subscription is `Enabled` again (post re-login); `az sql server list` confirms `quinaidemo` intact. Firewall rule applied successfully. |
+| 17:26:58 | `az account show` confirms the subscription is `Enabled` again (post re-login); `az sql server list` confirms `<azure-sql-server>` intact. Firewall rule applied successfully. |
 | 17:35:26 | Static egress IP allocated and firewall rule in place; `/health/dependencies` still `fallback`. |
 | — | Local `nc` test succeeds; local app-level test hangs >60s. IPv6 resolution-order theory formed and confirmed with `--dns-result-order=ipv4first`. |
 | — | `httpServer.ts` fix written, type-checked, and verified against all three test suites (387 + 70 + 6 passing). |

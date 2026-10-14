@@ -1,7 +1,7 @@
 import "./loadEnv.js";
 import { setDefaultResultOrder } from "node:dns";
 
-// Found live against the real Azure SQL instance (quinaidemo.database.windows.net):
+// Found live against the real Azure SQL instance (<azure-sql-server>.database.windows.net):
 // Node's default DNS resolution tries the AAAA (IPv6) record first, and on a
 // network/route with no working IPv6 path to that record, the connection attempt
 // hangs well past mssql's own configured connectionTimeout — the hang happens in
