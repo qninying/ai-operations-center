@@ -31,6 +31,11 @@ jobs:
       - name: Ask Claude to review the changes
         uses: anthropics/claude-code-action@459ad358ae43fea66bfefd0a1f8d840b4b9791fb # v1.0.194
         with:
+          # Credentials go in as inputs: given only an env var, the action ignored
+          # the key and fell back to GitHub App OIDC login, which this workflow
+          # has no id-token permission for, so every review failed.
+          anthropic_api_key: ${{ secrets.PR_REVIEWER }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: >
             Review this pull request's diff for the CoreOps AI Operations Center
             repo. This is a TypeScript walking skeleton with two independently
@@ -55,5 +60,3 @@ jobs:
             Flag correctness bugs first, then meaningful simplification/reuse/
             efficiency opportunities. Leave inline comments on specific lines
             rather than one long summary comment.
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.PR_REVIEWER }}

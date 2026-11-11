@@ -66,3 +66,9 @@ Older notes in the code and docs that say "see the PROGRESS.md entry" refer to t
   - What changed: `SECURITY.md` (private reporting via the Security tab, scope including a no-scanning rule for the live deployment, and a summary of the security design with ADR links) and `CONTRIBUTING.md` (setup, the pre-PR checklist matching CI and the inventory check, ADR expectations).
   - Verification: Claims checked against the code: `redactSecrets` is called in `rootCauseAgent.ts` (before the model) and `mcpServerFactory.ts` (MCP output); `.env.example`'s only prefilled values are local defaults (`NTFY_SERVER`, `SESSION_COOKIE_SECURE`, `MCP_HTTP_PORT`, `PG_VECTOR_*`); `inventory` and `inventory:check` scripts exist in `mcp-server/package.json`. Private vulnerability reporting is currently disabled (`gh api .../private-vulnerability-reporting` returned `{"enabled":false}`); enabling it is a listed manual follow-up.
 
+- [x] Portfolio cleanup: pass the Claude review's credentials as action inputs
+  - Date: 2026-11-10
+  - Session: CC-20261110-2u8d
+  - What changed: `claude-code-review.yml` now passes the `PR_REVIEWER` secret through the action's `anthropic_api_key` input, and the workflow token through its `github_token` input, instead of an `ANTHROPIC_API_KEY` env var.
+  - Verification: Root cause from the failed `review` run on PR #16 (`gh run view 42932606931 --log-failed`): "Could not fetch an OIDC token. Did you remember to add `id-token: write`", i.e. the action ignored the env var and fell back to GitHub App OIDC login. `gh run list` shows the review had failed on every run since August. Both input names confirmed in the action's `action.yml` at the pinned SHA (459ad35, v1.0.194). YAML parsed with Ruby and the inputs read back. A passing run on GitHub is the remaining proof, after push.
+
