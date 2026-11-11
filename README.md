@@ -15,11 +15,9 @@ An AI operations platform that finds the root cause of SQL Server and infrastruc
 
 ## Demo
 
-<!-- TODO: record docs/media/demo.gif (shot list: docs/media/SHOT_LIST.md), then replace this comment with:
-![Incident to AI root cause to human approval to audit trail](docs/media/demo.gif)
--->
+![CoreOps in production: two services down; the Postgres fix is approved, executed and confirmed healthy; the Superset fix is rejected, so nothing runs](docs/media/demo.gif)
 
-The flow: an incident appears, Claude explains the likely root cause with cited evidence, an operator approves or rejects the proposed fix after MFA login, and the decision lands in the audit trail.
+Recorded on the production deployment: two services are down, the Postgres restart runs only after an approval and is confirmed healthy by a separate check, and the rejected Superset restart never runs. For incidents with evidence to analyse, Claude adds a root cause with cited evidence before the approval step.
 
 Check the production deployment without logging in:
 
