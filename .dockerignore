@@ -17,8 +17,7 @@ docs
 project-blueprint
 artifacts
 command-center
-coreops-dependency-map
-prompts
+tools
 scripts
 *.md
 .env

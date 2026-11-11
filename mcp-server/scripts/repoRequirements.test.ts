@@ -142,6 +142,14 @@ describe("buildRequirements", () => {
     expect(buildRequirements(root).requirements[0].evidence.code).toEqual(["mcp-server/src/guard.ts"]);
   });
 
+  it("archived change logs under docs/archive/ are not counted as documentation evidence", () => {
+    writeFileSync(join(root, "docs", "REQUIREMENTS.md"), "### REQ-001: Safety · must\n\nApproval required.\n");
+    mkdirSync(join(root, "docs", "archive"), { recursive: true });
+    writeFileSync(join(root, "docs", "archive", "PROGRESS-full.md"), "- [x] did something for REQ-001\n");
+    writeFileSync(join(root, "docs", "design.md"), "Design notes for REQ-001.\n");
+    expect(buildRequirements(root).requirements[0].evidence.docs).toEqual(["docs/design.md"]);
+  });
+
   it("boundary: no REQUIREMENTS.md and no plan still returns empty lists, not an error", () => {
     expect(buildRequirements(root)).toEqual({ requirements: [], stories: [] });
   });

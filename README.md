@@ -1,272 +1,159 @@
-# CoreOps — AI Operations Platform
+# CoreOps: AI operations with a human in control
 
-CoreOps is an AI operations platform for SQL Server, SSIS, SSRS, and Windows
-infrastructure: it monitors telemetry, correlates failures across services, uses
-Claude to reason about root cause and business impact, and proposes remediations —
-but nothing writes to a monitored system without a real, authenticated human
-approving it first, and every decision leaves a durable, reconstructable record of
-who approved what and when.
+An AI operations platform that finds the root cause of SQL Server and infrastructure incidents with Claude, and cannot change a production system until a verified human approves it.
 
-That last part is the design's actual center of gravity. Automation that ops teams
-can't audit or override doesn't get trusted into production; automation with no
-oversight at all is worse than the outage it's meant to prevent. CoreOps is built
-around the boundary between "the AI proposes" and "a verified human decides" being
-real, enforced in code, and provable after the fact — not a policy comment.
+[![CI](https://github.com/qninying/ai-operations-center/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/qninying/ai-operations-center/actions/workflows/ci.yml)
+[![Deploy](https://github.com/qninying/ai-operations-center/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/qninying/ai-operations-center/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node 22](https://img.shields.io/badge/node-22.x-339933?logo=node.js&logoColor=white)](mcp-server/package.json)
+
+> - **What it is:** monitors SQL Server, SSIS, SSRS and Windows telemetry, correlates failures across systems, has Claude propose a root cause and a fix, and routes every fix through an MFA-verified human approval gate with a full audit trail.
+> - **My role:** sole engineer: architecture, build, tests, deployment and operations.
+> - **Stack:** TypeScript, Node 22, React + Vite, Claude API, Model Context Protocol (MCP), SQL Server, Postgres + pgvector, Docker, Fly.io, GitHub Actions.
+> - **Headline results:** 541 automated tests · 16 architecture decision records · in production on Fly.io · deploy failure rolled back in about 90 seconds in a live drill.
+> - **Live:** [coreops.fly.dev](https://coreops.fly.dev) · [Command Center](https://qninying.github.io/ai-operations-center/command-center/)
+
+## Demo
+
+<!-- TODO: record docs/media/demo.gif (shot list: docs/media/SHOT_LIST.md), then replace this comment with:
+![Incident to AI root cause to human approval to audit trail](docs/media/demo.gif)
+-->
+
+The flow: an incident appears, Claude explains the likely root cause with cited evidence, an operator approves or rejects the proposed fix after MFA login, and the decision lands in the audit trail.
+
+Check the production deployment without logging in:
+
+```bash
+curl https://coreops.fly.dev/health/dependencies
+```
+
+It reports each data source's mode (`live` or `fallback`) and its last outcome. A source that is down shows as down, never as live.
+
+## Key features
+
+**Governance and security**
+- Every production change needs an approval from the assigned, logged-in approver ([ADR-003](docs/ADR-003-session-based-authentication.md)).
+- TOTP multi-factor login, built on `node:crypto` and checked against the RFC test vectors ([ADR-006](docs/ADR-006-totp-mfa.md)).
+- Backup approver with its own identity takes over when an approval times out ([ADR-007](docs/ADR-007-second-approver-identity.md)).
+- MCP gateway gives AI agents read-only diagnostics behind bearer-token auth ([ADR-001](docs/ADR-001-mcp-transport-selection.md), [ADR-014](docs/ADR-014-mcp-roots-containment-order.md)).
+
+**AI reasoning**
+- Root-cause agent grounded in DMV evidence; below 80% confidence it returns a differential instead of one guess.
+- Every cited evidence ID, and every field and value behind a claim, is checked against the input ([ADR-008](docs/ADR-008-evidence-grounding-check.md), [ADR-009](docs/ADR-009-structured-claim-verification.md)).
+- Near-duplicate incidents reuse a recent judgment via local embeddings and pgvector ([ADR-015](docs/ADR-015-triage-semantic-cache-pgvector.md)).
+- Remediations follow DBA-style safety rules per source ([ADR-010](docs/ADR-010-sql-remediation-safety.md)).
+
+**Reliability**
+- Immutable audit trail, persisted and rotated, traceable by one correlation ID ([ADR-002](docs/ADR-002-audit-trail-correlation-id-unification.md), [ADR-005](docs/ADR-005-audit-trail-persistence.md)).
+- Timeouts, capped retries and circuit breakers on every upstream call.
+- Data sources are plug-in connectors with visible live/fallback status ([ADR-016](docs/ADR-016-plugin-connector-architecture.md)).
+- Two execution paths act on real systems: Docker restart and Postgres blocking-query kill ([ADR-012](docs/ADR-012-real-docker-execution.md), [ADR-013](docs/ADR-013-real-postgres-remediation.md)).
+
+**Operations and deployment**
+- Dockerized, deployed to Fly.io by GitHub Actions, with automatic rollback and paging on failure ([runbook](docs/DEPLOYMENT.md)).
+- Incident drill: broken health check caught by CI and rolled back in about 90 seconds ([write-up](docs/INCIDENT-DRILL-001.md)).
+
+Full detail, with code paths and how each item was verified: [docs/FEATURES.md](docs/FEATURES.md).
+
+## Architecture
 
 <img src="docs/diagrams/layer-diagram.svg" alt="Seven-layer pipeline: Data and Infrastructure up through Integration, Reasoning, and Orchestration to a Governance gate requiring human approval before an action executes, with Observability and Audit connected to every layer by one shared correlation ID." width="640">
 
-## See it running
-
-A real production deployment is live at
-[coreops.fly.dev](https://coreops.fly.dev) (Fly.io, STORY-012). Without
-credentials you'll hit the real login page, not a demo — that's the point,
-the human-approval gate is real, not a UI mockup. What's checkable with no
-login at all: `curl https://coreops.fly.dev/health/dependencies` returns the
-same honest `live`/`fallback` tagging described throughout this doc, live,
-right now — SQL Server currently reports `fallback` in this deployment, shown
-plainly rather than disguised as a live connection.
-
-To run it yourself:
-
-**You don't need real SQL Server access to try this.** If `SQLSERVER_*` is
-unset, the DMV read tool falls back to fixture data automatically, same for
-`AZURE_STORAGE_CONNECTION_STRING`/SSRS. The real setup step is auth, not
-infrastructure: generate a password hash and a TOTP secret first, since the
-server fails fast at startup without both.
-
-```bash
-cd mcp-server
-npm install
-cp .env.example .env
-npm run hash-password -- '<your password>'       # paste the result into AUTH_PASSWORD_HASH
-npm run generate-totp-secret                     # paste the result into MFA_TOTP_SECRET
-# fill in ANTHROPIC_API_KEY too — see .env.example for what's required vs. optional
-npm run http
-```
-
-Then open `http://localhost:8787/` — sign in at `/login`, then a live dashboard
-showing real SQL Server DMV incident data and a "Recommend Remediation" flow that
-runs the real guardrail, live, in the browser: propose an action, approve or reject
-it as the authenticated user, and watch the decision land in the audit trail.
-
-For the network-facing MCP transport (AI agents connecting over HTTP, not just
-local stdio):
-
-```bash
-cd mcp-server
-npm run http-mcp
-```
-
-See [`.env.example`](mcp-server/.env.example) for the auth setup both need.
-
-For the role-based Operations Console served the way it would be in a real
-deployment (one origin, no dev proxy, session cookies just work):
-
-```bash
-cd mcp-server
-npm run build-console
-npm run http
-```
-
-Then open `http://localhost:8787/console?role=it-manager`.
-
-## What's real
-
-Every claim below has a test behind it and was verified against a real running
-server, not just unit-tested. Current counts, re-run 2026-09-16: **457 tests
-passing** — 387 in `mcp-server/`, 70 in `guardrails/`, 6 in `frontend/` (the
-frontend count is source-verified — `grep -c "  it(" frontend/src/App.test.tsx`
-— rather than executed in every environment, since vitest's worker pool can be
-blocked by sandbox restrictions on spawning workers; it ran clean the last time
-it was executed).
-
-**Governance & security**
-- Session-based authentication (`mcp-server/src/auth/`) gates every route —
-  `scrypt` password hashing, `HttpOnly`+`SameSite=Strict` session cookies, no
-  raw credential ever touches client-side JS.
-- Real TOTP-based MFA (RFC 6238), hand-rolled with `node:crypto` — verified
-  against the published RFC test vectors, with drift-tolerant, replay-protected
-  code verification. Login requiring TOTP makes every session inherently
-  MFA-verified; a guardrail decision's `mfa` check used to be a hardcoded
-  placeholder — see [ADR-006](docs/ADR-006-totp-mfa.md) for the fix.
-- The human-approval guardrail (`guardrails/`) blocks any action lacking real
-  evidence, an allowed reversible type, or a genuine approval — and only the
-  assigned approver, verified by real login, can decide it. That check used to
-  compare a hardcoded value against itself and could never actually fail; see
-  [ADR-003](docs/ADR-003-session-based-authentication.md) for the fix.
-- A second, real approver identity with its own credentials and MFA, closing a
-  single-operator gap — the queue's escalate-to-backup-approver path was fully
-  tested but unreachable from the live server (the timeout check it depends on
-  was never called). Live-verified with a genuine 15-minute wait: a real second
-  human decided an item after real escalation, and the original approver was
-  locked out with a `403` naming the switch — see
-  [ADR-007](docs/ADR-007-second-approver-identity.md).
-- Rate limiting on every HTTP surface — closes a real, confirmed-absent gap
-  found during a trust audit, not a precaution added speculatively.
-- A network-facing MCP tool gateway (`mcp-server/src/httpMcpServer.ts`), gated
-  by bearer-token auth, giving AI agents read-only access to live diagnostics
-  with zero write privileges — see [ADR-001](docs/ADR-001-mcp-transport-selection.md).
-- Every confidence threshold this system acts on (insufficient-evidence,
-  differential-gathering, human-escalation) is configurable via env var,
-  validated and fail-fast on a malformed value rather than silently disabling
-  the gate it controls — `mcp-server/src/confidenceThresholds.ts`.
-- An evidence grounding check (`mcp-server/src/evidenceGroundingCheck.ts`)
-  cross-checks every AI recommendation's cited evidence IDs against the
-  evidence it was actually given, flagging a fabricated citation or a
-  diagnosis that cited nothing at all — closing the gap named by the hardest
-  question in Expo demo-prep review: what stops a confident-but-wrong
-  recommendation from reaching a human approver with no independent signal.
-  Live-verified against a real Claude response (no false positive) and a
-  deliberate break test proving the failure path actually renders — see
-  [ADR-008](docs/ADR-008-evidence-grounding-check.md). Extended one level
-  deeper by structured claim verification — the model now cites the exact
-  field and value backing each specific fact in its diagnosis, checked
-  against the real evidence, catching a citation that's real but misstated,
-  not just a fabricated one. Live-verified against a real Claude response
-  that complied correctly on the first attempt — see
-  [ADR-009](docs/ADR-009-structured-claim-verification.md). Neither check
-  makes human approval less necessary — only better-informed; the approval
-  gate itself is untouched by design.
-
-**Audit trail**
-- Every decision and action is recorded immutably and idempotently by ID
-  (`guardrails/auditLog.ts`), reconstructable end-to-end by correlation ID via
-  `GET /api/audit?correlationId=`.
-- Persisted to disk, not just in-memory — proven by killing the running server
-  mid-session and confirming a prior approval decision was still retrievable
-  afterward. See [ADR-005](docs/ADR-005-audit-trail-persistence.md).
-- Bounded by size-based rotation, never deletion — every entry ever recorded
-  stays queryable forever, split across numbered archive segments instead of
-  one unbounded file. Live-verified against a copy of the real, running
-  audit log's actual data, not synthetic data. See ADR-005's implementation
-  addendum.
-
-**Reasoning & reliability**
-- The Root Cause Analysis Agent (`mcp-server/src/rootCauseAgent.ts`) makes real
-  Claude Sonnet 5 calls over real DMV evidence — zod-validated output,
-  evidence-attributed, never fabricates a result when evidence is thin or the
-  API call fails. Below 80% confidence, it gathers a differential instead of
-  presenting one guess.
-- A generic timeout + capped-retry + circuit-breaker wrapper
-  (`mcp-server/src/reliability/`) around every upstream call — SQL Server and
-  the Anthropic API alike.
-- Live data is honestly tagged `live` vs. `fallback` — an unreachable SQL
-  Server is a visible notification, never a silent fixture substitution. The
-  same fixture-first pattern now also covers SSRS report-execution monitoring
-  (`mcp-server/src/ssrsReader.ts`, querying `ExecutionLog3`), and the pattern
-  itself has been live-verified against a real running open-source system
-  (Apache Superset — see `mcp-server/dev-superset/`), not just mocks.
-- The Docker/Postgres incident-and-restart capability above now has a second,
-  real target: `DEMO_TARGET=prod` (`mcp-server/src/demoTargetConfig.ts`)
-  points the same detection and restart code at `dev-postgres`/`dev-superset`
-  deployed as their own Fly apps, reached over Fly's private network (via
-  `.flycast`, not `.internal` — a real routing distinction found live, see
-  ADR-012's second addendum), restarted through the real Fly Machines API
-  (`mcp-server/src/flyMachinesExecutor.ts`) instead of a local `docker
-  restart`. Fully additive: unset, nothing about the original local-only
-  behavior changes. Live-verified against the actual deployed production
-  instance, not just unit-tested: a real stop/restart cycle for both targets,
-  watched end to end in `coreops`'s own production logs.
-- Cross-system correlation (REQ-017): `GET /api/correlated-recommendation`
-  (`mcp-server/src/correlatedRecommendationService.ts`) gathers live evidence
-  from SQL Server DMVs and SSRS together and hands it all to one root-cause
-  call, instead of the two single-source routes that came before it —
-  correlation happens at the LLM reasoning layer, not a fabricated join key
-  (the two systems' row shapes share no real key in this codebase). Degrades
-  honestly when one source is down (flags `partialCorrelation`, never silently
-  drops to single-source and calls it complete); live-verified against the
-  real current state of this deployment, where both sources are genuinely
-  unavailable for two different real reasons.
-- Semantic dedup for `triage_active_incidents` (`mcp-server/src/triageSemanticCache.ts`):
-  evidence text is embedded locally (`@huggingface/transformers`, no paid API) and
-  checked against a real **vector database** — a dedicated `pgvector`-backed
-  Postgres instance (`mcp-server/dev-vector-db/`) — so a near-duplicate incident
-  (same underlying issue, slightly different wording or values) reuses a recent
-  judgment instead of triggering a fresh AI call. Sits on top of an exact-match
-  cache for byte-identical evidence; entirely optional at runtime (`PG_VECTOR_HOST`
-  unset disables it with zero behavior change). Live-verified against a real
-  running container: a genuine near-duplicate matched at cosine distance 0.0047,
-  a genuinely different incident correctly did not match. See
-  [ADR-015](docs/ADR-015-triage-semantic-cache-pgvector.md).
-
-**Interfaces**
-- `dashboard.html` — the primary operations dashboard, `apiFetch()`-wrapped so
-  a session expiring mid-use redirects to `/login` instead of failing silently.
-- The Operations Console (`frontend/`, React + Vite) — role-based summaries,
-  an honest error state for any unrecognized role, served same-origin from
-  `mcp-server` itself in the deployment path (see
-  [ADR-004](docs/ADR-004-console-serving-topology.md)).
-
-## Architecture decisions
-
-Sixteen ADRs, each with real alternatives considered and rejected, not just the
-choice made:
-
-| ADR | Decision |
-|---|---|
-| [ADR-001](docs/ADR-001-mcp-transport-selection.md) | MCP transport selection — StreamableHTTP for network callers, stdio kept for local dev, bearer-token auth |
-| [ADR-002](docs/ADR-002-audit-trail-correlation-id-unification.md) | Unifying correlation IDs between the audit log and `mcp-server`'s operational logging |
-| [ADR-003](docs/ADR-003-session-based-authentication.md) | Session-based auth over JWT — no distributed system for JWT's statelessness to help with, and a JWT in `localStorage` sits in the same XSS exposure class an audit had just closed |
-| [ADR-004](docs/ADR-004-console-serving-topology.md) | Serving the built console from `mcp-server` itself, not a reverse proxy that doesn't exist yet |
-| [ADR-005](docs/ADR-005-audit-trail-persistence.md) | Append-only JSONL persistence for the audit trail, chosen over SQLite to avoid a first-ever database dependency; size-based rotation into numbered archives over time-based or deletion, added in a later addendum |
-| [ADR-006](docs/ADR-006-totp-mfa.md) | Real TOTP-based MFA over an ntfy-delivered OTP or WebAuthn — hand-rolled with `node:crypto`, and login itself requiring TOTP makes every session inherently MFA-verified, closing a hardcoded placeholder |
-| [ADR-007](docs/ADR-007-second-approver-identity.md) | A real second approver identity over a general N-user credential store — mirrors the existing single-user pattern for exactly the two roles the escalation model actually has |
-| [ADR-008](docs/ADR-008-evidence-grounding-check.md) | A citation-existence check, generic over opaque evidence, over a second "critic" LLM call (not actually independent) or per-source semantic verification (couples a shared module to three separately-evolving schemas) |
-| [ADR-009](docs/ADR-009-structured-claim-verification.md) | Structured claim-to-field verification over a fuzzy semantic/substring check — the model cites the exact field and value backing each fact, checked with an exact (not inferred) comparison, avoiding the false-positive risk a text-similarity check would carry |
-| [ADR-010](docs/ADR-010-sql-remediation-safety.md) | Source-aware remediation with real DBA-style safety judgment, over the single hardcoded demo action every incident previously proposed regardless of source |
-| [ADR-011](docs/ADR-011-moroccan-theme-system.md) | A shared day/night theme system across all three UI surfaces, restyled with zero business-logic, API, or routing changes |
-| [ADR-012](docs/ADR-012-real-docker-execution.md) | One real execution path — Docker/Superset restart — over extending real writes to SQL Server or IIS, since this is the one target already under direct, unprivileged, reversible control; execution and confirmation kept as two separate steps so a restart is never reported fixed until independently confirmed healthy |
-| [ADR-013](docs/ADR-013-real-postgres-remediation.md) | A second real execution path — a real Postgres blocking-query kill — over repurposing or renaming the existing demo Postgres container (rejected, breaks an unrelated working demo) or cloning the Docker case onto a second container (rejected, proves nothing new) |
-| [ADR-014](docs/ADR-014-mcp-roots-containment-order.md) | Resolve the real filesystem path first, compare against declared MCP roots second — the only order that closes a symlink or `../` traversal escape, verified against a real symlink and a real traversal attempt, not just reasoned about |
-| [ADR-015](docs/ADR-015-triage-semantic-cache-pgvector.md) | A dedicated pgvector container with local, in-process embeddings for near-duplicate incident matching, over a paid embeddings API (no per-call cost or new external failure mode) or skipping semantic matching entirely (misses the real near-duplicate pattern this tool actually sees) |
-| [ADR-016](docs/ADR-016-plugin-connector-architecture.md) | A read-only plug-in connector registry for data sources (one file plus one registry line to add a system; the feed, health report and Command Center read the registry), over dynamic folder loading (a stray file would silently go live) or a plugin framework (new dependency for a ~20-line contract); write paths deliberately stay hand-built and reviewed |
-
-The full architecture package — a written summary, layer diagrams, and a
-trust-boundary data-flow diagram — is in
-[`project-blueprint/expo/`](project-blueprint/expo/).
-
-## The core design guarantee
-
-Exactly one path in this system can write anything to a monitored server, and it
-can only act after a human explicitly approves a pending remediation. Every
-collector, every AI agent, and every read path is architecturally incapable of
-writing to production, not just policy-incapable. This is enforced in code and
-covered by tests — not just a design claim.
-
-## The design + planning layer
+Exactly one path can write to a monitored system, and only after a human approves a pending remediation. Collectors, AI agents and read paths have no write access at all.
 
 <img src="docs/diagrams/trust-boundaries.svg" alt="Data flows left to right from external sources, Azure SQL, the Claude API, and ntfy.sh, through a validating gateway and reasoning step, into the application where an operator views it, through a guardrail requiring the operator's real approval, before crossing back out to execute." width="720">
 
-| Path | What it is |
+| ADR | Decision |
 |---|---|
-| [`project-blueprint/architecture.md`](project-blueprint/architecture.md) | The full system architecture: 18 components, a Mermaid flowchart, a data-flow walkthrough, a 6-phase build order, and what the design deliberately doesn't cover. |
-| [`project-blueprint/tech-stack.md`](project-blueprint/tech-stack.md) | One fit-rated technology recommendation per component, plus alternatives considered. |
-| [`project-blueprint/requirements.md`](project-blueprint/requirements.md) | Per-requirement traceability (UNMAPPED / PLANNED / BUILT) — every claim points at a real test. |
-| [`project-blueprint/demo-script.md`](project-blueprint/demo-script.md) | A 90-second screencast script, every command verified against real output. |
+| [001](docs/ADR-001-mcp-transport-selection.md) | MCP over StreamableHTTP for network callers, stdio for local use, bearer-token auth |
+| [002](docs/ADR-002-audit-trail-correlation-id-unification.md) | One correlation ID shared by the audit log and operational logs |
+| [003](docs/ADR-003-session-based-authentication.md) | Server-side sessions over JWT: no distributed system to benefit, and no token in `localStorage` |
+| [004](docs/ADR-004-console-serving-topology.md) | Serve the built console from `mcp-server` on the same origin |
+| [005](docs/ADR-005-audit-trail-persistence.md) | Append-only JSONL audit trail over SQLite, with size-based rotation, never deletion |
+| [006](docs/ADR-006-totp-mfa.md) | TOTP MFA over emailed codes or WebAuthn; login itself requires it |
+| [007](docs/ADR-007-second-approver-identity.md) | A dedicated backup approver identity over a general user store |
+| [008](docs/ADR-008-evidence-grounding-check.md) | Citation-existence check over a second "critic" LLM call |
+| [009](docs/ADR-009-structured-claim-verification.md) | Exact claim-to-field verification over fuzzy text similarity |
+| [010](docs/ADR-010-sql-remediation-safety.md) | Source-aware remediation with DBA safety rules |
+| [011](docs/ADR-011-moroccan-theme-system.md) | One shared day/night theme across all three UIs |
+| [012](docs/ADR-012-real-docker-execution.md) | First real execution path: Docker restart, confirmed healthy before reported fixed |
+| [013](docs/ADR-013-real-postgres-remediation.md) | Second real execution path: Postgres blocking-query kill |
+| [014](docs/ADR-014-mcp-roots-containment-order.md) | Resolve the real path before checking MCP roots, closing symlink and `../` escapes |
+| [015](docs/ADR-015-triage-semantic-cache-pgvector.md) | Local embeddings and pgvector over a paid embeddings API |
+| [016](docs/ADR-016-plugin-connector-architecture.md) | Read-only connector registry over dynamic loading or a plugin framework |
 
-## Programme tracking (Command Center)
+The written architecture package (summary, layer diagrams, trust boundaries) is in [`project-blueprint/expo/`](project-blueprint/expo/).
 
-This repo also tracks a separate, formally-scoped programme (11 stories across 5
-releases, 18 requirements) in `.colaberry/plan.json` + `.colaberry/progress.json`,
-viewable via a local status dashboard:
+## Quick start
+
+Needs Node 22. No SQL Server, Azure or Anthropic account required: without them, data sources fall back to fixture data and say so.
 
 ```bash
-python3 -m http.server   # from the repo root
+git clone https://github.com/qninying/ai-operations-center.git
+cd ai-operations-center/mcp-server
+npm ci
+{
+  echo "AUTH_USERNAME=operator"
+  echo "AUTH_PASSWORD_HASH=$(npm run --silent hash-password -- 'change-me')"
+  npm run --silent generate-totp-secret | head -1
+} > .env
+npm run http
 ```
 
-Then open `http://localhost:8000/` (must be served over HTTP, not `file://`).
-Every tab has a Sample/Real toggle — Real shows exactly what's recorded in
-`.colaberry/progress.json`'s `verification` block, which the Colaberry
-platform owns and writes separately from the `passed`/`evidence` fields the
-coding session itself reports (see
-[`docs/DATA_CONTRACT.md`](docs/DATA_CONTRACT.md)). That's a real separation
-from a bare self-declaration, but this repo alone can't establish what the
-platform's own verification run consists of, so don't oversell it as
-independent human review unless you can point to what that process actually
-is.
+Open <http://localhost:8787/login> and sign in as `operator` / `change-me`. For the one-time code, add the TOTP secret from `.env` to an authenticator app, or run `npm run current-totp-code` in a second terminal.
 
-## Status
+Optional:
+- **AI root-cause analysis:** add `ANTHROPIC_API_KEY=...` to `.env`. Every other setting is documented in [`.env.example`](mcp-server/.env.example).
+- **Role-based Operations Console:** `npm run build-console && npm run http`, then open <http://localhost:8787/console?role=it-manager>.
+- **MCP over HTTP for AI agents:** set `MCP_API_TOKEN` in `.env`, then `npm run http-mcp`.
 
-Not a finished product — `project-blueprint/requirements.md` and
-`.colaberry/progress.json` are both honest about what's real vs. planned, with a
-test or an in-browser check for every claim. Nothing is marked done without one.
+## Testing
+
+541 tests, counted from a full run on 2026-11-10 with Node 22:
+
+| Package | Tests |
+|---|---|
+| `mcp-server/` | 465 |
+| `guardrails/` | 70 |
+| `frontend/` | 6 |
+
+```bash
+for d in mcp-server guardrails frontend; do (cd $d && npm ci && npm test); done
+```
+
+Type check: `npx tsc --noEmit` in `mcp-server/` and `guardrails/`, `npx tsc -b` in `frontend/`. Adversarial prompt-injection and jailbreak probes: `npm run eval:adversarial` in `mcp-server/` (calls the Claude API).
+
+## My contribution and AI usage
+
+<!-- TODO (Quincy): write this section in your own words. Suggested points: -->
+- **What I designed and decided:** TODO
+- **What I built myself vs. with AI assistance:** TODO
+- **How AI-written code was reviewed and verified:** TODO
+- **What I would do differently:** TODO
+
+## Status and roadmap
+
+In production and maintained. Open items:
+- Approved fixes for SQL Server, SSRS, SSIS, IIS and cloud sources run as clearly labeled stand-ins; only the Docker restart and Postgres blocking-query kill act on real systems ([ADR-012](docs/ADR-012-real-docker-execution.md)).
+- The time-saved target for manual incident correlation is defined but not yet measured.
+- The deployment runbook has not yet been tested by an engineer new to the project.
+
+Milestones: [CHANGELOG.md](CHANGELOG.md).
+
+## Repository layout
+
+| Path | Contents |
+|---|---|
+| `mcp-server/` | HTTP server, dashboard, AI agents, MCP server, connectors |
+| `guardrails/` | Approval guardrail and audit log |
+| `frontend/` | Role-based Operations Console (React) |
+| `command-center/` | Static project dashboard, published on GitHub Pages ([docs](docs/COMMAND_CENTER.md)) |
+| `docs/` | ADRs, runbooks, incident write-ups, [features](docs/FEATURES.md) |
+| `project-blueprint/` | Original architecture blueprint and Architect Expo package |
+| `tools/` | Python MCP server for service dependencies and audit history |
+| `.colaberry/`, `artifacts/` | Programme plan, progress and weekly deliverables synced from the Colaberry Enterprise AI Leadership Accelerator platform |
+| `.claude/`, `CLAUDE.md` | Claude Code configuration used during development |
+
+## License
+
+[MIT](LICENSE)

@@ -26,7 +26,7 @@ mcp = MCPServer("coreops-dependency-map")
 # an append-only JSONL file guardrails/auditLog.ts writes to, wired in production
 # via mcp-server/src/httpServer.ts. Read directly, not duplicated or mocked: this
 # is genuine incident history, not a sample.
-AUDIT_LOG_PATH = Path(__file__).parent.parent / "mcp-server" / "data" / "audit-log.jsonl"
+AUDIT_LOG_PATH = Path(__file__).resolve().parents[2] / "mcp-server" / "data" / "audit-log.jsonl"
 
 
 def _load_audit_entries() -> list[dict]:

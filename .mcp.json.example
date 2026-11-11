@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "coreops-mcp-server": {
+      "command": "npx",
+      "args": ["tsx", "mcp-server/src/index.ts"]
+    }
+  }
+}
