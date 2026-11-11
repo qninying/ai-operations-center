@@ -13,7 +13,7 @@ Usage:
     python3 scripts/score_prompt.py <path-to-prompt-file> <path-to-eval.jsonl>
 
 Example:
-    python3 scripts/score_prompt.py prompts/classify-incident-severity/prompt.txt prompts/classify-incident-severity/eval.jsonl
+    python3 scripts/score_prompt.py docs/process/prompts/classify-incident-severity/v1.0.1.md docs/process/prompts/classify-incident-severity/eval.jsonl
 
 Usage note on scores: claude-sonnet-5 doesn't allow pinning down a
 "temperature" setting (confirmed by actually trying it — the API rejects it

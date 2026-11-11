@@ -1343,3 +1343,9 @@ heading and tagged with the Session ID that made the change.
   - What changed: Added `coverage/`, `*.tsbuildinfo`, `*.log`, `npm-debug.log*`, `.vscode/`, `.idea/`, `*.swp` and `audit-log*.jsonl` to `.gitignore` (`.env`, `node_modules/`, `dist/`, `.DS_Store` and `mcp-server/data/` were already covered).
   - Verification: `git ls-files` filtered for logs, coverage, tsbuildinfo, editor folders, dist, node_modules and audit JSONL returned nothing tracked, so no `git rm --cached` was needed (the `prompts/*/eval.jsonl` files are prompt-eval datasets, not audit data, and stay tracked).
 
+- [x] Portfolio cleanup: move build-process material out of the repo root
+  - Date: 2026-11-10
+  - Session: CC-20261110-2u8d
+  - What changed: `git mv` of `BuildIdeaPrompt.txt`, `skills.md` and `prompts/` into `docs/process/`, added `docs/process/README.md` explaining each, and updated the usage example in `scripts/score_prompt.py` (it also pointed at a `prompt.txt` that no longer existed; now points at the real `v1.0.1.md`).
+  - Verification: `git grep` found no code, workflow, Docker or GitHub Pages reference to these paths (only the score_prompt.py docstring, now updated, and `skills.md`'s relative link to `BuildIdeaPrompt.txt`, which moved with it). Colaberry-managed files (`.colaberry/`, `artifacts/`, `docs/stories/`, requirements/stories/traceability docs, `CLAUDE.md`) untouched.
+
