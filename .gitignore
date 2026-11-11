@@ -15,6 +15,9 @@ dist/
 # OS cruft
 .DS_Store
 
+# Local MCP client config (holds machine-specific paths); copy .mcp.json.example
+.mcp.json
+
 # Runtime data (ADR-005: the persisted audit-trail JSONL file) — generated at
 # runtime, not source, and may contain operational detail not meant for the repo.
 mcp-server/data/
