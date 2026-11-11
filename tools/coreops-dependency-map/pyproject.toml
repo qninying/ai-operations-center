@@ -1,7 +1,7 @@
 [project]
 name = "coreops-dependency-map"
 version = "0.1.0"
-description = "Add your description here"
+description = "MCP server exposing CoreOps service dependencies and audit-log history"
 readme = "README.md"
 authors = [
     { name = "Quincy Ninying", email = "qninying@gmail.com" }

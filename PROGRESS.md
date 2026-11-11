@@ -1349,3 +1349,9 @@ heading and tagged with the Session ID that made the change.
   - What changed: `git mv` of `BuildIdeaPrompt.txt`, `skills.md` and `prompts/` into `docs/process/`, added `docs/process/README.md` explaining each, and updated the usage example in `scripts/score_prompt.py` (it also pointed at a `prompt.txt` that no longer existed; now points at the real `v1.0.1.md`).
   - Verification: `git grep` found no code, workflow, Docker or GitHub Pages reference to these paths (only the score_prompt.py docstring, now updated, and `skills.md`'s relative link to `BuildIdeaPrompt.txt`, which moved with it). Colaberry-managed files (`.colaberry/`, `artifacts/`, `docs/stories/`, requirements/stories/traceability docs, `CLAUDE.md`) untouched.
 
+- [x] Portfolio cleanup: move the Python dependency-map MCP server into tools/
+  - Date: 2026-11-10
+  - Session: CC-20261110-2u8d
+  - What changed: `git mv coreops-dependency-map tools/`. Its `AUDIT_LOG_PATH` was `Path(__file__).parent.parent / "mcp-server"`, which would break one level deeper, so it is now `Path(__file__).resolve().parents[2] / "mcp-server"` (same target file). Filled the empty README and the placeholder pyproject description; `.dockerignore` now excludes `tools` (and drops the stale `prompts` line; `docs/` already covers it).
+  - Verification: Resolved the new `AUDIT_LOG_PATH` from the new location in Python: it is the same `mcp-server/data/audit-log.jsonl` the old path resolved to, and exists. `python3 -m py_compile` passes. The Dockerfile only COPYs `frontend/`, `mcp-server/` and `guardrails/*.ts`, so the image is unchanged.
+
