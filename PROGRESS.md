@@ -78,3 +78,9 @@ Older notes in the code and docs that say "see the PROGRESS.md entry" refer to t
   - What changed: Added `docs/media/demo.gif` (40.8 s, 800x792, 5.0 MB, looping) and replaced the README's placeholder with it, plus a caption describing exactly what it shows.
   - Verification: Cut with ffmpeg from the local production demo recording (6 clips: dashboard, monitoring, Postgres Fix and Approve, confirmed reachable and Resolved, Superset Reject), cropped to the app pane only so the slide window's local file path, bookmarks bar and Dock are excluded. Frames reviewed on a contact sheet: no secrets, only correlation IDs and the public GitHub username. Size is under GitHub's 10 MB inline limit. Caption says the root-cause step is not shown, because these two incidents are connectivity checks with no AI analysis.
 
+- [x] Portfolio cleanup: fill in the README's "My contribution and AI usage" section
+  - Date: 2026-11-10
+  - Session: CC-20261110-2u8d
+  - What changed: Replaced the four TODO placeholders with Quincy's role, the split between his work and Claude Code assistance, how AI-written code was verified, and two lessons learned (set up CI and monitoring on day one; check platform limits before designing the deploy).
+  - Verification: Wording drafted with Quincy and both lessons chosen by him. Facts checked against the repo history: 16 ADRs in `docs/`, the self-comparing approval check recorded in ADR-003, full CI added in this cleanup, the blue-green to rolling switch documented in `docs/DEPLOYMENT.md` and `deploy.yml`, and the review workflow's failed runs since August (`gh run list --workflow claude-code-review.yml`). No TODOs or em dashes remain in the README.
+
