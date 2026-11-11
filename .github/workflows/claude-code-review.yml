@@ -18,6 +18,9 @@ permissions:
 
 jobs:
   review:
+    # Dependabot-triggered runs only receive Dependabot secrets, so the Claude
+    # API key is missing and the review always failed on dependency bumps.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check out the pull request's code

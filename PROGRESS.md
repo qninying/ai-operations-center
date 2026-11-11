@@ -42,3 +42,9 @@ Older notes in the code and docs that say "see the PROGRESS.md entry" refer to t
   - What changed: Added `.github/workflows/ci.yml`: on every push and pull request, a 3-job matrix (`mcp-server`, `guardrails`, `frontend`) on Node 22 with npm caching runs `npm ci`, the type check (`tsc --noEmit`, or `tsc -b --noEmit` for the frontend) and `npm test`. Read-only token permissions, 15-minute timeout, superseded runs cancelled. Added the CI badge to the README.
   - Verification: `act` is not installed, so each matrix job was reproduced in its own fresh shallow clone of this branch (`git clone --depth 1`, matching CI's default checkout) under Node 22 with the job's exact commands: all three `npm ci` exit 0, all three type checks exit 0, tests 465/465, 70/70 and 6/6. The guardrails clone had no `mcp-server/node_modules`, confirming the jobs do not depend on each other. YAML parsed with Ruby `YAML.load_file`. Not yet run on GitHub (nothing pushed).
 
+- [x] Portfolio cleanup: skip the Claude code review on Dependabot pull requests
+  - Date: 2026-11-10
+  - Session: CC-20261110-2u8d
+  - What changed: `claude-code-review.yml`'s `review` job now has `if: github.actor != 'dependabot[bot]'`.
+  - Verification: Root cause from the failed run log of Dependabot PR #15 (`gh run view --log-failed`): "Secret source: Dependabot", so the Anthropic key is unavailable and the review fails on every dependency bump (all 5 open Dependabot PRs show `review: FAILURE`). Workflow YAML parsed with Ruby `YAML.load_file` and the `if` read back. Takes effect on GitHub after merge.
+
