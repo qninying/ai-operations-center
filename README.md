@@ -123,11 +123,12 @@ Type check: `npx tsc --noEmit` in `mcp-server/` and `guardrails/`, `npx tsc -b` 
 
 ## My contribution and AI usage
 
-<!-- TODO (Quincy): write this section in your own words. Suggested points: -->
-- **What I designed and decided:** TODO
-- **What I built myself vs. with AI assistance:** TODO
-- **How AI-written code was reviewed and verified:** TODO
-- **What I would do differently:** TODO
+- **What I designed and decided:** the architecture and its core rule, that only one path can write to production and only after an MFA-verified human approves. I made all 16 architecture decisions, including the alternatives I rejected, and owned deployment, the incident drill and production operations.
+- **What I built myself vs. with AI assistance:** I used Claude Code as a pair programmer for most of the implementation and tests. I set the requirements, reviewed every change and decided what shipped.
+- **How AI-written code was reviewed and verified:** nothing counted as done on the AI's word. Each change needed passing tests plus a check against the running system, recorded with its evidence in the progress log. Several "done" claims failed that check and were fixed, for example an approval check that compared a value against itself and could never fail.
+- **What I would do differently:**
+  - Set up CI and monitoring on day one. Full CI only arrived at the end, and a code review workflow failed silently for three months before I noticed. A check nobody watches is no check at all.
+  - Check the hosting platform's limits before designing the deploy. I planned blue-green deploys and only found at deploy time that Fly.io can't attach one storage volume to two machines, so I switched to rolling deploys, which bring a brief outage on every release ([deployment notes](docs/DEPLOYMENT.md)).
 
 ## Status and roadmap
 
