@@ -15,6 +15,12 @@ Older notes in the code and docs that say "see the PROGRESS.md entry" refer to t
 - [x] Portfolio cleanup: fix relative links in docs/process/skills.md after the move
   - Date: 2026-11-10
   - Session: CC-20261110-2u8d
-  - What changed: Five `](project-blueprint/...)` links in `docs/process/skills.md` now use `../../project-blueprint/`.
+  - What changed: Five relative links to project-blueprint files in `docs/process/skills.md` now climb two levels (`../../project-blueprint/`).
   - Verification: A link checker over every tracked `.md`/`.html` file (scratchpad `linkcheck.py`, run against `main` and against this branch's HEAD, diffing the two) reports zero new broken links after this fix.
+
+- [x] Portfolio cleanup: keep the archived progress log out of requirement evidence
+  - Date: 2026-11-10
+  - Session: CC-20261110-2u8d
+  - What changed: `requirementEvidence()` in `mcp-server/scripts/repoRequirements.mjs` now skips `docs/archive/`. Without it, moving the log under `docs/` made it count as documentation evidence for 24 requirement references and flipped one requirement from `no_evidence` to `documented_only` on the public Command Center. At the root it was never scanned, so this restores the previous output exactly.
+  - Verification: New test `archived change logs under docs/archive/ are not counted as documentation evidence` fails without the fix (1 failed, 17 passed) and passes with it (18/18). `node mcp-server/scripts/generateRepoInventory.mjs --check` passes again, so the committed `repo-inventory.json` is unchanged from `main`.
 

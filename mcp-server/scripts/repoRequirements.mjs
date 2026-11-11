@@ -81,6 +81,9 @@ export function requirementEvidence(repoRoot) {
     for (const full of walk(join(repoRoot, root))) {
       const rel = relative(repoRoot, full);
       if (TRACKING_DOCS.has(rel) || rel.startsWith("docs/stories/")) continue;
+      // Archived change logs mention many REQ ids in passing; a log entry is
+      // history, not documentation that a requirement is met.
+      if (rel.startsWith("docs/archive/")) continue;
       // The inventory generator's own files mention REQ ids as test fixtures;
       // counting them would make every requirement look tested.
       if (SELF_FILES.test(rel)) continue;
