@@ -6,14 +6,23 @@ __pycache__/
 
 # Build output
 dist/
+coverage/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
 
 # Secrets
 .env
 .env.*
 !.env.example
 
-# OS cruft
+# OS and editor cruft
 .DS_Store
+.vscode/
+.idea/
+*.swp
 
 # Local MCP client config (holds machine-specific paths); copy .mcp.json.example
 .mcp.json
@@ -21,6 +30,7 @@ dist/
 # Runtime data (ADR-005: the persisted audit-trail JSONL file) — generated at
 # runtime, not source, and may contain operational detail not meant for the repo.
 mcp-server/data/
+audit-log*.jsonl
 
 # Internal Colaberry operating contract — contains a real production server
 # IP/SSH command and an internal escalation email. Not for the public repo.

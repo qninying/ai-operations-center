@@ -1337,3 +1337,9 @@ heading and tagged with the Session ID that made the change.
   - What changed: Stopped tracking `.mcp.json` (its `cwd` was a local absolute path), added it to `.gitignore`, and added `.mcp.json.example` with no `cwd` (MCP clients launch from the repo root). The local file stays on disk, so local MCP use is unchanged.
   - Verification: `git check-ignore .mcp.json` confirms it is ignored; `git ls-files .mcp.json` is empty after the commit. gitleaks 8.30.1 full-history and working-tree scans found no real credentials (4 history hits are the fake fixtures in `evidenceRedaction.test.ts`; the ignored local `mcp-server/.env` has never been committed).
 
+- [x] Portfolio cleanup: extend .gitignore for logs, coverage, editor folders and audit-log data
+  - Date: 2026-11-10
+  - Session: CC-20261110-2u8d
+  - What changed: Added `coverage/`, `*.tsbuildinfo`, `*.log`, `npm-debug.log*`, `.vscode/`, `.idea/`, `*.swp` and `audit-log*.jsonl` to `.gitignore` (`.env`, `node_modules/`, `dist/`, `.DS_Store` and `mcp-server/data/` were already covered).
+  - Verification: `git ls-files` filtered for logs, coverage, tsbuildinfo, editor folders, dist, node_modules and audit JSONL returned nothing tracked, so no `git rm --cached` was needed (the `prompts/*/eval.jsonl` files are prompt-eval datasets, not audit data, and stay tracked).
+
