@@ -24,3 +24,9 @@ Older notes in the code and docs that say "see the PROGRESS.md entry" refer to t
   - What changed: `requirementEvidence()` in `mcp-server/scripts/repoRequirements.mjs` now skips `docs/archive/`. Without it, moving the log under `docs/` made it count as documentation evidence for 24 requirement references and flipped one requirement from `no_evidence` to `documented_only` on the public Command Center. At the root it was never scanned, so this restores the previous output exactly.
   - Verification: New test `archived change logs under docs/archive/ are not counted as documentation evidence` fails without the fix (1 failed, 17 passed) and passes with it (18/18). `node mcp-server/scripts/generateRepoInventory.mjs --check` passes again, so the committed `repo-inventory.json` is unchanged from `main`.
 
+- [x] Portfolio cleanup: move feature detail and Command Center docs out of the README
+  - Date: 2026-11-10
+  - Session: CC-20261110-2u8d
+  - What changed: Added `docs/FEATURES.md` (the README's long "What's real" detail, regrouped as governance and security, audit trail, AI reasoning, reliability, operations, interfaces, with code paths and ADR links) and `docs/COMMAND_CENTER.md` (what the Command Center shows, the live Pages URL, how to run it locally, and which files the Colaberry platform owns).
+  - Verification: Every code path named in `FEATURES.md` checked to exist with a shell loop (one fix: `dashboard.html` is `mcp-server/src/dashboard.html`); the Command Center's data paths read from its source (`../.colaberry/*.json`, `data/repo-inventory.json`), which is why it must be served from the repo root; `https://qninying.github.io/ai-operations-center/command-center/` returned 200 (the old README's instruction to open the repo root gives a 404 on Pages).
+
