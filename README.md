@@ -2,6 +2,7 @@
 
 An AI operations platform that finds the root cause of SQL Server and infrastructure incidents with Claude, and cannot change a production system until a verified human approves it.
 
+[![CI](https://github.com/qninying/ai-operations-center/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/qninying/ai-operations-center/actions/workflows/ci.yml)
 [![Deploy](https://github.com/qninying/ai-operations-center/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/qninying/ai-operations-center/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node 22](https://img.shields.io/badge/node-22.x-339933?logo=node.js&logoColor=white)](mcp-server/package.json)

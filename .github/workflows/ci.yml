@@ -1,0 +1,51 @@
+# Type check and test every package on every push and pull request.
+# deploy.yml runs the same tests as a gate before production, but only on main;
+# this gives every branch and pull request the same signal before merge.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: mcp-server
+            typecheck: npx tsc --noEmit
+          - package: guardrails
+            typecheck: npx tsc --noEmit
+          - package: frontend
+            typecheck: npx tsc -b --noEmit
+    defaults:
+      run:
+        working-directory: ${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ${{ matrix.package }}/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Type check
+        run: ${{ matrix.typecheck }}
+
+      - name: Test
+        run: npm test
