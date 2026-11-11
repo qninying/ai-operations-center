@@ -72,3 +72,9 @@ Older notes in the code and docs that say "see the PROGRESS.md entry" refer to t
   - What changed: `claude-code-review.yml` now passes the `PR_REVIEWER` secret through the action's `anthropic_api_key` input, and the workflow token through its `github_token` input, instead of an `ANTHROPIC_API_KEY` env var.
   - Verification: Root cause from the failed `review` run on PR #16 (`gh run view 42932606931 --log-failed`): "Could not fetch an OIDC token. Did you remember to add `id-token: write`", i.e. the action ignored the env var and fell back to GitHub App OIDC login. `gh run list` shows the review had failed on every run since August. Both input names confirmed in the action's `action.yml` at the pinned SHA (459ad35, v1.0.194). YAML parsed with Ruby and the inputs read back. A passing run on GitHub is the remaining proof, after push.
 
+- [x] Portfolio cleanup: add the README demo GIF
+  - Date: 2026-11-10
+  - Session: CC-20261110-2u8d
+  - What changed: Added `docs/media/demo.gif` (40.8 s, 800x792, 5.0 MB, looping) and replaced the README's placeholder with it, plus a caption describing exactly what it shows.
+  - Verification: Cut with ffmpeg from the local production demo recording (6 clips: dashboard, monitoring, Postgres Fix and Approve, confirmed reachable and Resolved, Superset Reject), cropped to the app pane only so the slide window's local file path, bookmarks bar and Dock are excluded. Frames reviewed on a contact sheet: no secrets, only correlation IDs and the public GitHub username. Size is under GitHub's 10 MB inline limit. Caption says the root-cause step is not shown, because these two incidents are connectivity checks with no AI analysis.
+
