@@ -48,3 +48,9 @@ Older notes in the code and docs that say "see the PROGRESS.md entry" refer to t
   - What changed: `claude-code-review.yml`'s `review` job now has `if: github.actor != 'dependabot[bot]'`.
   - Verification: Root cause from the failed run log of Dependabot PR #15 (`gh run view --log-failed`): "Secret source: Dependabot", so the Anthropic key is unavailable and the review fails on every dependency bump (all 5 open Dependabot PRs show `review: FAILURE`). Workflow YAML parsed with Ruby `YAML.load_file` and the `if` read back. Takes effect on GitHub after merge.
 
+- [x] Portfolio cleanup: bump setup-node to v7 in the inventory check
+  - Date: 2026-11-10
+  - Session: CC-20261110-2u8d
+  - What changed: `inventory-check.yml` now uses `actions/setup-node@v7`, matching `ci.yml` and Dependabot PR #6 (which only bumps `deploy.yml`; `inventory-check.yml` was added after that PR was opened).
+  - Verification: setup-node v7.0.0 release notes (from the PR #6 body) list only new cache outputs, a removed dummy `NODE_AUTH_TOKEN` export and a cache library update; this workflow uses none of the changed inputs (`node-version` only). YAML parsed with Ruby.
+
