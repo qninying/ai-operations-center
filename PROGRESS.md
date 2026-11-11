@@ -54,3 +54,9 @@ Older notes in the code and docs that say "see the PROGRESS.md entry" refer to t
   - What changed: `inventory-check.yml` now uses `actions/setup-node@v7`, matching `ci.yml` and Dependabot PR #6 (which only bumps `deploy.yml`; `inventory-check.yml` was added after that PR was opened).
   - Verification: setup-node v7.0.0 release notes (from the PR #6 body) list only new cache outputs, a removed dummy `NODE_AUTH_TOKEN` export and a cache library update; this workflow uses none of the changed inputs (`node-version` only). YAML parsed with Ruby.
 
+- [x] Portfolio cleanup: group GitHub Actions updates into one Dependabot PR
+  - Date: 2026-11-10
+  - Session: CC-20261110-2u8d
+  - What changed: `.github/dependabot.yml` now has a `groups.github-actions` rule matching `*`, so weekly action bumps arrive as one pull request instead of one per action (there are 5 open today, including a duplicate pair for `claude-code-action`).
+  - Verification: YAML parsed with Ruby and the group read back. Grouping takes effect on Dependabot's next run after merge to `main`.
+
