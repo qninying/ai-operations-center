@@ -60,3 +60,9 @@ Older notes in the code and docs that say "see the PROGRESS.md entry" refer to t
   - What changed: `.github/dependabot.yml` now has a `groups.github-actions` rule matching `*`, so weekly action bumps arrive as one pull request instead of one per action (there are 5 open today, including a duplicate pair for `claude-code-action`).
   - Verification: YAML parsed with Ruby and the group read back. Grouping takes effect on Dependabot's next run after merge to `main`.
 
+- [x] Portfolio cleanup: add SECURITY.md and CONTRIBUTING.md
+  - Date: 2026-11-10
+  - Session: CC-20261110-2u8d
+  - What changed: `SECURITY.md` (private reporting via the Security tab, scope including a no-scanning rule for the live deployment, and a summary of the security design with ADR links) and `CONTRIBUTING.md` (setup, the pre-PR checklist matching CI and the inventory check, ADR expectations).
+  - Verification: Claims checked against the code: `redactSecrets` is called in `rootCauseAgent.ts` (before the model) and `mcpServerFactory.ts` (MCP output); `.env.example`'s only prefilled values are local defaults (`NTFY_SERVER`, `SESSION_COOKIE_SECURE`, `MCP_HTTP_PORT`, `PG_VECTOR_*`); `inventory` and `inventory:check` scripts exist in `mcp-server/package.json`. Private vulnerability reporting is currently disabled (`gh api .../private-vulnerability-reporting` returned `{"enabled":false}`); enabling it is a listed manual follow-up.
+
